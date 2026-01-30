@@ -1,6 +1,46 @@
+# Python
 *venv/
 *.pyc
-*.DS_store
+__pycache__/
+
+# macOS
+*.DS_Store
+
+# Environment
 .env
-.claude/    
+.claude/
+
+# IDE
 .idea/
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+
+# Gradle
+*.hprof
+*.log
+
+# APK/Bundle files (keep in outputs if needed, but usually ignored)
+*.apk
+*.aab
+*.ap_
+
+# Signing
+*.jks
+*.keystore
+
+# iOS
+warnabrotha/warnabrotha.xcodeproj/xcuserdata/
+warnabrotha/warnabrotha.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Backend
+backend/__pycache__/
+backend/**/__pycache__/

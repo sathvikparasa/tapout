@@ -1,0 +1,195 @@
+package com.warnabrotha.app.data.repository
+
+import com.warnabrotha.app.data.api.ApiService
+import com.warnabrotha.app.data.model.*
+import javax.inject.Inject
+import javax.inject.Singleton
+
+sealed class Result<out T> {
+    data class Success<T>(val data: T) : Result<T>()
+    data class Error(val message: String) : Result<Nothing>()
+}
+
+@Singleton
+class AppRepository @Inject constructor(
+    private val apiService: ApiService,
+    private val tokenRepository: TokenRepository
+) {
+
+    suspend fun register(): Result<TokenResponse> {
+        return try {
+            val deviceId = tokenRepository.getOrCreateDeviceId()
+            val response = apiService.register(DeviceRegistration(deviceId))
+            if (response.isSuccessful && response.body() != null) {
+                val tokenResponse = response.body()!!
+                tokenRepository.saveToken(tokenResponse.accessToken)
+                Result.Success(tokenResponse)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Registration failed")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun verifyEmail(email: String): Result<EmailVerificationResponse> {
+        return try {
+            val deviceId = tokenRepository.getOrCreateDeviceId()
+            val response = apiService.verifyEmail(EmailVerificationRequest(email, deviceId))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Email verification failed")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getDeviceInfo(): Result<DeviceResponse> {
+        return try {
+            val response = apiService.getDeviceInfo()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get device info")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getParkingLots(): Result<List<ParkingLot>> {
+        return try {
+            val response = apiService.getParkingLots()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get parking lots")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getParkingLot(id: Int): Result<ParkingLotWithStats> {
+        return try {
+            val response = apiService.getParkingLot(id)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get parking lot")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun checkIn(lotId: Int): Result<ParkingSession> {
+        return try {
+            val response = apiService.checkIn(ParkingSessionCreate(lotId))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Check-in failed")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun checkOut(): Result<CheckoutResponse> {
+        return try {
+            val response = apiService.checkOut()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Check-out failed")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getCurrentSession(): Result<ParkingSession?> {
+        return try {
+            val response = apiService.getCurrentSession()
+            if (response.isSuccessful) {
+                Result.Success(response.body())
+            } else if (response.code() == 404) {
+                Result.Success(null)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get session")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun reportSighting(lotId: Int, notes: String? = null): Result<SightingResponse> {
+        return try {
+            val response = apiService.reportSighting(SightingCreate(lotId, notes))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to report sighting")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getFeed(lotId: Int): Result<FeedResponse> {
+        return try {
+            val response = apiService.getFeed(lotId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get feed")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun vote(sightingId: Int, voteType: String): Result<VoteResult> {
+        return try {
+            val response = apiService.vote(sightingId, VoteCreate(voteType))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to vote")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun removeVote(sightingId: Int): Result<VoteResult> {
+        return try {
+            val response = apiService.removeVote(sightingId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to remove vote")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getPrediction(lotId: Int): Result<PredictionResponse> {
+        return try {
+            val response = apiService.getPrediction(lotId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get prediction")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    fun hasToken(): Boolean = tokenRepository.hasToken()
+}

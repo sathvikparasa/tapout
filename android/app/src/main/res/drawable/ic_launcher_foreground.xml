@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- W letter for WarnABrotha -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,35 L38,75 L46,50 L54,75 L62,35 L70,35 L58,85 L50,85 L46,65 L42,85 L34,85 L22,35 Z"/>
+
+    <!-- Exclamation mark for warning -->
+    <path
+        android:fillColor="#CC0000"
+        android:pathData="M76,35 L82,35 L81,65 L77,65 Z"/>
+    <path
+        android:fillColor="#CC0000"
+        android:pathData="M76,70 L82,70 L82,78 L76,78 Z"/>
+</vector>

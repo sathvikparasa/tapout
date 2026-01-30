@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, text
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
@@ -48,17 +48,17 @@ async def get_sighting_with_votes(
     Returns:
         FeedSighting with vote information
     """
-    # Count upvotes and downvotes
-    vote_counts = await db.execute(
-        select(
-            func.count(case((Vote.vote_type == VoteTypeModel.UPVOTE, 1))).label("upvotes"),
-            func.count(case((Vote.vote_type == VoteTypeModel.DOWNVOTE, 1))).label("downvotes"),
-        )
-        .where(Vote.sighting_id == sighting.id)
+    # Count upvotes and downvotes using raw SQL to avoid enum type issues
+    upvote_result = await db.execute(
+        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'upvote'"),
+        {"sid": sighting.id}
     )
-    counts = vote_counts.one()
-    upvotes = counts.upvotes or 0
-    downvotes = counts.downvotes or 0
+    downvote_result = await db.execute(
+        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'downvote'"),
+        {"sid": sighting.id}
+    )
+    upvotes = upvote_result.scalar() or 0
+    downvotes = downvote_result.scalar() or 0
 
     # Get user's vote on this sighting
     user_vote_result = await db.execute(
@@ -358,17 +358,17 @@ async def get_sighting_votes(
             detail=f"Sighting {sighting_id} not found"
         )
 
-    # Count votes
-    vote_counts = await db.execute(
-        select(
-            func.count(case((Vote.vote_type == VoteTypeModel.UPVOTE, 1))).label("upvotes"),
-            func.count(case((Vote.vote_type == VoteTypeModel.DOWNVOTE, 1))).label("downvotes"),
-        )
-        .where(Vote.sighting_id == sighting_id)
+    # Count votes using raw SQL to avoid enum type issues
+    upvote_result = await db.execute(
+        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'upvote'"),
+        {"sid": sighting_id}
     )
-    counts = vote_counts.one()
-    upvotes = counts.upvotes or 0
-    downvotes = counts.downvotes or 0
+    downvote_result = await db.execute(
+        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'downvote'"),
+        {"sid": sighting_id}
+    )
+    upvotes = upvote_result.scalar() or 0
+    downvotes = downvote_result.scalar() or 0
 
     # Get user's vote
     user_vote_result = await db.execute(
