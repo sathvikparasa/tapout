@@ -1,29 +1,58 @@
 package com.warnabrotha.app.ui.theme
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
+import android.app.Activity
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-private val LightColorScheme = lightColorScheme(
-    primary = Win95Colors.TitleBar,
-    onPrimary = Win95Colors.TitleBarText,
-    secondary = Win95Colors.SafeGreen,
-    onSecondary = Color.White,
-    background = Win95Colors.WindowBackground,
-    onBackground = Win95Colors.TextPrimary,
-    surface = Win95Colors.ButtonFace,
-    onSurface = Win95Colors.TextPrimary,
-    error = Win95Colors.DangerRed,
-    onError = Color.White
+private val TacticalColorScheme = darkColorScheme(
+    primary = Amber500,
+    onPrimary = Black900,
+    primaryContainer = Amber600,
+    onPrimaryContainer = TextWhite,
+    secondary = Blue500,
+    onSecondary = Black900,
+    secondaryContainer = Black600,
+    onSecondaryContainer = TextWhite,
+    tertiary = Green500,
+    onTertiary = Black900,
+    error = Red500,
+    onError = TextWhite,
+    errorContainer = Red600,
+    onErrorContainer = TextWhite,
+    background = Black900,
+    onBackground = TextWhite,
+    surface = Black800,
+    onSurface = TextWhite,
+    surfaceVariant = Black700,
+    onSurfaceVariant = TextGray,
+    outline = Border,
+    outlineVariant = BorderLight,
 )
 
 @Composable
 fun WarnABrothaTheme(
     content: @Composable () -> Unit
 ) {
+    val view = LocalView.current
+
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = Black900.toArgb()
+            window.navigationBarColor = Black900.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+        }
+    }
+
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = TacticalColorScheme,
+        typography = AppTypography,
         content = content
     )
 }
