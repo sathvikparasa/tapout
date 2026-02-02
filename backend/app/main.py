@@ -45,15 +45,20 @@ async def seed_initial_data():
     """
     async with AsyncSessionLocal() as db:
         lots_to_seed = [
-            {"name": "Hutchinson Parking Structure", "code": "HUTCH", "latitude": 38.5382, "longitude": -121.7617},
-            {"name": "Memorial Union Parking Structure", "code": "MU", "latitude": 38.5425, "longitude": -121.7490},
+            {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.5382, "longitude": -121.7617},
+            {"name": "Quad Structure", "code": "MU", "latitude": 38.5425, "longitude": -121.7490},
+            {"name": "Parking Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
         ]
 
         for lot_data in lots_to_seed:
             result = await db.execute(select(ParkingLot).where(ParkingLot.code == lot_data["code"]))
-            if result.scalar_one_or_none() is None:
+            existing = result.scalar_one_or_none()
+            if existing is None:
                 db.add(ParkingLot(**lot_data, is_active=True))
                 logger.info(f"Seeded parking lot: {lot_data['name']}")
+            elif existing.name != lot_data["name"]:
+                existing.name = lot_data["name"]
+                logger.info(f"Updated parking lot name: {lot_data['code']} -> {lot_data['name']}")
 
         await db.commit()
 
