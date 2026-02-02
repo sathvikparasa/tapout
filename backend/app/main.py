@@ -44,23 +44,18 @@ async def seed_initial_data():
     Only adds data if the table is empty.
     """
     async with AsyncSessionLocal() as db:
-        # Check if we already have parking lots
-        result = await db.execute(select(ParkingLot).limit(1))
-        if result.scalar_one_or_none() is not None:
-            logger.info("Database already seeded, skipping")
-            return
+        lots_to_seed = [
+            {"name": "Hutchinson Parking Structure", "code": "HUTCH", "latitude": 38.5382, "longitude": -121.7617},
+            {"name": "Memorial Union Parking Structure", "code": "MU", "latitude": 38.5425, "longitude": -121.7490},
+        ]
 
-        # Add Hutchinson Parking Structure as the initial lot
-        hutchinson = ParkingLot(
-            name="Hutchinson Parking Structure",
-            code="HUTCH",
-            latitude=38.5382,
-            longitude=-121.7617,
-            is_active=True,
-        )
-        db.add(hutchinson)
+        for lot_data in lots_to_seed:
+            result = await db.execute(select(ParkingLot).where(ParkingLot.code == lot_data["code"]))
+            if result.scalar_one_or_none() is None:
+                db.add(ParkingLot(**lot_data, is_active=True))
+                logger.info(f"Seeded parking lot: {lot_data['name']}")
+
         await db.commit()
-        logger.info("Seeded initial parking lot: Hutchinson Parking Structure")
 
 
 async def run_scheduled_reminder_job():

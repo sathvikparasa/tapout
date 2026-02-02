@@ -40,7 +40,11 @@ class AppViewModel: ObservableObject {
     @Published var confirmationMessage = ""
 
     // Currently selected lot ID (default to first lot)
-    @Published var selectedLotId: Int = 1
+    @Published var selectedLotId: Int = 1 {
+        didSet {
+            UserDefaults.standard.set(selectedLotId, forKey: "selectedParkingLotId")
+        }
+    }
 
     private let api = APIClient.shared
     private let keychain = KeychainService.shared
@@ -52,8 +56,19 @@ class AppViewModel: ObservableObject {
         if keychain.getToken() != nil {
             isAuthenticated = true
             Task {
-                await loadInitialData()
+                await checkAuthAndLoad()
             }
+        }
+    }
+
+    private func checkAuthAndLoad() async {
+        do {
+            _ = try await api.getDeviceInfo()
+            await loadInitialData()
+        } catch {
+            // Token is stale or device no longer exists — force re-registration
+            isAuthenticated = false
+            keychain.clearAll()
         }
     }
 
@@ -128,8 +143,11 @@ class AppViewModel: ObservableObject {
             // Load parking lots
             parkingLots = try await api.getParkingLots()
 
-            // Set default selected lot if available
-            if let firstLot = parkingLots.first {
+            // Restore persisted lot selection, or default to first lot
+            let savedLotId = UserDefaults.standard.integer(forKey: "selectedParkingLotId")
+            if savedLotId != 0, parkingLots.contains(where: { $0.id == savedLotId }) {
+                selectedLotId = savedLotId
+            } else if let firstLot = parkingLots.first {
                 selectedLotId = firstLot.id
             }
 
