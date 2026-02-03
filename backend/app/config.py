@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     debug: bool = False
     api_version: str = "v1"
 
-    # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@db:5432/warnabrotha"
-    database_url_sync: str = "postgresql://postgres:postgres@db:5432/warnabrotha"
+    # Database (Supabase PostgreSQL)
+    database_url: str
+    database_url_sync: str
 
     # Authentication
     # Secret key for JWT token signing
