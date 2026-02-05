@@ -176,3 +176,10 @@ data class NotificationList(
 data class MarkReadRequest(
     @SerializedName("notification_ids") val notificationIds: List<Int>
 )
+
+// Global Stats
+data class GlobalStatsResponse(
+    @SerializedName("total_registered_devices") val totalRegisteredDevices: Int,
+    @SerializedName("total_parked") val totalParked: Int,
+    @SerializedName("total_sightings_today") val totalSightingsToday: Int
+)

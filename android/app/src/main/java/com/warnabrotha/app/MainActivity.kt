@@ -51,10 +51,13 @@ class MainActivity : ComponentActivity() {
                         MainScreen(
                             uiState = uiState,
                             onReportTaps = { viewModel.reportSighting() },
+                            onReportTapsAtLot = { lotId -> viewModel.reportSightingAtLot(lotId) },
                             onCheckIn = viewModel::checkIn,
+                            onCheckInAtLot = viewModel::checkInAtLot,
                             onCheckOut = viewModel::checkOut,
                             onRefresh = viewModel::refresh,
                             onLotSelected = viewModel::selectLot,
+                            onFeedFilterSelected = viewModel::selectFeedFilter,
                             onUpvote = { id -> viewModel.vote(id, "upvote") },
                             onDownvote = { id -> viewModel.vote(id, "downvote") },
                             onClearError = viewModel::clearError,

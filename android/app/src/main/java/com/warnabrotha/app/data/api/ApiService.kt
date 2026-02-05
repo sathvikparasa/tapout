@@ -73,4 +73,8 @@ interface ApiService {
 
     @POST("notifications/read")
     suspend fun markNotificationsRead(@Body request: MarkReadRequest): Response<Unit>
+
+    // Global Stats
+    @GET("stats")
+    suspend fun getGlobalStats(): Response<GlobalStatsResponse>
 }

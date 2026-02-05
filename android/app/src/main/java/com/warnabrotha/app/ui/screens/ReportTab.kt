@@ -38,6 +38,8 @@ fun ReportTab(
     parkingLots: List<ParkingLot>,
     currentSession: ParkingSession?,
     displayedProbability: Double,
+    totalParkedGlobal: Int,
+    totalRegisteredDevices: Int,
     isLoading: Boolean,
     onReportTaps: () -> Unit,
     onCheckIn: () -> Unit,
@@ -222,7 +224,7 @@ fun ReportTab(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SmallStat(
-                value = "${selectedLot?.activeParkers ?: 0}",
+                value = "$totalParkedGlobal",
                 label = "parked",
                 color = TextWhite
             )
@@ -232,8 +234,8 @@ fun ReportTab(
             )
             StatDivider()
             SmallStat(
-                value = "${(selectedLot?.activeParkers ?: 0) + (selectedLot?.recentSightings ?: 0) * 2}",
-                label = "active",
+                value = "$totalRegisteredDevices",
+                label = "users",
                 color = TextWhite
             )
         }

@@ -16,6 +16,12 @@
         android:theme="@style/Theme.WarnABrotha"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
+
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyAO5iZo7-WEaWswVff6G0hXljUqt5PDsv4" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

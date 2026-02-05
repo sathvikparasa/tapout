@@ -26,7 +26,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/api/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"https://tapout-485821.wl.r.appspot.com/api/v1/\"")
         }
         release {
             isMinifyEnabled = false
@@ -34,7 +34,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "BASE_URL", "\"https://api.warnabrotha.com/api/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"https://tapout-485821.wl.r.appspot.com/api/v1/\"")
         }
     }
     compileOptions {
@@ -83,6 +83,10 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Google Maps
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -27,10 +27,13 @@ import com.warnabrotha.app.ui.viewmodel.AppUiState
 fun MainScreen(
     uiState: AppUiState,
     onReportTaps: () -> Unit,
+    onReportTapsAtLot: (Int) -> Unit,
     onCheckIn: () -> Unit,
+    onCheckInAtLot: (Int) -> Unit,
     onCheckOut: () -> Unit,
     onRefresh: () -> Unit,
     onLotSelected: (Int) -> Unit,
+    onFeedFilterSelected: (Int?) -> Unit,
     onUpvote: (Int) -> Unit,
     onDownvote: (Int) -> Unit,
     onClearError: () -> Unit,
@@ -38,7 +41,13 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val newReportsCount = uiState.feed?.sightings?.count { it.minutesAgo < 30 } ?: 0
+
+    // Calculate new reports from all feed sightings
+    val newReportsCount = if (uiState.feedFilterLotId == null) {
+        uiState.allFeedSightings.count { it.minutesAgo < 30 }
+    } else {
+        uiState.feed?.sightings?.count { it.minutesAgo < 30 } ?: 0
+    }
 
     Box(
         modifier = modifier
@@ -52,12 +61,17 @@ fun MainScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
+                // Calculate global stats
+                val totalParkedGlobal = uiState.lotStats.values.sumOf { it.activeParkers }
+
                 when (selectedTab) {
                     0 -> ReportTab(
                         selectedLot = uiState.selectedLot,
                         parkingLots = uiState.parkingLots,
                         currentSession = uiState.currentSession,
                         displayedProbability = uiState.displayedProbability,
+                        totalParkedGlobal = totalParkedGlobal,
+                        totalRegisteredDevices = uiState.totalRegisteredDevices,
                         isLoading = uiState.isLoading,
                         onReportTaps = onReportTaps,
                         onCheckIn = onCheckIn,
@@ -68,12 +82,24 @@ fun MainScreen(
                     )
                     1 -> FeedTab(
                         parkingLots = uiState.parkingLots,
-                        selectedLotId = uiState.selectedLotId,
+                        feedFilterLotId = uiState.feedFilterLotId,
                         feed = uiState.feed,
+                        allFeedSightings = uiState.allFeedSightings,
+                        allFeedsTotalCount = uiState.allFeedsTotalCount,
                         isLoading = uiState.isLoading,
-                        onLotSelected = onLotSelected,
+                        onFeedFilterSelected = onFeedFilterSelected,
                         onUpvote = onUpvote,
                         onDownvote = onDownvote,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    2 -> MapTab(
+                        parkingLots = uiState.parkingLots,
+                        lotStats = uiState.lotStats,
+                        currentSession = uiState.currentSession,
+                        isLoading = uiState.isLoading,
+                        onCheckIn = onCheckInAtLot,
+                        onCheckOut = onCheckOut,
+                        onReportTaps = onReportTapsAtLot,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -143,6 +169,7 @@ private fun TacticalNavBar(
             .navigationBarsPadding(),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
+        // Tab 0: COMMAND
         NavTab(
             icon = Icons.Outlined.Shield,
             selectedIcon = Icons.Filled.Shield,
@@ -151,6 +178,7 @@ private fun TacticalNavBar(
             onClick = { onTabSelected(0) }
         )
 
+        // Tab 1: FEED with notification badge
         Box {
             NavTab(
                 icon = Icons.Outlined.Sensors,
@@ -168,6 +196,15 @@ private fun TacticalNavBar(
                 )
             }
         }
+
+        // Tab 2: MAP (rightmost)
+        NavTab(
+            icon = Icons.Outlined.Map,
+            selectedIcon = Icons.Filled.Map,
+            label = "MAP",
+            isSelected = selectedTab == 2,
+            onClick = { onTabSelected(2) }
+        )
     }
 }
 
