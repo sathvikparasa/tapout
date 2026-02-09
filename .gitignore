@@ -12,6 +12,7 @@ __pycache__/
 .env.local
 .env.*.local
 .claude/
+backend/app.yaml
 
 # Secrets & API Keys
 *.secret
