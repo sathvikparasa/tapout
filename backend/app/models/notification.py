@@ -39,7 +39,10 @@ class Notification(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, index=True)
-    notification_type = Column(Enum(NotificationType), nullable=False)
+    notification_type = Column(
+        Enum(NotificationType, name="notification_type", values_callable=lambda x: [e.value for e in x]),
+        nullable=False
+    )
     title = Column(String(255), nullable=False)
     message = Column(String(1000), nullable=False)
     parking_lot_id = Column(Integer, ForeignKey("parking_lots.id"), nullable=True)

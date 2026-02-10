@@ -25,6 +25,11 @@ data class EmailVerificationResponse(
     @SerializedName("email_verified") val emailVerified: Boolean
 )
 
+data class DeviceUpdate(
+    @SerializedName("push_token") val pushToken: String? = null,
+    @SerializedName("is_push_enabled") val isPushEnabled: Boolean? = null
+)
+
 data class DeviceResponse(
     val id: Int,
     @SerializedName("device_id") val deviceId: String,

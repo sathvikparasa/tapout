@@ -58,8 +58,9 @@ async def report_sighting(
             detail=f"Parking lot {sighting_data.parking_lot_id} not found"
         )
 
-    # Check for spam: prevent same device from reporting multiple times within 5 minutes
-    five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+    # Check for spam: prevent same device from reporting multiple times within cooldown period
+    # TODO: change back to minutes=5 after testing
+    five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=0)
     spam_check = await db.execute(
         select(TapsSighting)
         .where(
@@ -89,6 +90,7 @@ async def report_sighting(
         db=db,
         parking_lot_id=lot.id,
         parking_lot_name=lot.name,
+        parking_lot_code=lot.code,
     )
 
     return TapsSightingWithNotifications(

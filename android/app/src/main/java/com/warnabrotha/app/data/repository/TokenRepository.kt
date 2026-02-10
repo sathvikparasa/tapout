@@ -28,6 +28,7 @@ class TokenRepository @Inject constructor(
     companion object {
         private const val KEY_TOKEN = "auth_token"
         private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_PUSH_TOKEN = "push_token"
     }
 
     fun saveToken(token: String) {
@@ -52,4 +53,12 @@ class TokenRepository @Inject constructor(
     }
 
     fun hasToken(): Boolean = getToken() != null
+
+    fun savePushToken(token: String) {
+        sharedPreferences.edit().putString(KEY_PUSH_TOKEN, token).apply()
+    }
+
+    fun getPushToken(): String? {
+        return sharedPreferences.getString(KEY_PUSH_TOKEN, null)
+    }
 }

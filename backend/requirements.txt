@@ -2,6 +2,7 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 python-multipart==0.0.6
+gunicorn>=22.0.0
 
 # Database (Supabase PostgreSQL)
 sqlalchemy==2.0.25
@@ -17,6 +18,9 @@ python-jose[cryptography]==3.3.0
 
 # Push notifications (APNs)
 aioapns==3.1
+
+# Push notifications (FCM / Android)
+firebase-admin==6.4.0
 
 # HTTP client for external APIs
 httpx==0.26.0

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     apns_bundle_id: Optional[str] = None
     apns_use_sandbox: bool = True  # Use sandbox for development
 
+    # Firebase Cloud Messaging (Android push notifications)
+    firebase_credentials_json: Optional[str] = None  # JSON string or file path to service account key
+
     # Reminder settings
     parking_reminder_hours: int = 3  # Hours before sending checkout reminder
 

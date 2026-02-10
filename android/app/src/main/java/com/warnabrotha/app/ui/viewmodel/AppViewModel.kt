@@ -2,6 +2,7 @@ package com.warnabrotha.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
 import com.warnabrotha.app.data.model.*
 import com.warnabrotha.app.data.repository.AppRepository
 import com.warnabrotha.app.data.repository.Result
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class AppUiState(
@@ -31,7 +33,11 @@ data class AppUiState(
     val displayedProbability: Double = 0.0,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val successMessage: String? = null
+    val successMessage: String? = null,
+    // Notification fields
+    val pushToken: String? = null,
+    val notificationPermissionGranted: Boolean = false,
+    val unreadNotificationCount: Int = 0
 )
 
 @HiltViewModel
@@ -146,6 +152,8 @@ class AppViewModel @Inject constructor(
                     loadAllLotStats(lots)
                     // Load global stats (for homepage)
                     loadGlobalStats()
+                    // Load unread notification count
+                    fetchUnreadNotificationCount()
                 }
                 is Result.Error -> {
                     android.util.Log.e("AppViewModel", "Failed to load lots: ${lotsResult.message}")
@@ -403,6 +411,7 @@ class AppViewModel @Inject constructor(
 
     fun refresh() {
         _uiState.value.selectedLotId?.let { loadLotData(it) }
+        fetchUnreadNotificationCount()
         viewModelScope.launch {
             when (val sessionResult = repository.getCurrentSession()) {
                 is Result.Success -> {
@@ -419,5 +428,50 @@ class AppViewModel @Inject constructor(
 
     fun clearSuccessMessage() {
         _uiState.value = _uiState.value.copy(successMessage = null)
+    }
+
+    fun onNotificationPermissionResult(granted: Boolean) {
+        _uiState.value = _uiState.value.copy(notificationPermissionGranted = granted)
+        if (granted) {
+            fetchAndSyncPushToken()
+        }
+    }
+
+    private fun fetchAndSyncPushToken() {
+        viewModelScope.launch {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                updatePushToken(token)
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to get FCM token", e)
+            }
+        }
+    }
+
+    fun updatePushToken(token: String) {
+        viewModelScope.launch {
+            repository.savePushToken(token)
+            _uiState.value = _uiState.value.copy(pushToken = token)
+            try {
+                repository.updateDevice(pushToken = token, isPushEnabled = true)
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Failed to sync push token with backend", e)
+            }
+        }
+    }
+
+    fun fetchUnreadNotificationCount() {
+        viewModelScope.launch {
+            when (val result = repository.getUnreadNotifications()) {
+                is Result.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        unreadNotificationCount = result.data.unreadCount
+                    )
+                }
+                is Result.Error -> {
+                    android.util.Log.e("AppViewModel", "Failed to fetch unread count: ${result.message}")
+                }
+            }
+        }
     }
 }

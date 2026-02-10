@@ -226,5 +226,35 @@ class AppRepository @Inject constructor(
         }
     }
 
+    suspend fun updateDevice(pushToken: String? = null, isPushEnabled: Boolean? = null): Result<DeviceResponse> {
+        return try {
+            val response = apiService.updateDevice(DeviceUpdate(pushToken, isPushEnabled))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to update device")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getUnreadNotifications(): Result<NotificationList> {
+        return try {
+            val response = apiService.getUnreadNotifications()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get notifications")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
     fun hasToken(): Boolean = tokenRepository.hasToken()
+
+    fun getSavedPushToken(): String? = tokenRepository.getPushToken()
+
+    fun savePushToken(token: String) = tokenRepository.savePushToken(token)
 }
