@@ -16,6 +16,9 @@ interface ApiService {
     @GET("auth/me")
     suspend fun getDeviceInfo(): Response<DeviceResponse>
 
+    @PATCH("auth/me")
+    suspend fun updateDevice(@Body updates: DeviceUpdate): Response<DeviceResponse>
+
     // Parking Lots
     @GET("lots")
     suspend fun getParkingLots(): Response<List<ParkingLot>>
@@ -73,4 +76,8 @@ interface ApiService {
 
     @POST("notifications/read")
     suspend fun markNotificationsRead(@Body request: MarkReadRequest): Response<Unit>
+
+    // Global Stats
+    @GET("stats")
+    suspend fun getGlobalStats(): Response<GlobalStatsResponse>
 }

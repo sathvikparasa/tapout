@@ -4,6 +4,7 @@ WarnABrotha API - Main application entry point.
 A parking enforcement tracking app for UC Davis students.
 """
 
+import json
 import logging
 from contextlib import asynccontextmanager
 
@@ -77,6 +78,26 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting WarnABrotha API...")
+
+    # Initialize Firebase Admin SDK for FCM
+    if settings.firebase_credentials_json:
+        try:
+            import firebase_admin
+            from firebase_admin import credentials
+
+            cred_value = settings.firebase_credentials_json
+            if cred_value.strip().startswith('{'):
+                # JSON string (e.g., from env var in app.yaml)
+                cred = credentials.Certificate(json.loads(cred_value))
+            else:
+                # File path (e.g., for local development)
+                cred = credentials.Certificate(cred_value)
+            firebase_admin.initialize_app(cred)
+            logger.info("Firebase Admin SDK initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
+    else:
+        logger.warning("Firebase credentials not configured, FCM push notifications disabled")
 
     # Initialize database
     await init_db()

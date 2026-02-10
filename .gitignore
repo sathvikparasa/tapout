@@ -6,9 +6,37 @@ __pycache__/
 # macOS
 *.DS_Store
 
-# Environment
+# Environment & Secrets
 .env
+.env.*
+.env.local
+.env.*.local
 .claude/
+backend/app.yaml
+
+# Secrets & API Keys
+*.secret
+*.secrets
+secrets.json
+secrets.yaml
+secrets.yml
+**/secrets/
+api_keys.json
+api_keys.yaml
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Firebase / Google Services
+google-services.json
+GoogleService-Info.plist
+firebase*.json
+
+# AWS
+.aws/
+aws-credentials
+credentials.json
 
 # IDE
 .idea/
@@ -44,3 +72,13 @@ warnabrotha/warnabrotha.xcodeproj/project.xcworkspace/xcuserdata/
 # Backend
 backend/__pycache__/
 backend/**/__pycache__/
+
+# Android Secrets
+android/secrets.properties
+android/local.defaults.properties
+android/app/google-services.json
+
+# iOS Secrets
+warnabrotha/warnabrotha/Secrets.swift
+warnabrotha/warnabrotha/Config.swift
+warnabrotha/warnabrotha/APIKeys.swift

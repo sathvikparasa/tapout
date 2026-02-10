@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     debug: bool = False
     api_version: str = "v1"
 
-    # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@db:5432/warnabrotha"
-    database_url_sync: str = "postgresql://postgres:postgres@db:5432/warnabrotha"
+    # Database (Supabase PostgreSQL)
+    database_url: str
+    database_url_sync: str
 
     # Authentication
     # Secret key for JWT token signing
@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     apns_key_path: Optional[str] = None
     apns_bundle_id: Optional[str] = None
     apns_use_sandbox: bool = True  # Use sandbox for development
+
+    # Firebase Cloud Messaging (Android push notifications)
+    firebase_credentials_json: Optional[str] = None  # JSON string or file path to service account key
 
     # Reminder settings
     parking_reminder_hours: int = 3  # Hours before sending checkout reminder

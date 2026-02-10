@@ -5,6 +5,15 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.gms.google-services")
+}
+
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
 }
 
 android {
@@ -12,6 +21,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
+        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
         applicationId = "com.warnabrotha.app"
         minSdk = 26
         targetSdk = 35
@@ -26,7 +36,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/api/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"https://tapout-485821.wl.r.appspot.com/api/v1/\"")
         }
         release {
             isMinifyEnabled = false
@@ -34,7 +44,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "BASE_URL", "\"https://api.warnabrotha.com/api/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"https://tapout-485821.wl.r.appspot.com/api/v1/\"")
         }
     }
     compileOptions {
@@ -83,6 +93,17 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Google Maps
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
+    implementation("com.google.firebase:firebase-messaging")
+
+    // Coroutines support for Firebase Tasks (.await())
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

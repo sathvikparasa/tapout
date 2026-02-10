@@ -25,6 +25,11 @@ data class EmailVerificationResponse(
     @SerializedName("email_verified") val emailVerified: Boolean
 )
 
+data class DeviceUpdate(
+    @SerializedName("push_token") val pushToken: String? = null,
+    @SerializedName("is_push_enabled") val isPushEnabled: Boolean? = null
+)
+
 data class DeviceResponse(
     val id: Int,
     @SerializedName("device_id") val deviceId: String,
@@ -175,4 +180,11 @@ data class NotificationList(
 
 data class MarkReadRequest(
     @SerializedName("notification_ids") val notificationIds: List<Int>
+)
+
+// Global Stats
+data class GlobalStatsResponse(
+    @SerializedName("total_registered_devices") val totalRegisteredDevices: Int,
+    @SerializedName("total_parked") val totalParked: Int,
+    @SerializedName("total_sightings_today") val totalSightingsToday: Int
 )

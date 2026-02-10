@@ -1,11 +1,16 @@
 package com.warnabrotha.app
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -48,13 +53,30 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     else -> {
+                        val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                            ActivityResultContracts.RequestPermission()
+                        ) { granted ->
+                            viewModel.onNotificationPermissionResult(granted)
+                        }
+
+                        LaunchedEffect(Unit) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                viewModel.onNotificationPermissionResult(true)
+                            }
+                        }
+
                         MainScreen(
                             uiState = uiState,
                             onReportTaps = { viewModel.reportSighting() },
+                            onReportTapsAtLot = { lotId -> viewModel.reportSightingAtLot(lotId) },
                             onCheckIn = viewModel::checkIn,
+                            onCheckInAtLot = viewModel::checkInAtLot,
                             onCheckOut = viewModel::checkOut,
                             onRefresh = viewModel::refresh,
                             onLotSelected = viewModel::selectLot,
+                            onFeedFilterSelected = viewModel::selectFeedFilter,
                             onUpvote = { id -> viewModel.vote(id, "upvote") },
                             onDownvote = { id -> viewModel.vote(id, "downvote") },
                             onClearError = viewModel::clearError,

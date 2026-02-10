@@ -28,6 +28,14 @@ try:
 except ImportError:
     APNS_AVAILABLE = False
 
+# Conditional import for Firebase (FCM)
+try:
+    import firebase_admin
+    from firebase_admin import messaging as fcm_messaging
+    FCM_IMPORTABLE = True
+except ImportError:
+    FCM_IMPORTABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,6 +84,23 @@ class NotificationService:
             logger.error(f"Failed to initialize APNs client: {e}")
             return None
 
+    @staticmethod
+    def _is_fcm_token(token: str) -> bool:
+        """
+        Detect whether a push token is an FCM token (Android) or APNs token (iOS).
+
+        APNs tokens are 64 hex characters.
+        FCM tokens are longer and contain colons/alphanumeric characters.
+        """
+        if len(token) > 64 or ':' in token:
+            return True
+        # APNs tokens are exactly 64 hex chars
+        try:
+            int(token, 16)
+            return len(token) != 64
+        except ValueError:
+            return True
+
     @classmethod
     async def send_push_notification(
         cls,
@@ -85,10 +110,11 @@ class NotificationService:
         data: Optional[dict] = None
     ) -> bool:
         """
-        Send a push notification via APNs.
+        Send a push notification via FCM (Android) or APNs (iOS),
+        based on the token format.
 
         Args:
-            push_token: Device APNs token
+            push_token: Device push token
             title: Notification title
             body: Notification body
             data: Optional custom data payload
@@ -96,6 +122,20 @@ class NotificationService:
         Returns:
             True if notification was sent successfully
         """
+        if cls._is_fcm_token(push_token):
+            return await cls._send_fcm(push_token, title, body, data)
+        else:
+            return await cls._send_apns(push_token, title, body, data)
+
+    @classmethod
+    async def _send_apns(
+        cls,
+        push_token: str,
+        title: str,
+        body: str,
+        data: Optional[dict] = None
+    ) -> bool:
+        """Send a push notification via APNs (iOS)."""
         apns_client = cls._get_apns_client()
         if apns_client is None:
             logger.debug("APNs client not available, skipping push notification")
@@ -120,12 +160,63 @@ class NotificationService:
             response = await apns_client.send_notification(request)
 
             if not response.is_successful:
-                logger.warning(f"Push notification failed: {response.description}")
+                logger.warning(f"APNs push notification failed: {response.description}")
                 return False
 
             return True
         except Exception as e:
-            logger.error(f"Error sending push notification: {e}")
+            logger.error(f"Error sending APNs push notification: {e}")
+            return False
+
+    @classmethod
+    async def _send_fcm(
+        cls,
+        push_token: str,
+        title: str,
+        body: str,
+        data: Optional[dict] = None
+    ) -> bool:
+        """Send a push notification via Firebase Cloud Messaging (Android)."""
+        if not FCM_IMPORTABLE:
+            logger.warning("firebase-admin not installed, skipping FCM notification")
+            return False
+
+        # Check if Firebase app is initialized (happens at runtime in lifespan)
+        try:
+            firebase_admin.get_app()
+        except ValueError:
+            logger.warning("Firebase Admin SDK not initialized, skipping FCM notification")
+            return False
+
+        try:
+            import asyncio
+
+            # FCM data values must all be strings
+            str_data = {k: str(v) for k, v in (data or {}).items()}
+
+            message = fcm_messaging.Message(
+                token=push_token,
+                notification=fcm_messaging.Notification(title=title, body=body),
+                data=str_data,
+                android=fcm_messaging.AndroidConfig(
+                    priority="high",
+                    notification=fcm_messaging.AndroidNotification(
+                        channel_id="taps_alerts",
+                        sound="default",
+                    ),
+                ),
+            )
+
+            # firebase_admin.messaging.send() is synchronous — run in executor
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, fcm_messaging.send, message)
+            logger.info(f"FCM notification sent successfully: {response}")
+            return True
+        except fcm_messaging.UnregisteredError:
+            logger.warning(f"FCM token unregistered (stale): {push_token[:20]}...")
+            return False
+        except Exception as e:
+            logger.error(f"Error sending FCM notification: {e}")
             return False
 
     @staticmethod
@@ -168,7 +259,8 @@ class NotificationService:
         cls,
         db: AsyncSession,
         parking_lot_id: int,
-        parking_lot_name: str
+        parking_lot_name: str,
+        parking_lot_code: str = ""
     ) -> int:
         """
         Notify all users currently parked at a lot that TAPS was spotted.
@@ -177,6 +269,7 @@ class NotificationService:
             db: Database session
             parking_lot_id: ID of the parking lot
             parking_lot_name: Name of the parking lot for notification
+            parking_lot_code: Code of the parking lot
 
         Returns:
             Number of users notified
@@ -216,8 +309,10 @@ class NotificationService:
                     title=title,
                     body=message,
                     data={
-                        "type": "taps_spotted",
+                        "type": "TAPS_SPOTTED",
                         "parking_lot_id": parking_lot_id,
+                        "parking_lot_name": parking_lot_name,
+                        "parking_lot_code": parking_lot_code,
                     }
                 )
 
@@ -371,7 +466,7 @@ class NotificationService:
                 title=title,
                 body=message,
                 data={
-                    "type": "checkout_reminder",
+                    "type": "CHECKOUT_REMINDER",
                     "parking_lot_id": session.parking_lot_id,
                     "session_id": session.id,
                 }

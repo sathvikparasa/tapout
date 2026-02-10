@@ -33,14 +33,29 @@ import com.warnabrotha.app.ui.theme.*
 @Composable
 fun FeedTab(
     parkingLots: List<ParkingLot>,
-    selectedLotId: Int?,
+    feedFilterLotId: Int?,
     feed: FeedResponse?,
+    allFeedSightings: List<FeedSighting>,
+    allFeedsTotalCount: Int,
     isLoading: Boolean,
-    onLotSelected: (Int) -> Unit,
+    onFeedFilterSelected: (Int?) -> Unit,
     onUpvote: (Int) -> Unit,
     onDownvote: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Determine which sightings to display based on filter
+    val displayedSightings = if (feedFilterLotId == null) {
+        allFeedSightings
+    } else {
+        feed?.sightings ?: emptyList()
+    }
+
+    val totalCount = if (feedFilterLotId == null) {
+        allFeedsTotalCount
+    } else {
+        feed?.totalSightings ?: 0
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -67,26 +82,34 @@ fun FeedTab(
                 color = TextWhite
             )
             Text(
-                text = "${feed?.totalSightings ?: 0} reports",
+                text = "$totalCount reports",
                 style = MaterialTheme.typography.labelMedium,
-                color = if ((feed?.totalSightings ?: 0) > 0) Amber500 else TextMuted
+                color = if (totalCount > 0) Amber500 else TextMuted
             )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Lot selector
+        // Lot selector with ALL button at the leftmost position
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // ALL button - leftmost position
+            LotChip(
+                code = "ALL",
+                isSelected = feedFilterLotId == null,
+                onClick = { onFeedFilterSelected(null) }
+            )
+
+            // Individual lot chips
             parkingLots.forEach { lot ->
                 LotChip(
                     code = lot.code,
-                    isSelected = lot.id == selectedLotId,
-                    onClick = { onLotSelected(lot.id) }
+                    isSelected = lot.id == feedFilterLotId,
+                    onClick = { onFeedFilterSelected(lot.id) }
                 )
             }
         }
@@ -94,7 +117,7 @@ fun FeedTab(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Feed list
-        if (isLoading && feed == null) {
+        if (isLoading && displayedSightings.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -115,7 +138,7 @@ fun FeedTab(
                     )
                 }
             }
-        } else if (feed == null || feed.sightings.isEmpty()) {
+        } else if (displayedSightings.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -136,11 +159,12 @@ fun FeedTab(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(
-                    items = feed.sightings,
+                    items = displayedSightings,
                     key = { it.id }
                 ) { sighting ->
                     FeedItem(
                         sighting = sighting,
+                        showLotCode = feedFilterLotId == null, // Show lot code when viewing ALL
                         onUpvote = { onUpvote(sighting.id) },
                         onDownvote = { onDownvote(sighting.id) }
                     )
@@ -153,6 +177,7 @@ fun FeedTab(
 @Composable
 private fun FeedItem(
     sighting: FeedSighting,
+    showLotCode: Boolean = true,
     onUpvote: () -> Unit,
     onDownvote: () -> Unit
 ) {
@@ -196,7 +221,7 @@ private fun FeedItem(
                 )
             }
 
-            // Lot code
+            // Lot code (always show when ALL is selected, or when viewing specific lot)
             Text(
                 text = sighting.parkingLotCode ?: "Unknown",
                 style = MaterialTheme.typography.labelLarge,

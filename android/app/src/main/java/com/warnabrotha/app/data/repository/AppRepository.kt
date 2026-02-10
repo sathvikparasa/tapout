@@ -128,13 +128,22 @@ class AppRepository @Inject constructor(
 
     suspend fun reportSighting(lotId: Int, notes: String? = null): Result<SightingResponse> {
         return try {
+            android.util.Log.d("AppRepository", "Reporting sighting for lotId: $lotId")
             val response = apiService.reportSighting(SightingCreate(lotId, notes))
             if (response.isSuccessful && response.body() != null) {
                 Result.Success(response.body()!!)
             } else {
-                Result.Error(response.errorBody()?.string() ?: "Failed to report sighting")
+                val errorBody = response.errorBody()?.string()
+                val errorMsg = when {
+                    response.code() == 500 -> "Server error (500). Please try again."
+                    errorBody?.contains("detail") == true -> errorBody
+                    else -> errorBody ?: "Failed to report sighting (${response.code()})"
+                }
+                android.util.Log.e("AppRepository", "Report sighting failed: code=${response.code()}, body=$errorBody")
+                Result.Error(errorMsg)
             }
         } catch (e: Exception) {
+            android.util.Log.e("AppRepository", "Report sighting exception: ${e.message}", e)
             Result.Error(e.message ?: "Network error")
         }
     }
@@ -191,5 +200,61 @@ class AppRepository @Inject constructor(
         }
     }
 
+    suspend fun getAllFeeds(): Result<AllFeedsResponse> {
+        return try {
+            val response = apiService.getAllFeeds()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get all feeds")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getGlobalStats(): Result<GlobalStatsResponse> {
+        return try {
+            val response = apiService.getGlobalStats()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get global stats")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun updateDevice(pushToken: String? = null, isPushEnabled: Boolean? = null): Result<DeviceResponse> {
+        return try {
+            val response = apiService.updateDevice(DeviceUpdate(pushToken, isPushEnabled))
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to update device")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun getUnreadNotifications(): Result<NotificationList> {
+        return try {
+            val response = apiService.getUnreadNotifications()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to get notifications")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
     fun hasToken(): Boolean = tokenRepository.hasToken()
+
+    fun getSavedPushToken(): String? = tokenRepository.getPushToken()
+
+    fun savePushToken(token: String) = tokenRepository.savePushToken(token)
 }
