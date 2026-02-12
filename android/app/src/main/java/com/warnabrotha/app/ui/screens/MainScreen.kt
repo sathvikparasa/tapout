@@ -69,7 +69,7 @@ fun MainScreen(
                         selectedLot = uiState.selectedLot,
                         parkingLots = uiState.parkingLots,
                         currentSession = uiState.currentSession,
-                        displayedProbability = uiState.displayedProbability,
+                        prediction = uiState.prediction,
                         totalParkedGlobal = totalParkedGlobal,
                         totalRegisteredDevices = uiState.totalRegisteredDevices,
                         isLoading = uiState.isLoading,

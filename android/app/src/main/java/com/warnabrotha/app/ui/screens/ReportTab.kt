@@ -1,6 +1,5 @@
 package com.warnabrotha.app.ui.screens
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,12 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.warnabrotha.app.data.model.ParkingLot
 import com.warnabrotha.app.data.model.ParkingLotWithStats
 import com.warnabrotha.app.data.model.ParkingSession
+import com.warnabrotha.app.data.model.PredictionResponse
 import com.warnabrotha.app.ui.components.*
 import com.warnabrotha.app.ui.theme.*
 
@@ -37,7 +33,7 @@ fun ReportTab(
     selectedLot: ParkingLotWithStats?,
     parkingLots: List<ParkingLot>,
     currentSession: ParkingSession?,
-    displayedProbability: Double,
+    prediction: PredictionResponse?,
     totalParkedGlobal: Int,
     totalRegisteredDevices: Int,
     isLoading: Boolean,
@@ -168,7 +164,7 @@ fun ReportTab(
 
         Spacer(modifier = Modifier.weight(0.1f))
 
-        // === PRIMARY ACTIONS - HUGE BUTTONS ===
+        // === PRIMARY ACTIONS ===
         // Report Button
         BigSquareButton(
             text = "REPORT TAPS",
@@ -179,7 +175,7 @@ fun ReportTab(
             gradient = listOf(Red500, Red600),
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.8f)
+                .weight(0.5f)
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -195,7 +191,7 @@ fun ReportTab(
                 gradient = listOf(Black600, Black700),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.8f)
+                    .weight(0.5f)
             )
         } else {
             BigSquareButton(
@@ -208,48 +204,86 @@ fun ReportTab(
                 textColor = TextWhite,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.8f)
+                    .weight(0.5f)
             )
         }
 
-        Spacer(modifier = Modifier.weight(0.1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // === FOOTER - Stats ===
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Black800, RoundedCornerShape(12.dp))
-                .padding(vertical = 16.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SmallStat(
-                value = "$totalParkedGlobal",
-                label = "parked",
-                color = TextWhite
-            )
-            StatDivider()
-            RiskGaugeStat(
-                probability = displayedProbability
-            )
-            StatDivider()
-            SmallStat(
-                value = "$totalRegisteredDevices",
-                label = "users",
-                color = TextWhite
-            )
-        }
+        // === Risk Card ===
+        RiskCard(
+            riskLevel = prediction?.riskLevel ?: "MEDIUM",
+            riskMessage = prediction?.riskMessage ?: "Loading...",
+            modifier = Modifier.weight(0.4f)
+        )
     }
 }
 
 @Composable
-private fun StatDivider() {
-    Box(
-        modifier = Modifier
-            .width(1.dp)
-            .height(40.dp)
-            .background(Border)
-    )
+private fun RiskCard(
+    riskLevel: String,
+    riskMessage: String,
+    modifier: Modifier = Modifier
+) {
+    val riskColor = when (riskLevel) {
+        "HIGH" -> Red500
+        "MEDIUM" -> Amber500
+        "LOW" -> Green500
+        else -> TextMuted
+    }
+    val riskBars = when (riskLevel) {
+        "HIGH" -> 3
+        "MEDIUM" -> 2
+        "LOW" -> 1
+        else -> 2
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Black800, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Risk bars (3 bars of increasing height)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.height(48.dp)
+        ) {
+            for (i in 1..3) {
+                Box(
+                    modifier = Modifier
+                        .width(12.dp)
+                        .fillMaxHeight(fraction = i / 3f)
+                        .background(
+                            if (i <= riskBars) riskColor else Black600,
+                            RoundedCornerShape(2.dp)
+                        )
+                )
+            }
+        }
+
+        // Risk level + message stacked vertically
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = "$riskLevel RISK",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Black,
+                color = riskColor
+            )
+            Text(
+                text = riskMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextGray,
+                maxLines = 2
+            )
+        }
+    }
 }
 
 @Composable
@@ -303,96 +337,3 @@ private fun BigSquareButton(
     }
 }
 
-@Composable
-private fun SmallStat(
-    value: String,
-    label: String,
-    color: Color
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Black,
-            color = color
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            color = TextMuted,
-            letterSpacing = 1.sp
-        )
-    }
-}
-
-@Composable
-private fun RiskGaugeStat(
-    probability: Double
-) {
-    val riskLevel = when {
-        probability < 0.33 -> "Low"
-        probability < 0.66 -> "Med"
-        else -> "High"
-    }
-    val riskColor = when {
-        probability < 0.33 -> Green500
-        probability < 0.66 -> Amber500
-        else -> Red500
-    }
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Speedometer gauge
-        Box(
-            modifier = Modifier.size(48.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokeWidth = 5.dp.toPx()
-                val radius = (size.minDimension - strokeWidth) / 2
-                val center = Offset(size.width / 2, size.height / 2)
-
-                // Background arc (gray)
-                drawArc(
-                    color = Black600,
-                    startAngle = 135f,
-                    sweepAngle = 270f,
-                    useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-
-                // Filled arc based on probability
-                val sweepAngle = (probability * 270f).toFloat()
-                drawArc(
-                    color = riskColor,
-                    startAngle = 135f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-            }
-
-            // Risk level text inside gauge
-            Text(
-                text = riskLevel,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Black,
-                color = riskColor
-            )
-        }
-
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = "RISK",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            color = TextMuted,
-            letterSpacing = 1.sp
-        )
-    }
-}

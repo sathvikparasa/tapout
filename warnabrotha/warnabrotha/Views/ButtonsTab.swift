@@ -55,44 +55,24 @@ struct ButtonsTab: View {
                 alignment: .bottom
             )
 
-            // Probability Meter Section
-            VStack(alignment: .leading, spacing: 12) {
-                Win95ProbabilityMeter(
-                    probability: viewModel.displayedProbability,
-                    color: viewModel.probabilityColor
+            // Risk Card Section
+            HStack(spacing: 12) {
+                Win95RiskCard(
+                    riskLevel: viewModel.prediction?.riskLevel ?? "MEDIUM",
+                    riskMessage: viewModel.riskMessage
                 )
 
-                // Risk level and refresh
-                HStack {
-                    HStack(spacing: 6) {
-                        Text("Status:")
-                            .win95Font(size: 13)
-                            .foregroundColor(Win95Colors.textPrimary)
-
-                        Text(viewModel.riskLevelText)
-                            .win95Font(size: 13)
-                            .foregroundColor(riskTextColor)
-                    }
-
-                    Spacer()
-
-                    Button {
-                        Task { await viewModel.refresh() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 12))
-                            Text("Refresh")
-                                .win95Font(size: 12)
-                        }
+                Button {
+                    Task { await viewModel.refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12))
                         .foregroundColor(Win95Colors.textPrimary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                        .padding(8)
                         .background(Win95Colors.buttonFace)
                         .beveledBorder(raised: true, width: 1)
-                    }
-                    .buttonStyle(PlainButtonStyle())
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(16)
             .background(Win95Colors.windowBackground)
@@ -223,15 +203,6 @@ struct ButtonsTab: View {
         }
     }
 
-    private var riskTextColor: Color {
-        if viewModel.displayedProbability < 33 {
-            return Win95Colors.safeGreen
-        } else if viewModel.displayedProbability < 66 {
-            return Win95Colors.warningYellow
-        } else {
-            return Win95Colors.dangerRed
-        }
-    }
 }
 
 // MARK: - Windows 95 Status Bar

@@ -150,11 +150,18 @@ data class PredictionFactors(
 )
 
 data class PredictionResponse(
-    @SerializedName("parking_lot_id") val parkingLotId: Int,
+    // New fields
+    @SerializedName("risk_level") val riskLevel: String,
+    @SerializedName("risk_message") val riskMessage: String,
+    @SerializedName("last_sighting_lot_name") val lastSightingLotName: String?,
+    @SerializedName("last_sighting_lot_code") val lastSightingLotCode: String?,
+    @SerializedName("last_sighting_at") val lastSightingAt: String?,
+    @SerializedName("hours_since_last_sighting") val hoursSinceLastSighting: Double?,
+    // Backward-compatible fields
+    @SerializedName("parking_lot_id") val parkingLotId: Int?,
     @SerializedName("parking_lot_name") val parkingLotName: String?,
     @SerializedName("parking_lot_code") val parkingLotCode: String?,
     val probability: Double,
-    @SerializedName("risk_level") val riskLevel: String,
     @SerializedName("predicted_for") val predictedFor: String,
     val factors: PredictionFactors?,
     val confidence: Double?
