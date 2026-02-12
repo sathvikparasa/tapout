@@ -32,6 +32,10 @@ class AppViewModel: ObservableObject {
     @Published var displayedProbability: Double = 0
     @Published var isAnimatingProbability = false
 
+    // Notification state
+    @Published var notificationPermissionGranted = false
+    @Published var unreadNotificationCount = 0
+
     // UI state
     @Published var isLoading = false
     @Published var error: String?
@@ -100,6 +104,7 @@ class AppViewModel: ObservableObject {
                 isEmailVerified = true
                 showEmailVerification = false
                 await loadInitialData()
+                await requestNotificationPermission()
                 return true
             } else {
                 self.error = response.message
@@ -157,6 +162,9 @@ class AppViewModel: ObservableObject {
             // Load lot details and prediction
             await loadLotData()
 
+            // Fetch unread notification count
+            await fetchUnreadNotificationCount()
+
         } catch let apiError as APIClientError {
             if case .noToken = apiError {
                 isAuthenticated = false
@@ -191,6 +199,24 @@ class AppViewModel: ObservableObject {
 
     func refresh() async {
         await loadLotData()
+        await fetchUnreadNotificationCount()
+    }
+
+    // MARK: - Notifications
+
+    func requestNotificationPermission() async {
+        let granted = await PushNotificationService.shared.requestPermissionAndRegister()
+        notificationPermissionGranted = granted
+    }
+
+    func fetchUnreadNotificationCount() async {
+        do {
+            let list = try await api.getUnreadNotifications()
+            unreadNotificationCount = list.unreadCount
+        } catch {
+            // Non-critical — don't surface to UI
+            print("Failed to fetch unread notifications: \(error)")
+        }
     }
 
     // MARK: - Parking Actions

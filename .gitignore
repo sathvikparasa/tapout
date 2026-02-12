@@ -65,8 +65,7 @@ android/.cxx/
 *.keystore
 
 # iOS
-warnabrotha/warnabrotha.xcodeproj/xcuserdata/
-warnabrotha/warnabrotha.xcodeproj/project.xcworkspace/xcuserdata/
+*xcuserdata/
 *.xcuserstate
 
 # Backend

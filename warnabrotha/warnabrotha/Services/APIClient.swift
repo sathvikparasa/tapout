@@ -38,7 +38,7 @@ class APIClient {
 
     // Change this to your backend URL
     #if DEBUG
-    private let baseURL = "http://localhost:8000/api/v1"
+    private let baseURL = "https://tapout-485821.wl.r.appspot.com/api/v1"
     #else
     private let baseURL = "https://api.warnabrotha.com/api/v1"
     #endif
@@ -86,6 +86,11 @@ class APIClient {
 
     func getDeviceInfo() async throws -> DeviceResponse {
         return try await get(endpoint: "/auth/me")
+    }
+
+    func updateDevice(pushToken: String, isPushEnabled: Bool) async throws -> DeviceResponse {
+        let body = DeviceUpdate(pushToken: pushToken, isPushEnabled: isPushEnabled)
+        return try await patch(endpoint: "/auth/me", body: body)
     }
 
     // MARK: - Parking Lots
@@ -187,6 +192,16 @@ class APIClient {
         authenticated: Bool = true
     ) async throws -> T {
         var request = try buildRequest(endpoint: endpoint, method: "POST", authenticated: authenticated)
+        request.httpBody = try JSONEncoder().encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await execute(request)
+    }
+
+    private func patch<T: Decodable, B: Encodable>(
+        endpoint: String,
+        body: B
+    ) async throws -> T {
+        var request = try buildRequest(endpoint: endpoint, method: "PATCH")
         request.httpBody = try JSONEncoder().encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await execute(request)
