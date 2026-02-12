@@ -14,6 +14,7 @@ class KeychainService {
     private let serviceName = "com.warnabrotha.app"
     private let tokenKey = "auth_token"
     private let deviceIdKey = "device_id"
+    private let pushTokenKey = "push_token"
 
     private init() {}
 
@@ -29,6 +30,17 @@ class KeychainService {
 
     func deleteToken() -> Bool {
         return delete(key: tokenKey)
+    }
+
+    // MARK: - Push Token
+
+    @discardableResult
+    func savePushToken(_ token: String) -> Bool {
+        return save(key: pushTokenKey, value: token)
+    }
+
+    func getPushToken() -> String? {
+        return get(key: pushTokenKey)
     }
 
     // MARK: - Device ID

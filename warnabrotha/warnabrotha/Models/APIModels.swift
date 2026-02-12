@@ -53,6 +53,16 @@ struct EmailVerificationResponse: Codable {
     }
 }
 
+struct DeviceUpdate: Codable {
+    let pushToken: String?
+    let isPushEnabled: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case pushToken = "push_token"
+        case isPushEnabled = "is_push_enabled"
+    }
+}
+
 struct DeviceResponse: Codable {
     let id: Int
     let deviceId: String

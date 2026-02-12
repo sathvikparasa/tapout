@@ -65,7 +65,7 @@ android/.cxx/
 *.keystore
 
 # iOS
-*/xcuserdata/
+*xcuserdata/
 *.xcuserstate
 
 # Backend
