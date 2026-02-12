@@ -1,5 +1,5 @@
 """
-TAPS probability prediction API endpoints.
+TAPS risk prediction API endpoints.
 """
 
 from datetime import datetime, timezone
@@ -17,10 +17,32 @@ router = APIRouter(prefix="/predictions", tags=["Predictions"])
 
 
 @router.get(
+    "",
+    response_model=PredictionResponse,
+    summary="Get TAPS risk level",
+    description="Get the current TAPS risk level based on the most recent sighting across all lots."
+)
+async def get_prediction_global(
+    device: Device = Depends(get_current_device),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get TAPS risk prediction based on the most recent sighting globally.
+
+    Returns:
+    - Risk level (LOW, MEDIUM, HIGH)
+    - Risk bars count (1-3) for UI display
+    - Human-readable risk message
+    """
+    prediction = await PredictionService.predict(db=db)
+    return prediction
+
+
+@router.get(
     "/{lot_id}",
     response_model=PredictionResponse,
-    summary="Get TAPS probability",
-    description="Get the predicted probability of TAPS presence at a parking lot."
+    summary="Get TAPS risk level",
+    description="Get the current TAPS risk level. The lot_id is accepted for backward compatibility but risk is calculated globally."
 )
 async def get_prediction(
     lot_id: int,
@@ -28,33 +50,20 @@ async def get_prediction(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get TAPS probability prediction for a parking lot.
+    Get TAPS risk prediction for a parking lot.
 
-    Uses current time for the prediction. Returns:
-    - Probability (0.0 - 1.0)
-    - Risk level (LOW, MEDIUM, HIGH)
-    - Contributing factors with their weights
-    - Model confidence
+    The lot_id parameter is accepted for backward compatibility.
+    Risk is calculated globally based on the most recent sighting across all lots.
     """
-    try:
-        prediction = await PredictionService.predict(
-            db=db,
-            parking_lot_id=lot_id,
-            timestamp=datetime.now(timezone.utc),
-        )
-        return prediction
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    prediction = await PredictionService.predict(db=db)
+    return prediction
 
 
 @router.post(
     "",
     response_model=PredictionResponse,
-    summary="Get TAPS probability for specific time",
-    description="Get the predicted probability of TAPS presence at a specific time."
+    summary="Get TAPS risk level for specific time",
+    description="Get the TAPS risk level at a specific time."
 )
 async def predict_for_time(
     request: PredictionRequest,
@@ -62,22 +71,13 @@ async def predict_for_time(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get TAPS probability prediction for a specific time.
+    Get TAPS risk prediction for a specific time.
 
-    Useful for planning when to park - check probability at different times.
-
-    - **parking_lot_id**: ID of the parking lot
+    - **parking_lot_id**: Accepted for backward compatibility (ignored)
     - **timestamp**: Time to predict for (defaults to now)
     """
-    try:
-        prediction = await PredictionService.predict(
-            db=db,
-            parking_lot_id=request.parking_lot_id,
-            timestamp=request.timestamp or datetime.now(timezone.utc),
-        )
-        return prediction
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+    prediction = await PredictionService.predict(
+        db=db,
+        timestamp=request.timestamp or datetime.now(timezone.utc),
+    )
+    return prediction

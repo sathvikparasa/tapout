@@ -296,24 +296,31 @@ class AppViewModel: ObservableObject {
     // MARK: - Helpers
 
     var probabilityColor: Color {
-        let prob = displayedProbability / 100
-        if prob < 0.33 {
-            return .green
-        } else if prob < 0.66 {
-            return .yellow
-        } else {
-            return .red
+        guard let prediction = prediction else { return .gray }
+        switch prediction.riskLevel {
+        case "HIGH": return .red
+        case "MEDIUM": return .yellow
+        case "LOW": return .green
+        default: return .gray
         }
     }
 
     var riskLevelText: String {
-        let prob = displayedProbability / 100
-        if prob < 0.33 {
-            return "LOW RISK"
-        } else if prob < 0.66 {
-            return "MEDIUM RISK"
-        } else {
-            return "HIGH RISK"
+        guard let prediction = prediction else { return "UNKNOWN" }
+        return "\(prediction.riskLevel) RISK"
+    }
+
+    var riskMessage: String {
+        prediction?.riskMessage ?? "Loading..."
+    }
+
+    var riskBars: Int {
+        guard let prediction = prediction else { return 2 }
+        switch prediction.riskLevel {
+        case "HIGH": return 3
+        case "MEDIUM": return 2
+        case "LOW": return 1
+        default: return 2
         }
     }
 

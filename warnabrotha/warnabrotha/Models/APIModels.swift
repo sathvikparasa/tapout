@@ -284,21 +284,34 @@ struct PredictionFactors: Codable {
 }
 
 struct PredictionResponse: Codable {
-    let parkingLotId: Int
-    let parkingLotName: String
-    let parkingLotCode: String
-    let probability: Double
+    // New fields
     let riskLevel: String
+    let riskMessage: String
+    let lastSightingLotName: String?
+    let lastSightingLotCode: String?
+    let lastSightingAt: String?
+    let hoursSinceLastSighting: Double?
+
+    // Backward-compatible fields
+    let parkingLotId: Int?
+    let parkingLotName: String?
+    let parkingLotCode: String?
+    let probability: Double
     let predictedFor: String
-    let factors: PredictionFactors
-    let confidence: Double
+    let factors: PredictionFactors?
+    let confidence: Double?
 
     enum CodingKeys: String, CodingKey {
+        case riskLevel = "risk_level"
+        case riskMessage = "risk_message"
+        case lastSightingLotName = "last_sighting_lot_name"
+        case lastSightingLotCode = "last_sighting_lot_code"
+        case lastSightingAt = "last_sighting_at"
+        case hoursSinceLastSighting = "hours_since_last_sighting"
         case parkingLotId = "parking_lot_id"
         case parkingLotName = "parking_lot_name"
         case parkingLotCode = "parking_lot_code"
         case probability
-        case riskLevel = "risk_level"
         case predictedFor = "predicted_for"
         case factors, confidence
     }
