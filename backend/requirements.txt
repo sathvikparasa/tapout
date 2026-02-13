@@ -4,9 +4,12 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 gunicorn>=22.0.0
 
-# Database (Supabase PostgreSQL)
+# Database (Cloud SQL PostgreSQL)
 sqlalchemy==2.0.25
 asyncpg==0.29.0
+
+# GCP Secret Manager
+google-cloud-secret-manager==2.18.3
 
 # Validation and serialization
 pydantic==2.5.3
