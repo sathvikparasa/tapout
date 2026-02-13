@@ -1,8 +1,8 @@
 //
 //  EmailVerificationView.swift
-//  warnabrotha
+//  TapOut
 //
-//  Windows 95 style email verification - fullscreen layout.
+//  TapOut email verification — clean form with green accent.
 //
 
 import SwiftUI
@@ -14,84 +14,88 @@ struct EmailVerificationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Title bar
-            HStack(spacing: 6) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Win95Colors.titleBarText)
-
-                Text("Verify Email")
-                    .win95Font(size: 14)
-                    .foregroundColor(Win95Colors.titleBarText)
-
-                Spacer()
-
-                HStack(spacing: 2) {
-                    Win95TitleButton(symbol: "−")
-                    Win95TitleButton(symbol: "□")
-                    Win95TitleButton(symbol: "×")
+            // Back button area
+            HStack {
+                Button {
+                    viewModel.isAuthenticated = false
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColors.textPrimary)
+                        .frame(width: 44, height: 44)
                 }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                LinearGradient(
-                    colors: [Win95Colors.titleBarActive, Win95Colors.titleBarActive.opacity(0.85)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+                .buttonStyle(PlainButtonStyle())
 
-            // Content
-            VStack(spacing: 0) {
                 Spacer()
+            }
+            .padding(.horizontal, 12)
 
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Image(systemName: "envelope.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(Win95Colors.titleBarActive)
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Icon + Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "p.circle.fill")
+                            .font(.system(size: 48, weight: .light))
+                            .foregroundColor(AppColors.accent)
 
-                        Text("Email Verification")
-                            .win95Font(size: 18)
-                            .foregroundColor(Win95Colors.textPrimary)
-
-                        Text("Enter your UC Davis email to continue")
-                            .win95Font(size: 13)
-                            .foregroundColor(Win95Colors.textDisabled)
+                        VStack(spacing: 8) {
+                            Text("Verify Your Student Email")
+                                .displayFont(size: 24)
+                                .foregroundColor(AppColors.textPrimary)
+                                .tracking(-0.5)
+                                .multilineTextAlignment(.center)
+                        }
                     }
+                    .padding(.top, 24)
 
                     // Email input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("UC Davis Email:")
-                            .win95Font(size: 13)
-                            .foregroundColor(Win95Colors.textPrimary)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("UNIVERSITY EMAIL")
+                            .appFont(size: 10, weight: .bold)
+                            .tracking(1)
+                            .foregroundColor(AppColors.textMuted)
 
-                        TextField("you@ucdavis.edu", text: $email)
-                            .win95Font(size: 15)
-                            .foregroundColor(Win95Colors.textPrimary)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            .autocorrectionDisabled()
-                            .padding(12)
-                            .background(Win95Colors.inputBackground)
-                            .beveledBorder(raised: false, width: 1)
+                        HStack(spacing: 12) {
+                            TextField("yourname@ucdavis.edu", text: $email)
+                                .appFont(size: 16, weight: .medium)
+                                .foregroundColor(AppColors.textPrimary)
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.emailAddress)
+                                .autocorrectionDisabled()
 
-                        // Validation
-                        if !email.isEmpty {
-                            HStack(spacing: 6) {
-                                Image(systemName: isValidEmail ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .font(.system(size: 12))
-                                Text(isValidEmail ? "Valid email" : "Must end with @ucdavis.edu")
-                                    .win95Font(size: 12)
+                            if !email.isEmpty {
+                                Image(systemName: "envelope.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(isValidEmail ? AppColors.accent : AppColors.textMuted)
                             }
-                            .foregroundColor(isValidEmail ? Win95Colors.safeGreen : Win95Colors.dangerRed)
                         }
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppColors.cardBackground)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    email.isEmpty
+                                        ? AppColors.border
+                                        : (isValidEmail ? AppColors.accent : AppColors.danger),
+                                    lineWidth: 1
+                                )
+                        )
+
+                        // Validation hint
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12))
+                            Text("Must use UC Davis email address")
+                                .appFont(size: 12)
+                        }
+                        .foregroundColor(AppColors.textMuted)
                     }
                     .padding(.horizontal, 24)
 
-                    // Verify button
+                    // Submit button
                     Button {
                         Task {
                             isValidating = true
@@ -99,33 +103,41 @@ struct EmailVerificationView: View {
                             isValidating = false
                         }
                     } label: {
-                        Text(isValidating ? "Verifying..." : "Verify Email")
-                            .win95Font(size: 16)
-                            .foregroundColor(.white)
-                            .frame(width: 200, height: 48)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(isValidEmail ? Win95Colors.titleBarActive : Win95Colors.buttonShadow)
-                            )
+                        HStack(spacing: 8) {
+                            Text(isValidating ? "Verifying..." : "Submit")
+                                .appFont(size: 16, weight: .bold)
+
+                            if !isValidating {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9999)
+                                .fill(isValidEmail ? AppColors.accent : AppColors.textMuted)
+                        )
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(!isValidEmail || isValidating)
-                }
+                    .padding(.horizontal, 24)
 
-                Spacer()
+                    // Support link
+                    Text("Having trouble? **Contact Support**")
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textMuted)
 
-                // Privacy notice
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12))
-                    Text("We don't store your email address")
-                        .win95Font(size: 11)
+                    Spacer(minLength: 40)
                 }
-                .foregroundColor(Win95Colors.textDisabled)
-                .padding(.bottom, 24)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Win95Colors.windowBackground)
+        }
+        .background(AppColors.background)
+        .alert("Error", isPresented: $viewModel.showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.error ?? "An error occurred")
         }
     }
 

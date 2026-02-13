@@ -1,8 +1,8 @@
 //
 //  ButtonsTab.swift
-//  warnabrotha
+//  TapOut
 //
-//  Windows 95 style buttons tab with big half-screen action buttons.
+//  TapOut Dashboard — main home screen with check-in, report, risk meter.
 //
 
 import SwiftUI
@@ -15,168 +15,67 @@ struct ButtonsTab: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-        VStack(spacing: 0) {
-            // Location header with dropdown
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    showLotDropdown.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(Win95Colors.titleBarActive)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Lot selector
+                    lotSelector
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
 
-                    if let lot = viewModel.selectedLot {
-                        Text(lot.name)
-                            .win95Font(size: 18)
-                            .foregroundColor(Win95Colors.textPrimary)
-                    } else {
-                        Text("Select a location")
-                            .win95Font(size: 18)
-                            .foregroundColor(Win95Colors.textDisabled)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: showLotDropdown ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14))
-                        .foregroundColor(Win95Colors.textPrimary)
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .background(Win95Colors.windowBackground)
-            .overlay(
-                Rectangle()
-                    .fill(Win95Colors.buttonShadow.opacity(0.5))
-                    .frame(height: 1),
-                alignment: .bottom
-            )
-
-            // Risk Card Section
-            HStack(spacing: 12) {
-                Win95RiskCard(
-                    riskLevel: viewModel.prediction?.riskLevel ?? "MEDIUM",
-                    riskMessage: viewModel.riskMessage
-                )
-
-                Button {
-                    Task { await viewModel.refresh() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
-                        .foregroundColor(Win95Colors.textPrimary)
-                        .padding(8)
-                        .background(Win95Colors.buttonFace)
-                        .beveledBorder(raised: true, width: 1)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(16)
-            .background(Win95Colors.windowBackground)
-
-            // Divider
-            Rectangle()
-                .fill(Win95Colors.buttonShadow.opacity(0.5))
-                .frame(height: 1)
-
-            Spacer()
-
-            // Main buttons area - centered with consistent padding
-            VStack(spacing: 16) {
-                // Report TAPS button (RED - primary action)
-                Win95BigButton(
-                    title: "I SAW TAPS",
-                    subtitle: "Report a sighting",
-                    color: Win95Colors.dangerRed,
-                    height: 120
-                ) {
-                    showReportConfirmation = true
-                }
-
-                // Check-in/out button (secondary action)
-                if viewModel.isParked {
-                    Win95BigButton(
-                        title: "I'M LEAVING",
-                        subtitle: "from \(viewModel.currentSession?.parkingLotName ?? "lot")",
-                        color: Win95Colors.warningYellow,
-                        height: 72
-                    ) {
-                        Task {
-                            await viewModel.checkOut()
-                        }
-                    }
-                } else {
-                    Win95BigButton(
-                        title: "I PARKED HERE",
-                        subtitle: "Get TAPS alerts",
-                        color: Win95Colors.neutralGray,
-                        height: 72
-                    ) {
-                        Task {
-                            await viewModel.checkIn()
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-
-            Spacer()
-
-            // Status bar at bottom
-            Win95StatusBar(viewModel: viewModel)
-        }
-        .background(Win95Colors.windowBackground)
-
-        // Win95-styled dropdown overlay
-        if showLotDropdown {
-            VStack(spacing: 0) {
-                ForEach(viewModel.parkingLots) { lot in
-                    Button {
-                        viewModel.selectLot(lot.id)
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showLotDropdown = false
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if lot.id == viewModel.selectedLotId {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(Win95Colors.selectionText)
-                            } else {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 13))
-                                    .hidden()
+                    // Action buttons row
+                    HStack(spacing: 12) {
+                        // Check-in / Check-out button
+                        if viewModel.isParked {
+                            PrimaryButton(
+                                title: "CHECK OUT",
+                                icon: "arrow.right.circle",
+                                color: AppColors.warning,
+                                textColor: AppColors.textPrimary
+                            ) {
+                                Task { await viewModel.checkOut() }
                             }
-                            Text(lot.name)
-                                .win95Font(size: 16)
-                                .foregroundColor(
-                                    lot.id == viewModel.selectedLotId
-                                        ? Win95Colors.selectionText
-                                        : Win95Colors.textPrimary
-                                )
-                            Spacer()
+                        } else {
+                            PrimaryButton(
+                                title: "CHECK IN",
+                                icon: "p.circle.fill",
+                                color: AppColors.accent
+                            ) {
+                                Task { await viewModel.checkIn() }
+                            }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            lot.id == viewModel.selectedLotId
-                                ? Win95Colors.selectionBackground
-                                : Win95Colors.inputBackground
-                        )
+
+                        // Report button
+                        PrimaryButton(
+                            title: "REPORT TAPS",
+                            icon: "exclamationmark.triangle.fill",
+                            color: AppColors.danger
+                        ) {
+                            showReportConfirmation = true
+                        }
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .padding(.horizontal, 20)
+
+                    // Risk meter card
+                    riskMeterCard
+                        .padding(.horizontal, 20)
+
+                    // Recent activity
+                    recentActivitySection
+                        .padding(.horizontal, 20)
+
+                    Spacer(minLength: 20)
                 }
             }
-            .background(Win95Colors.inputBackground)
-            .beveledBorder(raised: false, width: 1)
-            .padding(.horizontal, 16)
-            .padding(.top, 50)
-        }
+            .background(AppColors.background)
 
-        } // ZStack
+            // Top bar
+            topBar
+
+            // Dropdown overlay
+            if showLotDropdown {
+                lotDropdownOverlay
+            }
+        }
         .alert("Report TAPS Sighting", isPresented: $showReportConfirmation) {
             TextField("Optional: Add details", text: $reportNotes)
             Button("Cancel", role: .cancel) {
@@ -203,87 +102,327 @@ struct ButtonsTab: View {
         }
     }
 
-}
+    // MARK: - Top Bar
 
-// MARK: - Windows 95 Status Bar
+    private var topBar: some View {
+        HStack {
+            Text("TapOut")
+                .displayFont(size: 24)
+                .foregroundColor(AppColors.textPrimary)
+                .tracking(-0.5)
 
-struct Win95StatusBar: View {
-    @ObservedObject var viewModel: AppViewModel
+            Spacer()
 
-    var body: some View {
-        HStack(spacing: 0) {
-            // Parked count
-            StatusBarItem(
-                icon: "car.fill",
-                text: "\(viewModel.selectedLot?.activeParkers ?? 0) parked"
-            )
+            Button {
+                // Notifications action placeholder
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 22))
+                        .foregroundColor(AppColors.textPrimary)
 
-            StatusBarDivider()
+                    if viewModel.unreadNotificationCount > 0 {
+                        Circle()
+                            .fill(AppColors.dangerBright)
+                            .frame(width: 10, height: 10)
+                            .offset(x: 2, y: -2)
+                    }
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            AppColors.background
+                .opacity(0.95)
+                .ignoresSafeArea(edges: .top)
+        )
+    }
 
-            // Reports count
-            StatusBarItem(
-                icon: "exclamationmark.triangle.fill",
-                text: "\(viewModel.selectedLot?.recentSightings ?? 0) reports"
-            )
+    // MARK: - Lot Selector
 
-            StatusBarDivider()
+    private var lotSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("SELECT PARKING ZONE")
+                .appFont(size: 10, weight: .bold)
+                .tracking(1)
+                .foregroundColor(AppColors.textMuted)
 
-            // Session status
-            if viewModel.isParked {
-                StatusBarItem(
-                    icon: "checkmark.circle.fill",
-                    text: "Parked",
-                    color: Win95Colors.safeGreen
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showLotDropdown.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppColors.accent)
+
+                    if let lot = viewModel.selectedLot {
+                        Text("\(lot.name) (\(lot.code))")
+                            .appFont(size: 16, weight: .semibold)
+                            .foregroundColor(AppColors.textPrimary)
+                    } else {
+                        Text("Select a location")
+                            .appFont(size: 16, weight: .medium)
+                            .foregroundColor(AppColors.textMuted)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: showLotDropdown ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppColors.textMuted)
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.cardBackground)
                 )
-            } else {
-                StatusBarItem(
-                    icon: "circle",
-                    text: "Not parked",
-                    color: Win95Colors.textDisabled
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(AppColors.border, lineWidth: 1)
                 )
             }
+            .buttonStyle(PlainButtonStyle())
         }
-        .frame(height: 28)
-        .background(Win95Colors.buttonFace)
-        .overlay(
-            Rectangle()
-                .fill(Win95Colors.buttonShadow)
-                .frame(height: 1),
-            alignment: .top
+        .padding(.top, 56) // space for top bar
+    }
+
+    // MARK: - Risk Meter Card
+
+    private var riskMeterCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Current Risk Meter")
+                    .appFont(size: 12, weight: .bold)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                    .foregroundColor(AppColors.textSecondary)
+
+                Spacer()
+
+                LiveBadge()
+            }
+
+            HStack(spacing: 12) {
+                RiskBadge(level: viewModel.prediction?.riskLevel ?? "UNKNOWN")
+
+                Text(viewModel.riskMessage)
+                    .appFont(size: 14, weight: .medium)
+                    .foregroundColor(AppColors.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: - Recent Activity
+
+    private var recentActivitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent Activity")
+                    .appFont(size: 14, weight: .bold)
+                    .foregroundColor(AppColors.textPrimary)
+
+                Spacer()
+
+                Button {
+                    Task { await viewModel.refresh() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("View Map")
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundColor(AppColors.accent)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppColors.accent)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            if let feed = viewModel.feed, let sighting = feed.sightings.first {
+                HStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppColors.danger)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppColors.dangerLight)
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(sighting.notes ?? "Taps spotted: \(sighting.parkingLotCode)")
+                            .appFont(size: 14, weight: .semibold)
+                            .foregroundColor(AppColors.textPrimary)
+                            .lineLimit(1)
+
+                        Text("\(sighting.minutesAgo)m ago")
+                            .appFont(size: 12)
+                            .foregroundColor(AppColors.textMuted)
+                    }
+
+                    Spacer()
+                }
+                .cardStyle(cornerRadius: 12)
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppColors.success)
+
+                    Text("No recent TAPS activity")
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle(cornerRadius: 12)
+            }
+        }
+    }
+
+    // MARK: - Lot Dropdown Overlay
+
+    private var lotDropdownOverlay: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: 152) // offset below lot selector
+
+            VStack(spacing: 0) {
+                ForEach(viewModel.parkingLots) { lot in
+                    Button {
+                        viewModel.selectLot(lot.id)
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showLotDropdown = false
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(
+                                    lot.id == viewModel.selectedLotId
+                                        ? AppColors.accent
+                                        : AppColors.textMuted
+                                )
+
+                            Text("\(lot.name) (\(lot.code))")
+                                .appFont(size: 14, weight: lot.id == viewModel.selectedLotId ? .bold : .regular)
+                                .foregroundColor(AppColors.textPrimary)
+
+                            Spacer()
+
+                            if lot.id == viewModel.selectedLotId {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(AppColors.accent)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(
+                            lot.id == viewModel.selectedLotId
+                                ? AppColors.accentVeryLight
+                                : Color.clear
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    if lot.id != viewModel.parkingLots.last?.id {
+                        Divider()
+                            .padding(.leading, 44)
+                    }
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(AppColors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(AppColors.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
+            .padding(.horizontal, 20)
+
+            Spacer()
+        }
+        .background(
+            Color.black.opacity(0.001) // tap-to-dismiss area
+                .onTapGesture {
+                    withAnimation { showLotDropdown = false }
+                }
         )
     }
 }
 
-struct StatusBarDivider: View {
+// MARK: - Status Bar (Bottom info)
+
+struct StatusInfoBar: View {
+    @ObservedObject var viewModel: AppViewModel
+
     var body: some View {
-        Rectangle()
-            .fill(Win95Colors.buttonShadow)
-            .frame(width: 1)
-            .padding(.vertical, 4)
+        HStack(spacing: 16) {
+            StatusInfoItem(
+                icon: "car.fill",
+                value: "\(viewModel.selectedLot?.activeParkers ?? 0)",
+                label: "Parked"
+            )
+
+            StatusInfoItem(
+                icon: "exclamationmark.triangle.fill",
+                value: "\(viewModel.selectedLot?.recentSightings ?? 0)",
+                label: "Reports"
+            )
+
+            if viewModel.isParked {
+                StatusInfoItem(
+                    icon: "checkmark.circle.fill",
+                    value: "Active",
+                    label: "Session",
+                    color: AppColors.success
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppColors.border, lineWidth: 1)
+        )
     }
 }
 
-struct StatusBarItem: View {
+struct StatusInfoItem: View {
     let icon: String
-    let text: String
-    var color: Color = Win95Colors.textPrimary
+    let value: String
+    let label: String
+    var color: Color = AppColors.textSecondary
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 11))
-            Text(text)
-                .win95Font(size: 12)
+                .font(.system(size: 12))
+                .foregroundColor(color)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value)
+                    .appFont(size: 14, weight: .bold)
+                    .foregroundColor(AppColors.textPrimary)
+                Text(label)
+                    .appFont(size: 10)
+                    .foregroundColor(AppColors.textMuted)
+            }
         }
-        .foregroundColor(color)
         .frame(maxWidth: .infinity)
     }
 }
 
 #Preview {
-    VStack(spacing: 0) {
-        Win95TitleBar(title: "WarnABrotha", icon: "car.fill")
-        ButtonsTab(viewModel: AppViewModel())
-    }
-    .background(Win95Colors.windowBackground)
+    ButtonsTab(viewModel: AppViewModel())
 }
