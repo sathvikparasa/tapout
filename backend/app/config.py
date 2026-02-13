@@ -1,10 +1,34 @@
 """
 Application configuration settings.
 Loads environment variables and provides typed configuration access.
+In production (GCP App Engine), secrets are loaded from Secret Manager.
 """
 
+import os
 from pydantic_settings import BaseSettings
 from typing import Optional
+
+GCP_PROJECT = "tapout-485821"
+SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON"]
+
+
+def _load_secrets_from_gcp():
+    """Load secrets from GCP Secret Manager into environment variables.
+    Only runs in production (when GAE_ENV is set)."""
+    if os.environ.get("GAE_ENV") != "standard":
+        return
+
+    from google.cloud import secretmanager
+
+    client = secretmanager.SecretManagerServiceClient()
+    for name in SECRET_NAMES:
+        if name not in os.environ:
+            secret_path = f"projects/{GCP_PROJECT}/secrets/{name}/versions/latest"
+            response = client.access_secret_version(request={"name": secret_path})
+            os.environ[name] = response.payload.data.decode("UTF-8")
+
+
+_load_secrets_from_gcp()
 
 
 class Settings(BaseSettings):
@@ -18,7 +42,7 @@ class Settings(BaseSettings):
     debug: bool = False
     api_version: str = "v1"
 
-    # Database (Supabase PostgreSQL)
+    # Database (Cloud SQL PostgreSQL)
     database_url: str
     database_url_sync: str
 
