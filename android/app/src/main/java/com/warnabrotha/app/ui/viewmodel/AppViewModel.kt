@@ -386,24 +386,30 @@ class AppViewModel @Inject constructor(
 
     fun vote(sightingId: Int, voteType: String) {
         viewModelScope.launch {
-            val currentVote = _uiState.value.feed?.sightings
-                ?.find { it.id == sightingId }?.userVote
+            // Check the correct data source based on current feed filter
+            val filterLotId = _uiState.value.feedFilterLotId
+            val currentVote = if (filterLotId == null) {
+                _uiState.value.allFeedSightings
+                    .find { it.id == sightingId }?.userVote
+            } else {
+                _uiState.value.feed?.sightings
+                    ?.find { it.id == sightingId }?.userVote
+            }
 
-            if (currentVote == voteType) {
-                // Remove vote
-                when (repository.removeVote(sightingId)) {
-                    is Result.Success -> {
-                        _uiState.value.selectedLotId?.let { loadLotData(it) }
-                    }
-                    is Result.Error -> { /* Handle error */ }
-                }
+            val result = if (currentVote == voteType) {
+                // Remove vote (toggle)
+                repository.removeVote(sightingId)
             } else {
                 // Add or change vote
-                when (repository.vote(sightingId, voteType)) {
-                    is Result.Success -> {
-                        _uiState.value.selectedLotId?.let { loadLotData(it) }
-                    }
-                    is Result.Error -> { /* Handle error */ }
+                repository.vote(sightingId, voteType)
+            }
+
+            if (result is Result.Success) {
+                // Refresh the correct feed view
+                if (filterLotId == null) {
+                    loadAllFeeds()
+                } else {
+                    loadFeedForLot(filterLotId)
                 }
             }
         }
