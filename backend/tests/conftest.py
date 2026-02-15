@@ -5,6 +5,7 @@ Provides database session, test client, and common test data.
 """
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Generator
 import uuid
 
@@ -151,3 +152,18 @@ async def unverified_auth_headers(test_device: Device) -> dict:
     """Get authentication headers for an unverified device."""
     token = AuthService.create_access_token(test_device.device_id)
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def active_session(db_session: AsyncSession, verified_device: Device, test_parking_lot: ParkingLot) -> ParkingSession:
+    """A parking session checked in 4 hours ago, no reminder sent."""
+    session = ParkingSession(
+        device_id=verified_device.id,
+        parking_lot_id=test_parking_lot.id,
+        checked_in_at=datetime.now(timezone.utc) - timedelta(hours=4),
+        reminder_sent=False,
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+    return session
