@@ -1,13 +1,12 @@
 package com.warnabrotha.app.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,7 +18,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.warnabrotha.app.ui.components.NotificationBadge
 import com.warnabrotha.app.ui.theme.*
 import com.warnabrotha.app.ui.viewmodel.AppUiState
 
@@ -42,7 +40,6 @@ fun MainScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    // Calculate new reports from all feed sightings
     val newReportsCount = if (uiState.feedFilterLotId == null) {
         uiState.allFeedSightings.count { it.minutesAgo < 30 }
     } else {
@@ -52,7 +49,7 @@ fun MainScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Black900)
+            .background(Background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Content area
@@ -61,7 +58,6 @@ fun MainScreen(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Calculate global stats
                 val totalParkedGlobal = uiState.lotStats.values.sumOf { it.activeParkers }
 
                 when (selectedTab) {
@@ -105,8 +101,8 @@ fun MainScreen(
                 }
             }
 
-            // Navigation bar
-            TacticalNavBar(
+            // Bottom navigation bar
+            AppBottomNav(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
                 newReportsCount = newReportsCount
@@ -117,17 +113,17 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 70.dp)
+                .padding(bottom = 96.dp)
         ) {
             uiState.error?.let { error ->
                 Snackbar(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     containerColor = Red500,
-                    contentColor = TextWhite,
-                    shape = RoundedCornerShape(8.dp),
+                    contentColor = TextOnPrimary,
+                    shape = RoundedCornerShape(12.dp),
                     dismissAction = {
                         TextButton(onClick = onClearError) {
-                            Text("OK", color = TextWhite, fontWeight = FontWeight.Bold)
+                            Text("OK", color = TextOnPrimary, fontWeight = FontWeight.Bold)
                         }
                     }
                 ) {
@@ -139,11 +135,11 @@ fun MainScreen(
                 Snackbar(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     containerColor = Green500,
-                    contentColor = Black900,
-                    shape = RoundedCornerShape(8.dp),
+                    contentColor = TextOnPrimary,
+                    shape = RoundedCornerShape(12.dp),
                     dismissAction = {
                         TextButton(onClick = onClearSuccess) {
-                            Text("OK", color = Black900, fontWeight = FontWeight.Bold)
+                            Text("OK", color = TextOnPrimary, fontWeight = FontWeight.Bold)
                         }
                     }
                 ) {
@@ -155,7 +151,7 @@ fun MainScreen(
 }
 
 @Composable
-private fun TacticalNavBar(
+private fun AppBottomNav(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
     newReportsCount: Int
@@ -163,45 +159,58 @@ private fun TacticalNavBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Black800)
-            .border(1.dp, Border, RoundedCornerShape(0.dp))
-            .padding(8.dp)
+            .background(Surface.copy(alpha = 0.95f))
+            .border(
+                width = 1.dp,
+                color = BorderSubtle,
+                shape = RoundedCornerShape(0.dp)
+            )
+            .padding(top = 12.dp, bottom = 8.dp)
             .navigationBarsPadding(),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Tab 0: COMMAND
         NavTab(
-            icon = Icons.Outlined.Shield,
-            selectedIcon = Icons.Filled.Shield,
-            label = "COMMAND",
+            icon = Icons.Outlined.GridView,
+            label = "Home",
             isSelected = selectedTab == 0,
             onClick = { onTabSelected(0) }
         )
 
-        // Tab 1: FEED with notification badge
+        // Feed tab with notification badge
         Box {
             NavTab(
-                icon = Icons.Outlined.Sensors,
-                selectedIcon = Icons.Filled.Sensors,
-                label = "FEED",
+                icon = Icons.Outlined.RssFeed,
+                label = "Feed",
                 isSelected = selectedTab == 1,
                 onClick = { onTabSelected(1) }
             )
             if (newReportsCount > 0) {
-                NotificationBadge(
-                    count = newReportsCount,
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-2).dp)
-                )
+                        .offset(x = 8.dp, y = (-4).dp)
+                        .size(16.dp)
+                        .border(2.dp, Surface, CircleShape)
+                        .background(BadgeRed, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (newReportsCount > 9) "+" else newReportsCount.toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 8.sp,
+                            lineHeight = 8.sp
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = TextOnPrimary
+                    )
+                }
             }
         }
 
-        // Tab 2: MAP (rightmost)
         NavTab(
             icon = Icons.Outlined.Map,
-            selectedIcon = Icons.Filled.Map,
-            label = "MAP",
+            label = "Map",
             isSelected = selectedTab == 2,
             onClick = { onTabSelected(2) }
         )
@@ -211,39 +220,34 @@ private fun TacticalNavBar(
 @Composable
 private fun NavTab(
     icon: ImageVector,
-    selectedIcon: ImageVector,
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val color = if (isSelected) Amber500 else TextMuted
+    val color = if (isSelected) Green500 else NavInactive
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) AmberGlow else Color.Transparent)
-            .border(
-                1.dp,
-                if (isSelected) Amber500.copy(alpha = 0.3f) else Color.Transparent,
-                RoundedCornerShape(6.dp)
-            )
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 24.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = if (isSelected) selectedIcon else icon,
+            imageVector = icon,
             contentDescription = label,
             tint = color,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(28.dp)
         )
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = color,
-            letterSpacing = 1.sp
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontFamily = DmSansFamily,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.5).sp
+            ),
+            color = color
         )
     }
 }

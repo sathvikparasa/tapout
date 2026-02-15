@@ -5,20 +5,23 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.warnabrotha.app.ui.components.TacticalButton
 import com.warnabrotha.app.ui.theme.*
 
 @Composable
@@ -30,158 +33,207 @@ fun WelcomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Black900)
+            .background(Background)
     ) {
+        // Subtle green blur circles
+        Box(
+            modifier = Modifier
+                .size(192.dp)
+                .offset(x = (-48).dp, y = (-48).dp)
+                .blur(32.dp)
+                .background(GreenOverlay10, RoundedCornerShape(percent = 50))
+        )
+        Box(
+            modifier = Modifier
+                .size(192.dp)
+                .align(Alignment.BottomEnd)
+                .offset(x = 48.dp, y = 48.dp)
+                .blur(32.dp)
+                .background(GreenOverlay10, RoundedCornerShape(percent = 50))
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 32.dp)
+                .padding(top = 48.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.weight(0.15f))
-
-            // Logo area
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(
-                        Brush.linearGradient(listOf(Amber500, Amber600)),
-                        RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            // Top: Logo + Branding
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = Black900,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "WARNABROTHA",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Black,
-                color = Amber500,
-                letterSpacing = 2.sp
-            )
-
-            Text(
-                text = "UC DAVIS PARKING INTEL",
-                style = MaterialTheme.typography.labelMedium,
-                color = TextMuted,
-                letterSpacing = 2.sp
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Features panel
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Black800, RoundedCornerShape(12.dp))
-                    .border(1.dp, Border, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FeatureRow(
-                        icon = Icons.Outlined.Sensors,
-                        title = "REAL-TIME ALERTS",
-                        description = "Get notified when TAPS is spotted"
-                    )
-                    HorizontalDivider(color = Border)
-                    FeatureRow(
-                        icon = Icons.Outlined.Campaign,
-                        title = "REPORT SIGHTINGS",
-                        description = "Help warn other parkers"
-                    )
-                    HorizontalDivider(color = Border)
-                    FeatureRow(
-                        icon = Icons.Outlined.Analytics,
-                        title = "RISK ANALYSIS",
-                        description = "AI-powered probability predictions"
-                    )
-                    HorizontalDivider(color = Border)
-                    FeatureRow(
-                        icon = Icons.Outlined.Groups,
-                        title = "COMMUNITY INTEL",
-                        description = "Crowdsourced parking data"
+                // Shield icon in green container
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(GreenOverlay10, RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.VerifiedUser,
+                        contentDescription = null,
+                        tint = Green500,
+                        modifier = Modifier.size(48.dp)
                     )
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // "TapOut" branded title
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = TextPrimary)) {
+                            append("Tap")
+                        }
+                        withStyle(SpanStyle(color = Green500)) {
+                            append("Out")
+                        }
+                    },
+                    style = MaterialTheme.typography.displayLarge,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = "Tap out of parking",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(modifier = Modifier.weight(0.3f))
-
-            // CTA
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(32.dp),
-                    color = Amber500,
-                    strokeWidth = 3.dp
+            // Middle: Feature cards
+            Column(
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                FeatureCard(
+                    icon = Icons.Outlined.NotificationsActive,
+                    title = "Real-time alerts",
+                    description = "Get notified when TAPS\nenforcement is spotted nearby."
                 )
-            } else {
-                TacticalButton(
-                    text = "Get Started",
-                    icon = Icons.Default.ArrowForward,
-                    onClick = onGetStarted,
-                    color = Amber500,
-                    modifier = Modifier.fillMaxWidth()
+                FeatureCard(
+                    icon = Icons.Outlined.Group,
+                    title = "Community-powered",
+                    description = "Join fellow Aggies in reporting active\nenforcement areas."
+                )
+                FeatureCard(
+                    icon = Icons.Outlined.Timer,
+                    title = "Check in/out tracking",
+                    description = "Smart reminders to pay or move\nbefore your time expires."
+                )
+                FeatureCard(
+                    icon = Icons.Outlined.Map,
+                    title = "Campus-wide coverage",
+                    description = "Detailed coverage across all UC\nDavis parking zones."
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Bottom: CTA
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = Green500,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Button(
+                        onClick = onGetStarted,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .shadow(
+                                elevation = 10.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                ambientColor = GreenShadow,
+                                spotColor = GreenShadow
+                            ),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Green500,
+                            contentColor = TextOnPrimary
+                        )
+                    ) {
+                        Text(
+                            text = "GET STARTED",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontFamily = DmSansFamily,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.4.sp
+                            )
+                        )
+                    }
+                }
 
-            Text(
-                text = "By continuing, you agree to our Terms of Service",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextMuted,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
+                // "Already have an account? Log In"
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = TextSecondary)) {
+                            append("Already have an account? ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                color = Green500,
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append("Log In")
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun FeatureRow(
+private fun FeatureCard(
     icon: ImageVector,
     title: String,
     description: String
 ) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(GreenOverlay5, RoundedCornerShape(12.dp))
+            .border(1.dp, GreenOverlay10, RoundedCornerShape(12.dp))
+            .padding(17.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top
     ) {
+        // Green icon container
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .background(AmberGlow, RoundedCornerShape(8.dp))
-                .border(1.dp, Amber500.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                .clip(RoundedCornerShape(8.dp))
+                .background(Green500),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Amber500,
-                modifier = Modifier.size(18.dp)
+                tint = TextOnPrimary,
+                modifier = Modifier.size(20.dp)
             )
         }
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextWhite,
-                letterSpacing = 0.5.sp
+                style = MaterialTheme.typography.headlineSmall,
+                color = TextPrimary
             )
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextMuted
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                lineHeight = 20.sp
             )
         }
     }
