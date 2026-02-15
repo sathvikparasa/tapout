@@ -200,6 +200,59 @@ class TestParkingSessionEndpoints:
         assert data[0]["is_active"] is False
 
     @pytest.mark.asyncio
+    async def test_check_out_requires_auth(
+        self,
+        client: AsyncClient,
+    ):
+        """Checkout without auth → 403."""
+        response = await client.post("/api/v1/sessions/checkout")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_session_history_ordered_most_recent_first(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot,
+    ):
+        """Session history returns most recent sessions first."""
+        # Create two completed sessions
+        for _ in range(2):
+            await client.post(
+                "/api/v1/sessions/checkin",
+                headers=auth_headers,
+                json={"parking_lot_id": test_parking_lot.id},
+            )
+            await client.post(
+                "/api/v1/sessions/checkout",
+                headers=auth_headers,
+            )
+
+        response = await client.get(
+            "/api/v1/sessions/history",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        # Most recent session first
+        assert data[0]["checked_in_at"] >= data[1]["checked_in_at"]
+
+    @pytest.mark.asyncio
+    async def test_checkin_requires_auth(
+        self,
+        client: AsyncClient,
+        test_parking_lot: ParkingLot,
+    ):
+        """Checkin without auth → 403."""
+        response = await client.post(
+            "/api/v1/sessions/checkin",
+            json={"parking_lot_id": test_parking_lot.id},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_session_history_limit(
         self,
         client: AsyncClient,

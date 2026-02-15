@@ -113,6 +113,44 @@ class TestParkingLotEndpoints:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
+    async def test_list_lots_excludes_inactive(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        auth_headers: dict,
+    ):
+        """Inactive lots are excluded from the listing."""
+        inactive_lot = ParkingLot(
+            name="Closed Structure",
+            code="CLOSED",
+            latitude=38.5,
+            longitude=-121.7,
+            is_active=False,
+        )
+        db_session.add(inactive_lot)
+        await db_session.commit()
+
+        response = await client.get("/api/v1/lots", headers=auth_headers)
+
+        assert response.status_code == 200
+        codes = [lot["code"] for lot in response.json()]
+        assert "CLOSED" not in codes
+
+    @pytest.mark.asyncio
+    async def test_get_parking_lot_by_code_not_found(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+    ):
+        """Non-existent lot code → 404."""
+        response = await client.get(
+            "/api/v1/lots/code/DOESNOTEXIST",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
     async def test_parking_lot_stats_active_parkers(
         self,
         client: AsyncClient,

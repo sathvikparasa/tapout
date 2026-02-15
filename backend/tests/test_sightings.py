@@ -68,6 +68,52 @@ class TestSightingEndpoints:
         assert data["users_notified"] >= 1
 
     @pytest.mark.asyncio
+    async def test_report_sighting_without_notes(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot,
+    ):
+        """Sighting with no notes field → succeeds, notes is null."""
+        response = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["notes"] is None or data["notes"] == ""
+
+    @pytest.mark.asyncio
+    async def test_list_sightings_empty(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+    ):
+        """No sightings → empty list."""
+        response = await client.get(
+            "/api/v1/sightings",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_report_sighting_requires_auth(
+        self,
+        client: AsyncClient,
+        test_parking_lot: ParkingLot,
+    ):
+        """Sighting report without auth → 403."""
+        response = await client.post(
+            "/api/v1/sightings",
+            json={"parking_lot_id": test_parking_lot.id},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_report_sighting_invalid_lot(
         self,
         client: AsyncClient,
