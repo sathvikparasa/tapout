@@ -9,6 +9,10 @@ from app.schemas.device import (
     EmailVerificationRequest,
     EmailVerificationResponse,
     TokenResponse,
+    SendOTPRequest,
+    SendOTPResponse,
+    VerifyOTPRequest,
+    VerifyOTPResponse,
 )
 from app.schemas.parking_lot import (
     ParkingLotCreate,
@@ -55,6 +59,10 @@ __all__ = [
     "EmailVerificationRequest",
     "EmailVerificationResponse",
     "TokenResponse",
+    "SendOTPRequest",
+    "SendOTPResponse",
+    "VerifyOTPRequest",
+    "VerifyOTPResponse",
     # Parking Lot
     "ParkingLotCreate",
     "ParkingLotResponse",

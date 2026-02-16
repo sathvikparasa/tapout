@@ -8,6 +8,7 @@ import com.warnabrotha.app.data.repository.AppRepository
 import com.warnabrotha.app.data.repository.Result
 import kotlinx.coroutines.async
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,10 +16,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
+enum class OTPStep {
+    EMAIL_INPUT,
+    CODE_INPUT
+}
+
 data class AppUiState(
     val isAuthenticated: Boolean = false,
     val isEmailVerified: Boolean = false,
     val showEmailVerification: Boolean = false,
+    val otpStep: OTPStep = OTPStep.EMAIL_INPUT,
+    val otpEmail: String = "",
+    val canResendOTP: Boolean = false,
+    val resendCooldownSeconds: Int = 0,
     val parkingLots: List<ParkingLot> = emptyList(),
     val lotStats: Map<Int, ParkingLotWithStats> = emptyMap(),
     val selectedLot: ParkingLotWithStats? = null,
@@ -49,28 +59,46 @@ class AppViewModel @Inject constructor(
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
     init {
-        checkAuthStatus()
+        if (repository.hasToken() && repository.hasCompletedOnboarding()) {
+            _uiState.value = _uiState.value.copy(
+                isAuthenticated = true,
+                isEmailVerified = true
+            )
+            silentRefresh()
+        } else if (repository.hasToken()) {
+            _uiState.value = _uiState.value.copy(isAuthenticated = true)
+            silentRefresh()
+        }
     }
 
-    fun checkAuthStatus() {
+    private fun silentRefresh() {
         viewModelScope.launch {
-            if (repository.hasToken()) {
-                when (val result = repository.getDeviceInfo()) {
-                    is Result.Success -> {
+            when (val result = repository.register()) {
+                is Result.Success -> {
+                    if (result.data.emailVerified) {
+                        repository.setCompletedOnboarding(true)
                         _uiState.value = _uiState.value.copy(
                             isAuthenticated = true,
-                            isEmailVerified = result.data.emailVerified,
-                            showEmailVerification = !result.data.emailVerified
+                            isEmailVerified = true,
+                            showEmailVerification = false
                         )
-                        if (result.data.emailVerified) {
-                            loadInitialData()
-                        }
-                    }
-                    is Result.Error -> {
+                        loadInitialData()
+                    } else {
                         _uiState.value = _uiState.value.copy(
-                            isAuthenticated = false,
-                            isEmailVerified = false
+                            isAuthenticated = true,
+                            showEmailVerification = true
                         )
+                    }
+                }
+                is Result.Error -> {
+                    // Network error — use existing token optimistically
+                    if (repository.hasCompletedOnboarding()) {
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = true,
+                            isEmailVerified = true,
+                            showEmailVerification = false
+                        )
+                        loadInitialData()
                     }
                 }
             }
@@ -83,11 +111,22 @@ class AppViewModel @Inject constructor(
 
             when (val result = repository.register()) {
                 is Result.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        isAuthenticated = true,
-                        isLoading = false,
-                        showEmailVerification = true
-                    )
+                    if (result.data.emailVerified) {
+                        repository.setCompletedOnboarding(true)
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = true,
+                            isEmailVerified = true,
+                            showEmailVerification = false,
+                            isLoading = false
+                        )
+                        loadInitialData()
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = true,
+                            isLoading = false,
+                            showEmailVerification = true
+                        )
+                    }
                 }
                 is Result.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -99,16 +138,48 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun verifyEmail(email: String) {
+    fun sendOTP(email: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, otpEmail = email)
+
+            when (val result = repository.sendOTP(email)) {
+                is Result.Success -> {
+                    if (result.data.success) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            otpStep = OTPStep.CODE_INPUT
+                        )
+                        startResendCooldown()
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = result.data.message
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun verifyOTP(otpCode: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            val email = _uiState.value.otpEmail
 
-            when (val result = repository.verifyEmail(email)) {
+            when (val result = repository.verifyOTP(email, otpCode)) {
                 is Result.Success -> {
-                    if (result.data.emailVerified) {
+                    if (result.data.success && result.data.emailVerified) {
+                        repository.setCompletedOnboarding(true)
                         _uiState.value = _uiState.value.copy(
                             isEmailVerified = true,
                             showEmailVerification = false,
+                            otpStep = OTPStep.EMAIL_INPUT,
                             isLoading = false
                         )
                         loadInitialData()
@@ -126,6 +197,28 @@ class AppViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    fun resendOTP() {
+        sendOTP(_uiState.value.otpEmail)
+    }
+
+    fun changeEmail() {
+        _uiState.value = _uiState.value.copy(
+            otpStep = OTPStep.EMAIL_INPUT,
+            error = null
+        )
+    }
+
+    private fun startResendCooldown() {
+        _uiState.value = _uiState.value.copy(canResendOTP = false, resendCooldownSeconds = 30)
+        viewModelScope.launch {
+            for (i in 29 downTo 0) {
+                delay(1000)
+                _uiState.value = _uiState.value.copy(resendCooldownSeconds = i)
+            }
+            _uiState.value = _uiState.value.copy(canResendOTP = true, resendCooldownSeconds = 0)
         }
     }
 

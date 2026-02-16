@@ -73,15 +73,33 @@ class APIClient {
         return response
     }
 
-    func verifyEmail(_ email: String) async throws -> EmailVerificationResponse {
+    func sendOTP(_ email: String) async throws -> SendOTPResponse {
         let deviceId = keychain.getOrCreateDeviceId()
-        let body = EmailVerificationRequest(email: email, deviceId: deviceId)
+        let body = SendOTPRequest(email: email, deviceId: deviceId)
 
         return try await post(
-            endpoint: "/auth/verify-email",
+            endpoint: "/auth/send-otp",
             body: body,
             authenticated: false
         )
+    }
+
+    func verifyOTP(email: String, code: String) async throws -> VerifyOTPResponse {
+        let deviceId = keychain.getOrCreateDeviceId()
+        let body = VerifyOTPRequest(email: email, deviceId: deviceId, otpCode: code)
+
+        let response: VerifyOTPResponse = try await post(
+            endpoint: "/auth/verify-otp",
+            body: body,
+            authenticated: false
+        )
+
+        // Save fresh token on success
+        if response.success && !response.accessToken.isEmpty {
+            _ = keychain.saveToken(response.accessToken)
+        }
+
+        return response
     }
 
     func getDeviceInfo() async throws -> DeviceResponse {
