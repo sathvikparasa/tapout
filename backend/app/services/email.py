@@ -23,19 +23,19 @@ class EmailService:
     def _send_sync(to_email: str, otp_code: str) -> None:
         """Synchronous email send using SMTP_SSL on port 465."""
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"WarnABrotha - Your verification code is {otp_code}"
+        msg["Subject"] = f"TapOut - Your verification code is {otp_code}"
         msg["From"] = settings.smtp_email
         msg["To"] = to_email
 
         text_body = (
-            f"Your WarnABrotha verification code is: {otp_code}\n\n"
+            f"Your TapOut verification code is: {otp_code}\n\n"
             f"This code expires in 10 minutes.\n\n"
             f"If you didn't request this, you can safely ignore this email."
         )
 
         html_body = f"""
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <h2 style="color: #1a1a1a; margin-bottom: 8px;">WarnABrotha</h2>
+            <h2 style="color: #1a1a1a; margin-bottom: 8px;">TapOut</h2>
             <p style="color: #666; font-size: 14px;">Enter this code to verify your UC Davis email:</p>
             <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: center; margin: 16px 0;">
                 <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1a1a1a;">{otp_code}</span>
@@ -58,4 +58,6 @@ class EmailService:
     async def send_otp_email(to_email: str, otp_code: str) -> None:
         """Send OTP email asynchronously via thread pool."""
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(_executor, EmailService._send_sync, to_email, otp_code)
+        await loop.run_in_executor(
+            _executor, EmailService._send_sync, to_email, otp_code
+        )
