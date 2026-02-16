@@ -87,10 +87,18 @@ class TicketOCRService:
 
         raw_text = response.content[0].text.strip()
 
+        # Strip markdown code fences if present (e.g. ```json ... ```)
+        if raw_text.startswith("```"):
+            lines = raw_text.split("\n")
+            # Remove first line (```json) and last line (```)
+            lines = [l for l in lines if not l.strip().startswith("```")]
+            raw_text = "\n".join(lines).strip()
+
         # Parse JSON
         try:
             data = json.loads(raw_text)
         except json.JSONDecodeError:
+            logger.warning(f"VLM response not valid JSON: {raw_text[:200]}")
             raise ValueError("VLM response is not valid JSON")
 
         if not isinstance(data, dict):
