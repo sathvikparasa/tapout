@@ -248,7 +248,7 @@ private fun PreviewContent(
 }
 
 @Composable
-private fun ProcessingContent() {
+private fun ColumnScope.ProcessingContent() {
     Spacer(modifier = Modifier.weight(1f))
 
     CircularProgressIndicator(
@@ -450,7 +450,7 @@ private fun DetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun ErrorContent(
+private fun ColumnScope.ErrorContent(
     error: String?,
     onTryAgain: () -> Unit
 ) {

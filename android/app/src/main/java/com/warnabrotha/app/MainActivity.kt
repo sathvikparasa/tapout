@@ -137,7 +137,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onPickFromLibrary = {
                                 galleryLauncher.launch(
-                                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly.let {
+                                        androidx.activity.result.PickVisualMediaRequest(it)
+                                    }
                                 )
                             },
                             onSubmitScan = { viewModel.submitTicketScan(context) },
