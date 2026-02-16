@@ -11,7 +11,8 @@ data class DeviceRegistration(
 data class TokenResponse(
     @SerializedName("access_token") val accessToken: String,
     @SerializedName("token_type") val tokenType: String,
-    @SerializedName("expires_in") val expiresIn: Int
+    @SerializedName("expires_in") val expiresIn: Int,
+    @SerializedName("email_verified") val emailVerified: Boolean = false
 )
 
 data class EmailVerificationRequest(
@@ -23,6 +24,31 @@ data class EmailVerificationResponse(
     val success: Boolean,
     val message: String,
     @SerializedName("email_verified") val emailVerified: Boolean
+)
+
+data class SendOTPRequest(
+    val email: String,
+    @SerializedName("device_id") val deviceId: String
+)
+
+data class SendOTPResponse(
+    val success: Boolean,
+    val message: String
+)
+
+data class VerifyOTPRequest(
+    val email: String,
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("otp_code") val otpCode: String
+)
+
+data class VerifyOTPResponse(
+    val success: Boolean,
+    val message: String,
+    @SerializedName("email_verified") val emailVerified: Boolean = false,
+    @SerializedName("access_token") val accessToken: String = "",
+    @SerializedName("token_type") val tokenType: String = "bearer",
+    @SerializedName("expires_in") val expiresIn: Int = 0
 )
 
 data class DeviceUpdate(

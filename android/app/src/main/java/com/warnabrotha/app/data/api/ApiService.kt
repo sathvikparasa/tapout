@@ -10,8 +10,11 @@ interface ApiService {
     @POST("auth/register")
     suspend fun register(@Body registration: DeviceRegistration): Response<TokenResponse>
 
-    @POST("auth/verify-email")
-    suspend fun verifyEmail(@Body request: EmailVerificationRequest): Response<EmailVerificationResponse>
+    @POST("auth/send-otp")
+    suspend fun sendOTP(@Body request: SendOTPRequest): Response<SendOTPResponse>
+
+    @POST("auth/verify-otp")
+    suspend fun verifyOTP(@Body request: VerifyOTPRequest): Response<VerifyOTPResponse>
 
     @GET("auth/me")
     suspend fun getDeviceInfo(): Response<DeviceResponse>

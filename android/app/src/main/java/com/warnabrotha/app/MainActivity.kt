@@ -48,7 +48,14 @@ class MainActivity : ComponentActivity() {
                         EmailVerificationScreen(
                             isLoading = uiState.isLoading,
                             error = uiState.error,
-                            onVerify = viewModel::verifyEmail,
+                            otpStep = uiState.otpStep,
+                            otpEmail = uiState.otpEmail,
+                            canResendOTP = uiState.canResendOTP,
+                            resendCooldownSeconds = uiState.resendCooldownSeconds,
+                            onSendOTP = viewModel::sendOTP,
+                            onVerifyOTP = viewModel::verifyOTP,
+                            onResendOTP = viewModel::resendOTP,
+                            onChangeEmail = viewModel::changeEmail,
                             modifier = modifier
                         )
                     }

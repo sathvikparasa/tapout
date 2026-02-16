@@ -8,6 +8,11 @@
 import Foundation
 import SwiftUI
 
+enum OTPStep {
+    case emailInput
+    case codeInput
+}
+
 @MainActor
 class AppViewModel: ObservableObject {
     // MARK: - Published State
@@ -16,6 +21,12 @@ class AppViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var isEmailVerified = false
     @Published var showEmailVerification = false
+
+    // OTP state
+    @Published var otpStep: OTPStep = .emailInput
+    @Published var otpEmail: String = ""
+    @Published var canResendOTP = false
+    @Published var resendCooldown: Int = 0
 
     // Parking state
     @Published var parkingLots: [ParkingLot] = []
@@ -53,26 +64,49 @@ class AppViewModel: ObservableObject {
     private let api = APIClient.shared
     private let keychain = KeychainService.shared
 
+    private var resendTimer: Timer?
+
+    var hasCompletedOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
+    }
+
     // MARK: - Initialization
 
     init() {
-        // Check if we have a token
-        if keychain.getToken() != nil {
+        if keychain.getToken() != nil && hasCompletedOnboarding {
+            isAuthenticated = true
+            isEmailVerified = true
+            Task {
+                await silentRefresh()
+            }
+        } else if keychain.getToken() != nil {
             isAuthenticated = true
             Task {
-                await checkAuthAndLoad()
+                await silentRefresh()
             }
         }
     }
 
-    private func checkAuthAndLoad() async {
+    private func silentRefresh() async {
         do {
-            _ = try await api.getDeviceInfo()
-            await loadInitialData()
+            let response = try await api.register()
+            if response.emailVerified {
+                isEmailVerified = true
+                hasCompletedOnboarding = true
+                showEmailVerification = false
+                await loadInitialData()
+                await requestNotificationPermission()
+            } else {
+                showEmailVerification = true
+            }
         } catch {
-            // Token is stale or device no longer exists — force re-registration
-            isAuthenticated = false
-            keychain.clearAll()
+            // Network error — use existing token optimistically
+            if hasCompletedOnboarding {
+                isEmailVerified = true
+                showEmailVerification = false
+                await loadInitialData()
+            }
         }
     }
 
@@ -83,9 +117,18 @@ class AppViewModel: ObservableObject {
         error = nil
 
         do {
-            _ = try await api.register()
+            let response = try await api.register()
             isAuthenticated = true
-            showEmailVerification = true
+
+            if response.emailVerified {
+                isEmailVerified = true
+                hasCompletedOnboarding = true
+                showEmailVerification = false
+                await loadInitialData()
+                await requestNotificationPermission()
+            } else {
+                showEmailVerification = true
+            }
         } catch {
             self.error = error.localizedDescription
             showError = true
@@ -94,48 +137,75 @@ class AppViewModel: ObservableObject {
         isLoading = false
     }
 
-    func verifyEmail(_ email: String) async -> Bool {
+    func sendOTP(_ email: String) async {
         isLoading = true
         error = nil
+        otpEmail = email
 
         do {
-            let response = try await api.verifyEmail(email)
-            if response.emailVerified {
-                isEmailVerified = true
-                showEmailVerification = false
-                await loadInitialData()
-                await requestNotificationPermission()
-                return true
+            let response = try await api.sendOTP(email)
+            if response.success {
+                otpStep = .codeInput
+                startResendCooldown()
             } else {
                 self.error = response.message
                 showError = true
-                return false
             }
         } catch {
             self.error = error.localizedDescription
             showError = true
-            return false
         }
+
+        isLoading = false
     }
 
-    func checkAuthStatus() async {
-        guard keychain.getToken() != nil else {
-            isAuthenticated = false
-            return
-        }
+    func verifyOTP(_ code: String) async {
+        isLoading = true
+        error = nil
 
         do {
-            let device = try await api.getDeviceInfo()
-            isAuthenticated = true
-            isEmailVerified = device.emailVerified
-
-            if !isEmailVerified {
-                showEmailVerification = true
+            let response = try await api.verifyOTP(email: otpEmail, code: code)
+            if response.success && response.emailVerified {
+                isEmailVerified = true
+                hasCompletedOnboarding = true
+                showEmailVerification = false
+                otpStep = .emailInput
+                await loadInitialData()
+                await requestNotificationPermission()
+            } else {
+                self.error = response.message
+                showError = true
             }
         } catch {
-            // Token might be invalid
-            isAuthenticated = false
-            keychain.clearAll()
+            self.error = error.localizedDescription
+            showError = true
+        }
+
+        isLoading = false
+    }
+
+    func resendOTP() async {
+        await sendOTP(otpEmail)
+    }
+
+    func changeEmail() {
+        otpStep = .emailInput
+        error = nil
+    }
+
+    private func startResendCooldown() {
+        canResendOTP = false
+        resendCooldown = 30
+        resendTimer?.invalidate()
+        resendTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            Task { @MainActor in
+                guard let self = self else { timer.invalidate(); return }
+                self.resendCooldown -= 1
+                if self.resendCooldown <= 0 {
+                    self.canResendOTP = true
+                    timer.invalidate()
+                }
+            }
         }
     }
 

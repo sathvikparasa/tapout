@@ -29,6 +29,7 @@ class TokenRepository @Inject constructor(
         private const val KEY_TOKEN = "auth_token"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_PUSH_TOKEN = "push_token"
+        private const val KEY_HAS_COMPLETED_ONBOARDING = "has_completed_onboarding"
     }
 
     fun saveToken(token: String) {
@@ -53,6 +54,14 @@ class TokenRepository @Inject constructor(
     }
 
     fun hasToken(): Boolean = getToken() != null
+
+    fun hasCompletedOnboarding(): Boolean {
+        return sharedPreferences.getBoolean(KEY_HAS_COMPLETED_ONBOARDING, false)
+    }
+
+    fun setCompletedOnboarding(completed: Boolean) {
+        sharedPreferences.edit().putBoolean(KEY_HAS_COMPLETED_ONBOARDING, completed).apply()
+    }
 
     fun savePushToken(token: String) {
         sharedPreferences.edit().putString(KEY_PUSH_TOKEN, token).apply()

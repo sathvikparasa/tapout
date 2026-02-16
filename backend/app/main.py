@@ -27,6 +27,9 @@ from app.api import (
 from app.services.reminder import run_reminder_job
 from app.models.parking_lot import ParkingLot
 from app.database import Base
+from app.api.auth import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 # Configure logging
 logging.basicConfig(
@@ -151,6 +154,9 @@ app = FastAPI(
     version=settings.api_version,
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware for iOS app
 app.add_middleware(
