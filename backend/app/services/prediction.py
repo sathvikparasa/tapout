@@ -78,7 +78,10 @@ class PredictionService:
             return cls._build_no_sighting_response(now, lot_name=lot_name)
 
         sighting, lot = row
-        hours_ago = (now - sighting.reported_at).total_seconds() / 3600
+        reported_at = sighting.reported_at
+        if reported_at.tzinfo is None:
+            reported_at = reported_at.replace(tzinfo=timezone.utc)
+        hours_ago = (now - reported_at).total_seconds() / 3600
 
         return cls._build_sighting_response(now, hours_ago, sighting, lot)
 

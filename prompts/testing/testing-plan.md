@@ -1043,3 +1043,368 @@ jobs:
 | Backend tests (working) | 67 | ~205 |
 | Android tests | 0 | ~97 |
 | **Total** | **67** | **~302** |
+
+---
+
+## 12. Phase 5 Detailed Implementation Plan — Android Unit Tests (AppRepository + AppViewModel)
+
+### Context
+
+Phase 4 is complete (21 Android tests passing). Test infrastructure is fully set up: JUnit 4, MockK 1.13.13, Robolectric 4.14.1, kotlinx-coroutines-test 1.9.0, Turbine 1.2.0, and AndroidX Test Core. Phase 5 adds the two largest Android test files.
+
+---
+
+### Changes Summary
+
+| File | Action | Tests |
+|------|--------|-------|
+| `android/app/src/test/.../data/repository/AppRepositoryTest.kt` | Create | 26 |
+| `android/app/src/test/.../ui/viewmodel/AppViewModelTest.kt` | Create | 25 |
+| **Total** | | **51** |
+
+---
+
+### Step 1: Directory Creation
+
+```
+android/app/src/test/java/com/warnabrotha/app/ui/viewmodel/
+```
+
+(Repository test directory already exists from Phase 4.)
+
+---
+
+### Step 2: `AppRepositoryTest.kt` — 26 tests
+
+#### Architecture
+
+`AppRepository` wraps every `ApiService` Retrofit call with the same pattern:
+1. Call `apiService.someMethod()` → `Response<T>`
+2. If `response.isSuccessful && response.body() != null` → `Result.Success(body)`
+3. Else → `Result.Error(errorBody or fallback message)`
+4. Catch exceptions → `Result.Error(e.message)`
+
+Special cases:
+- `register()` calls `tokenRepository.getOrCreateDeviceId()` before the API call, and `tokenRepository.saveToken()` on success
+- `verifyEmail()` calls `tokenRepository.getOrCreateDeviceId()` before the API call
+- `getCurrentSession()` treats HTTP 404 as `Result.Success(null)` instead of error
+- `reportSighting()` has custom error handling for HTTP 500
+
+#### Setup Pattern
+
+```kotlin
+import kotlinx.coroutines.test.runTest
+import io.mockk.*
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.Response
+
+class AppRepositoryTest {
+
+    private lateinit var apiService: ApiService
+    private lateinit var tokenRepository: TokenRepository
+    private lateinit var repository: AppRepository
+
+    @Before
+    fun setUp() {
+        apiService = mockk()
+        tokenRepository = mockk(relaxed = true)
+        every { tokenRepository.getOrCreateDeviceId() } returns "test-device-id"
+        repository = AppRepository(apiService, tokenRepository)
+    }
+}
+```
+
+#### Helper: Creating Retrofit Error Responses
+
+```kotlin
+private fun <T> errorResponse(code: Int, body: String = """{"detail":"error"}"""): Response<T> =
+    Response.error(code, body.toResponseBody(null))
+```
+
+#### Tests
+
+**Auth (5):**
+
+1. `registerSuccess` — `apiService.register()` returns `Response.success(TokenResponse("tok", "bearer", 3600))` → result is `Result.Success`, `data.accessToken == "tok"`
+2. `registerSavesToken` — on successful register → `verify { tokenRepository.saveToken("tok") }` called
+3. `registerFailure` — `apiService.register()` throws `IOException("timeout")` → `Result.Error`, `message == "timeout"`
+4. `verifyEmailSuccess` — `apiService.verifyEmail()` returns `Response.success(EmailVerificationResponse(true, "ok", true))` → `Result.Success`, `data.emailVerified == true`
+5. `verifyEmailFailure` — `apiService.verifyEmail()` returns `errorResponse(400)` → `Result.Error`
+
+**Device (1):**
+
+6. `getDeviceInfoSuccess` — `apiService.getDeviceInfo()` returns success → `Result.Success(DeviceResponse(...))`, verify `data.deviceId`, `data.emailVerified`
+
+**Parking (7):**
+
+7. `getParkingLotsSuccess` — returns list of 2 lots → `Result.Success`, `data.size == 2`
+8. `getParkingLotSuccess` — returns `ParkingLotWithStats(...)` → `Result.Success`, verify `data.activeParkers`, `data.recentSightings`
+9. `checkInSuccess` — `apiService.checkIn()` returns `ParkingSession(...)` → `Result.Success`, verify `data.isActive == true`
+10. `checkInHttpError` — `apiService.checkIn()` returns `errorResponse(409, "Already checked in")` → `Result.Error`
+11. `checkOutSuccess` — `apiService.checkOut()` returns `CheckoutResponse(true, "ok", 1, "2025-01-15T10:00:00Z")` → `Result.Success`
+12. `getCurrentSessionActive` — `apiService.getCurrentSession()` returns `Response.success(ParkingSession(...))` → `Result.Success`, `data != null`
+13. `getCurrentSessionNullOn404` — `apiService.getCurrentSession()` returns `errorResponse(404)` → `Result.Success(null)` (NOT Result.Error)
+
+**Sighting/Feed (4):**
+
+14. `reportSightingSuccess` — returns `SightingResponse(usersNotified=3)` → `Result.Success`, `data.usersNotified == 3`
+15. `reportSightingServerError` — returns `errorResponse(500)` → `Result.Error`, message contains "Server error (500)"
+16. `getFeedSuccess` — returns `FeedResponse(...)` with 2 sightings → `Result.Success`, `data.sightings.size == 2`
+17. `getAllFeedsSuccess` — returns `AllFeedsResponse(feeds=[...], totalSightings=5)` → `Result.Success`, `data.totalSightings == 5`
+
+**Voting (2):**
+
+18. `voteSuccess` — `apiService.vote(10, VoteCreate("upvote"))` returns `VoteResult(true, "created", "upvote")` → `Result.Success`
+19. `removeVoteSuccess` — `apiService.removeVote(10)` returns `VoteResult(true, "removed", null)` → `Result.Success`
+
+**Other (4):**
+
+20. `getPredictionSuccess` — returns `PredictionResponse(riskLevel="high", probability=0.85, ...)` → `Result.Success`, verify `data.riskLevel`, `data.probability`
+21. `getGlobalStatsSuccess` — returns `GlobalStatsResponse(100, 25, 10)` → `Result.Success`, `data.totalRegisteredDevices == 100`
+22. `updateDeviceSuccess` — `apiService.updateDevice(DeviceUpdate("push-tok", true))` returns `DeviceResponse(...)` → `Result.Success`
+23. `getUnreadNotificationsSuccess` — returns `NotificationList(notifications=emptyList(), unreadCount=3, total=10)` → `Result.Success`, `data.unreadCount == 3`
+
+**Token Delegation (3):**
+
+24. `hasTokenDelegates` — `every { tokenRepository.hasToken() } returns true` → `repository.hasToken() == true`, `verify { tokenRepository.hasToken() }`
+25. `getSavedPushTokenDelegates` — `every { tokenRepository.getPushToken() } returns "tok"` → `repository.getSavedPushToken() == "tok"`
+26. `savePushTokenDelegates` — `repository.savePushToken("tok")` → `verify { tokenRepository.savePushToken("tok") }`
+
+---
+
+### Step 3: `AppViewModelTest.kt` — 25 tests
+
+#### Challenge 1: `init` Block
+
+The `AppViewModel` constructor calls `checkAuthStatus()` in its `init` block, which launches a coroutine via `viewModelScope.launch`. This means:
+- `Dispatchers.setMain(testDispatcher)` must be called BEFORE creating the ViewModel
+- `repository.hasToken()` must be mocked BEFORE creating the ViewModel
+- Default mock: `hasToken() returns false` → init block's `if` is skipped, ViewModel starts clean
+
+#### Challenge 2: `android.util.Log`
+
+The ViewModel calls `android.util.Log.d()` and `android.util.Log.e()` throughout. Requires `@RunWith(RobolectricTestRunner::class)` which provides shadow implementations.
+
+#### Challenge 3: `FirebaseMessaging`
+
+`fetchAndSyncPushToken()` (private) calls `FirebaseMessaging.getInstance().token.await()`. This is called from `onNotificationPermissionResult(true)`.
+
+**Solution:** Don't test `onNotificationPermissionResult(true)` directly. Instead:
+- Test `onNotificationPermissionResult(false)` for the flag update
+- Test `updatePushToken(token)` directly (public method) for push token sync logic
+
+#### Challenge 4: Private `loadInitialData`
+
+`loadInitialData()` is private and called from `checkAuthStatus()` (on verified device) and `verifyEmail()` (on success). It triggers many API calls (`getParkingLots`, `getParkingLot` per lot, `getAllFeeds`, `getCurrentSession`, `getGlobalStats`, `getUnreadNotifications`).
+
+**Solution:** For tests that trigger `loadInitialData`, provide relaxed mocks for all these calls:
+
+```kotlin
+private fun mockLoadInitialData() {
+    coEvery { repository.getParkingLots() } returns Result.Success(testLots)
+    coEvery { repository.getParkingLot(any()) } returns Result.Success(testLotWithStats)
+    coEvery { repository.getAllFeeds() } returns Result.Success(testAllFeeds)
+    coEvery { repository.getCurrentSession() } returns Result.Success(null)
+    coEvery { repository.getFeed(any()) } returns Result.Success(testFeedResponse)
+    coEvery { repository.getPrediction(any()) } returns Result.Success(testPrediction)
+    coEvery { repository.getGlobalStats() } returns Result.Success(testGlobalStats)
+    coEvery { repository.getUnreadNotifications() } returns Result.Success(testNotificationList)
+}
+```
+
+#### Setup Pattern
+
+```kotlin
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
+class AppViewModelTest {
+
+    private lateinit var repository: AppRepository
+    private val testDispatcher = UnconfinedTestDispatcher()
+
+    // Test data fixtures
+    private val testDeviceResponse = DeviceResponse(
+        id = 1, deviceId = "test-id", emailVerified = true,
+        isPushEnabled = false, createdAt = "2025-01-01T00:00:00Z",
+        lastSeenAt = "2025-01-15T00:00:00Z"
+    )
+    private val testLots = listOf(
+        ParkingLot(1, "Lot A", "LOT_A", 38.54, -121.74, true),
+        ParkingLot(2, "Lot B", "LOT_B", 38.55, -121.75, true)
+    )
+    private val testLotWithStats = ParkingLotWithStats(
+        id = 1, name = "Lot A", code = "LOT_A",
+        latitude = 38.54, longitude = -121.74, isActive = true,
+        activeParkers = 5, recentSightings = 2, tapsProbability = 0.7
+    )
+    private val testFeedResponse = FeedResponse(
+        parkingLotId = 1, parkingLotName = "Lot A",
+        parkingLotCode = "LOT_A", sightings = emptyList(), totalSightings = 0
+    )
+    private val testAllFeeds = AllFeedsResponse(feeds = emptyList(), totalSightings = 0)
+    private val testPrediction = PredictionResponse(
+        riskLevel = "low", riskMessage = "Low risk", lastSightingLotName = null,
+        lastSightingLotCode = null, lastSightingAt = null,
+        hoursSinceLastSighting = null, parkingLotId = 1,
+        parkingLotName = "Lot A", parkingLotCode = "LOT_A",
+        probability = 0.2, predictedFor = "2025-01-15T12:00:00Z",
+        factors = null, confidence = null
+    )
+    private val testGlobalStats = GlobalStatsResponse(
+        totalRegisteredDevices = 100, totalParked = 25, totalSightingsToday = 10
+    )
+    private val testNotificationList = NotificationList(
+        notifications = emptyList(), unreadCount = 0, total = 0
+    )
+    private val testSession = ParkingSession(
+        id = 1, parkingLotId = 1, parkingLotName = "Lot A",
+        parkingLotCode = "LOT_A", checkedInAt = "2025-01-15T10:00:00Z",
+        checkedOutAt = null, isActive = true, reminderSent = false
+    )
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+        repository = mockk(relaxed = true)
+        // Default: not authenticated → init block skips
+        every { repository.hasToken() } returns false
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    // Helper: create ViewModel (init block runs immediately with UnconfinedTestDispatcher)
+    private fun createViewModel() = AppViewModel(repository)
+
+    // Helper: create ViewModel in authenticated+verified state
+    private fun createAuthenticatedViewModel(): AppViewModel {
+        every { repository.hasToken() } returns true
+        coEvery { repository.getDeviceInfo() } returns Result.Success(testDeviceResponse)
+        mockLoadInitialData()
+        return AppViewModel(repository)
+    }
+
+    private fun mockLoadInitialData() {
+        coEvery { repository.getParkingLots() } returns Result.Success(testLots)
+        coEvery { repository.getParkingLot(any()) } returns Result.Success(testLotWithStats)
+        coEvery { repository.getAllFeeds() } returns Result.Success(testAllFeeds)
+        coEvery { repository.getCurrentSession() } returns Result.Success(null)
+        coEvery { repository.getFeed(any()) } returns Result.Success(testFeedResponse)
+        coEvery { repository.getPrediction(any()) } returns Result.Success(testPrediction)
+        coEvery { repository.getGlobalStats() } returns Result.Success(testGlobalStats)
+        coEvery { repository.getUnreadNotifications() } returns Result.Success(testNotificationList)
+    }
+}
+```
+
+#### Tests
+
+**Auth (9):**
+
+1. `initialStateIsDefault` — `createViewModel()` → `uiState.value` matches `AppUiState()` defaults: `isAuthenticated=false`, `isEmailVerified=false`, `parkingLots=emptyList()`, `error=null`
+
+2. `checkAuthStatusWithTokenVerified` — mock `hasToken()=true`, `getDeviceInfo()=Success(emailVerified=true)`, plus `mockLoadInitialData()` → `createViewModel()` → `isAuthenticated=true`, `isEmailVerified=true`, `showEmailVerification=false`; verify `coVerify { repository.getParkingLots() }` was called (loadInitialData triggered)
+
+3. `checkAuthStatusWithTokenUnverified` — mock `hasToken()=true`, `getDeviceInfo()=Success(emailVerified=false)` → `createViewModel()` → `isAuthenticated=true`, `isEmailVerified=false`, `showEmailVerification=true`; verify `getParkingLots()` was NOT called (loadInitialData not triggered)
+
+4. `checkAuthStatusNoToken` — default setup (`hasToken()=false`) → `createViewModel()` → `isAuthenticated=false`; verify `getDeviceInfo()` was NOT called
+
+5. `registerSuccess` — `coEvery { repository.register() } returns Result.Success(TokenResponse("tok", "bearer", 3600))` → `viewModel.register()` → `isAuthenticated=true`, `showEmailVerification=true`, `isLoading=false`
+
+6. `registerFailure` — `coEvery { repository.register() } returns Result.Error("Network error")` → `viewModel.register()` → `isAuthenticated=false`, `error="Network error"`, `isLoading=false`
+
+7. `verifyEmailSuccess` — `coEvery { repository.verifyEmail("user@ucdavis.edu") } returns Result.Success(EmailVerificationResponse(true, "ok", true))`, plus `mockLoadInitialData()` → `viewModel.verifyEmail("user@ucdavis.edu")` → `isEmailVerified=true`, `showEmailVerification=false`; verify `getParkingLots()` called
+
+8. `verifyEmailNotVerified` — `coEvery { repository.verifyEmail(...) } returns Result.Success(EmailVerificationResponse(false, "Invalid email domain", false))` → `verifyEmail(...)` → `isEmailVerified=false`, `error="Invalid email domain"`
+
+9. `verifyEmailError` — `coEvery { repository.verifyEmail(...) } returns Result.Error("Server error")` → `verifyEmail(...)` → `error="Server error"`
+
+**Data Loading (2):**
+
+10. `selectLotUpdatesState` — `createAuthenticatedViewModel()` → `viewModel.selectLot(2)` → `uiState.value.selectedLotId == 2`; verify `coVerify { repository.getParkingLot(2) }`, `coVerify { repository.getPrediction(2) }`, `coVerify { repository.getFeed(2) }`
+
+11. `selectFeedFilterUpdatesState` — `createAuthenticatedViewModel()` → `viewModel.selectFeedFilter(1)` → `feedFilterLotId == 1`; then `viewModel.selectFeedFilter(null)` → `feedFilterLotId == null`; verify `getAllFeeds()` called when null
+
+**Check-in / Check-out (4):**
+
+12. `checkInSuccess` — `createAuthenticatedViewModel()`, `coEvery { repository.checkIn(1) } returns Result.Success(testSession)` → `viewModel.checkInAtLot(1)` → `currentSession == testSession`, `successMessage == "Checked in successfully!"`, `isLoading=false`
+
+13. `checkInFailure` — `coEvery { repository.checkIn(1) } returns Result.Error("Already checked in")` → `viewModel.checkInAtLot(1)` → `currentSession == null`, `error == "Already checked in"`
+
+14. `checkOutSuccess` — set up with active session, `coEvery { repository.checkOut() } returns Result.Success(CheckoutResponse(true, "ok", 1, "..."))` → `viewModel.checkOut()` → `currentSession == null`, `successMessage == "Checked out successfully!"`
+
+15. `checkOutFailure` — `coEvery { repository.checkOut() } returns Result.Error("No active session")` → `viewModel.checkOut()` → `error == "No active session"`
+
+**Sighting (3):**
+
+16. `reportSightingSuccess` — `createAuthenticatedViewModel()`, mock `reportSighting(1)` → Success with `usersNotified=3` → `viewModel.reportSightingAtLot(1)` → `successMessage` contains "3 users notified", `isLoading=false`
+
+17. `reportSightingFailure` — `coEvery { repository.reportSighting(1, any()) } returns Result.Error("Failed")` → `viewModel.reportSightingAtLot(1)` → `error == "Failed"`
+
+18. `reportSightingNoSelectedLot` — `createViewModel()` (no selectedLotId) → `viewModel.reportSighting()` → no state change, `coVerify(exactly = 0) { repository.reportSighting(any(), any()) }`
+
+**Voting (2):**
+
+19. `voteNewVote` — `createAuthenticatedViewModel()`, set up `allFeedSightings` with a sighting that has `userVote=null`, `coEvery { repository.vote(10, "upvote") } returns Result.Success(...)` → `viewModel.vote(10, "upvote")` → verify `coVerify { repository.vote(10, "upvote") }` (not `removeVote`)
+
+20. `voteToggleRemoves` — set up `allFeedSightings` with a sighting that has `userVote="upvote"` (id=10), `coEvery { repository.removeVote(10) } returns Result.Success(...)` → `viewModel.vote(10, "upvote")` → verify `coVerify { repository.removeVote(10) }` (toggle = remove)
+
+**Notifications (2):**
+
+21. `fetchUnreadCount` — `coEvery { repository.getUnreadNotifications() } returns Result.Success(NotificationList(emptyList(), 5, 5))` → `viewModel.fetchUnreadNotificationCount()` → `uiState.value.unreadNotificationCount == 5`
+
+22. `updatePushToken` — `viewModel.updatePushToken("fcm-token-123")` → verify `repository.savePushToken("fcm-token-123")` called, `uiState.value.pushToken == "fcm-token-123"`, verify `coVerify { repository.updateDevice(pushToken = "fcm-token-123", isPushEnabled = true) }`
+
+**UI State (3):**
+
+23. `clearError` — set error via a failed operation → `viewModel.clearError()` → `uiState.value.error == null`
+
+24. `clearSuccessMessage` — set successMessage via a successful operation → `viewModel.clearSuccessMessage()` → `uiState.value.successMessage == null`
+
+25. `refreshReloadsData` — `createAuthenticatedViewModel()` → `viewModel.refresh()` → verify `coVerify { repository.getCurrentSession() }` called again, verify `coVerify { repository.getParkingLot(any()) }` called again (via loadLotData), verify `coVerify { repository.getUnreadNotifications() }` called again
+
+---
+
+### Step 4: Execution Order
+
+1. Create `viewmodel/` test directory
+2. Write `AppRepositoryTest.kt` (simpler — pure coroutine tests with MockK, no Android framework)
+3. Write `AppViewModelTest.kt` (more complex — Robolectric + coroutine dispatcher + init block handling)
+
+---
+
+### Step 5: Verification
+
+```bash
+cd android
+.\gradlew :app:testDebugUnitTest --tests "com.warnabrotha.app.data.repository.AppRepositoryTest"
+.\gradlew :app:testDebugUnitTest --tests "com.warnabrotha.app.ui.viewmodel.AppViewModelTest"
+```
+
+Or all at once:
+```bash
+.\gradlew :app:testDebugUnitTest
+```
+
+Expected: 72 passed (21 from Phase 4 + 51 from Phase 5).
+
+---
+
+### Known Risks
+
+**1. `UnconfinedTestDispatcher` vs `StandardTestDispatcher`:**
+`UnconfinedTestDispatcher` executes coroutines eagerly (immediately). This is needed because the ViewModel launches coroutines in `init` and in every public method. If tests are flaky because of execution order, switch to `StandardTestDispatcher` and call `testScheduler.advanceUntilIdle()` after each action.
+
+**2. Retrofit `Response.error()` with null media type:**
+`"error".toResponseBody(null)` creates a response body with no content type. If this causes issues, use `"application/json".toMediaType()` explicitly. Import: `okhttp3.MediaType.Companion.toMediaType`.
+
+**3. `vote()` reads from `allFeedSightings` or `feed.sightings`:**
+The `vote()` method checks `feedFilterLotId` to decide which list to search for the current user vote. Tests for `voteToggleRemoves` must ensure the sighting exists in the correct list based on `feedFilterLotId`. Set `feedFilterLotId=null` and populate `allFeedSightings` via a mocked `getAllFeeds()` response.
+
+**4. `loadInitialData` cascade:**
+When `checkAuthStatus` or `verifyEmail` succeeds with a verified device, `loadInitialData()` fires ~7 API calls (getParkingLots, getParkingLot per lot, getAllFeeds, getCurrentSession, getFeed, getPrediction, getGlobalStats, getUnreadNotifications). All must be mocked or the test will fail with "no answer found" from MockK. The `mockLoadInitialData()` helper handles this, but forgetting to call it is the most likely source of test failures.
+
+**5. ViewModel `init` block timing:**
+With `UnconfinedTestDispatcher`, the `init` block completes synchronously during `AppViewModel(repository)`. State assertions immediately after construction will see the final state (not intermediate loading states). If testing loading states is needed, switch to `StandardTestDispatcher`.
