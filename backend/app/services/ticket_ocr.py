@@ -90,8 +90,11 @@ class TicketOCRService:
         # Strip markdown code fences if present (e.g. ```json ... ```)
         if raw_text.startswith("```"):
             lines = raw_text.split("\n")
-            # Remove first line (```json) and last line (```)
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            # Remove first line (```json) and last line (```), but preserve inner content
+            if lines and lines[0].lstrip().startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip().startswith("```"):
+                lines = lines[:-1]
             raw_text = "\n".join(lines).strip()
 
         # Parse JSON
