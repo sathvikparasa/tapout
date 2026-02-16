@@ -286,10 +286,7 @@ class AppRepository @Inject constructor(
 
     suspend fun scanTicket(imageFile: File): Result<TicketScanResponse> {
         return try {
-            val mediaType = when {
-                imageFile.name.endsWith(".png", ignoreCase = true) -> "image/png"
-                else -> "image/jpeg"
-            }
+            val mediaType = "image/*"
             val requestBody = imageFile.asRequestBody(mediaType.toMediaTypeOrNull())
             val part = MultipartBody.Part.createFormData("image", imageFile.name, requestBody)
             val response = apiService.scanTicket(part)
