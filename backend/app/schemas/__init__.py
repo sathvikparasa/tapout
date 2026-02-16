@@ -50,6 +50,7 @@ from app.schemas.feed import (
     FeedResponse,
     AllFeedsResponse,
 )
+from app.schemas.ticket_scan import TicketScanResponse
 
 __all__ = [
     # Device
@@ -92,4 +93,6 @@ __all__ = [
     "FeedSighting",
     "FeedResponse",
     "AllFeedsResponse",
+    # Ticket Scan
+    "TicketScanResponse",
 ]

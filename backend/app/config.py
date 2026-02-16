@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 GCP_PROJECT = "tapout-485821"
-SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "SMTP_EMAIL", "SMTP_PASSWORD"]
+SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "SMTP_EMAIL", "SMTP_PASSWORD", "ANTHROPIC_API_KEY"]
 
 
 def _load_secrets_from_gcp():
@@ -68,6 +68,9 @@ class Settings(BaseSettings):
 
     # Firebase Cloud Messaging (Android push notifications)
     firebase_credentials_json: Optional[str] = None  # JSON string or file path to service account key
+
+    # Anthropic API key for ticket OCR
+    anthropic_api_key: str = ""
 
     # Reminder settings
     parking_reminder_hours: int = 3  # Hours before sending checkout reminder

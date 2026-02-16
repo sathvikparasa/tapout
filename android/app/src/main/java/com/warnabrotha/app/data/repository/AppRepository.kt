@@ -2,6 +2,10 @@ package com.warnabrotha.app.data.repository
 
 import com.warnabrotha.app.data.api.ApiService
 import com.warnabrotha.app.data.model.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -279,4 +283,23 @@ class AppRepository @Inject constructor(
     fun getSavedPushToken(): String? = tokenRepository.getPushToken()
 
     fun savePushToken(token: String) = tokenRepository.savePushToken(token)
+
+    suspend fun scanTicket(imageFile: File): Result<TicketScanResponse> {
+        return try {
+            val mediaType = when {
+                imageFile.name.endsWith(".png", ignoreCase = true) -> "image/png"
+                else -> "image/jpeg"
+            }
+            val requestBody = imageFile.asRequestBody(mediaType.toMediaTypeOrNull())
+            val part = MultipartBody.Part.createFormData("image", imageFile.name, requestBody)
+            val response = apiService.scanTicket(part)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to scan ticket")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
 }

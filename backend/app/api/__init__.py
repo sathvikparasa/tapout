@@ -9,6 +9,7 @@ from app.api.sightings import router as sightings_router
 from app.api.notifications import router as notifications_router
 from app.api.predictions import router as predictions_router
 from app.api.feed import router as feed_router
+from app.api.ticket_scan import router as ticket_scan_router
 
 __all__ = [
     "auth_router",
@@ -18,4 +19,5 @@ __all__ = [
     "notifications_router",
     "predictions_router",
     "feed_router",
+    "ticket_scan_router",
 ]

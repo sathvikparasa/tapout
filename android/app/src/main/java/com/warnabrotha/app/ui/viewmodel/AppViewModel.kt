@@ -1,5 +1,7 @@
 package com.warnabrotha.app.ui.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
@@ -14,11 +16,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.File
 import javax.inject.Inject
 
 enum class OTPStep {
     EMAIL_INPUT,
     CODE_INPUT
+}
+
+enum class ScanState {
+    IDLE, PREVIEW, PROCESSING, SUCCESS, ERROR
 }
 
 data class AppUiState(
@@ -47,7 +54,12 @@ data class AppUiState(
     // Notification fields
     val pushToken: String? = null,
     val notificationPermissionGranted: Boolean = false,
-    val unreadNotificationCount: Int = 0
+    val unreadNotificationCount: Int = 0,
+    // Scan fields
+    val scanState: ScanState = ScanState.IDLE,
+    val scanImageUri: Uri? = null,
+    val scanResult: TicketScanResponse? = null,
+    val scanError: String? = null
 )
 
 @HiltViewModel
@@ -572,5 +584,85 @@ class AppViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // Scan methods
+    fun selectScanImage(uri: Uri) {
+        _uiState.value = _uiState.value.copy(
+            scanState = ScanState.PREVIEW,
+            scanImageUri = uri,
+            scanResult = null,
+            scanError = null
+        )
+    }
+
+    fun submitTicketScan(context: Context) {
+        val uri = _uiState.value.scanImageUri ?: return
+        _uiState.value = _uiState.value.copy(scanState = ScanState.PROCESSING)
+
+        viewModelScope.launch {
+            try {
+                // Copy URI content to a temp file
+                val tempFile = File(context.cacheDir, "images").also { it.mkdirs() }
+                    .let { File(it, "ticket_${System.currentTimeMillis()}.jpg") }
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tempFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: run {
+                    _uiState.value = _uiState.value.copy(
+                        scanState = ScanState.ERROR,
+                        scanError = "Could not read image file"
+                    )
+                    return@launch
+                }
+
+                when (val result = repository.scanTicket(tempFile)) {
+                    is Result.Success -> {
+                        val response = result.data
+                        if (response.success && (response.ticketDate != null || response.ticketTime != null || response.ticketLocation != null)) {
+                            _uiState.value = _uiState.value.copy(
+                                scanState = ScanState.SUCCESS,
+                                scanResult = response
+                            )
+                            // Refresh feed if a sighting was created
+                            if (response.sightingId != null) {
+                                loadAllFeeds()
+                                refreshAllLotStats()
+                            }
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                scanState = ScanState.ERROR,
+                                scanError = "Could not read ticket. Make sure the photo is clear and shows a UC Davis parking ticket."
+                            )
+                        }
+                    }
+                    is Result.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            scanState = ScanState.ERROR,
+                            scanError = result.message
+                        )
+                    }
+                }
+
+                // Clean up temp file
+                tempFile.delete()
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Ticket scan failed", e)
+                _uiState.value = _uiState.value.copy(
+                    scanState = ScanState.ERROR,
+                    scanError = e.message ?: "An unexpected error occurred"
+                )
+            }
+        }
+    }
+
+    fun resetScan() {
+        _uiState.value = _uiState.value.copy(
+            scanState = ScanState.IDLE,
+            scanImageUri = null,
+            scanResult = null,
+            scanError = null
+        )
     }
 }

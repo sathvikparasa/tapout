@@ -23,6 +23,7 @@ from app.api import (
     notifications_router,
     predictions_router,
     feed_router,
+    ticket_scan_router,
 )
 from app.services.reminder import run_reminder_job
 from app.models.parking_lot import ParkingLot
@@ -175,6 +176,7 @@ app.include_router(sightings_router, prefix=f"/api/{settings.api_version}")
 app.include_router(notifications_router, prefix=f"/api/{settings.api_version}")
 app.include_router(predictions_router, prefix=f"/api/{settings.api_version}")
 app.include_router(feed_router, prefix=f"/api/{settings.api_version}")
+app.include_router(ticket_scan_router, prefix=f"/api/{settings.api_version}")
 
 
 @app.get("/", tags=["Health"])
