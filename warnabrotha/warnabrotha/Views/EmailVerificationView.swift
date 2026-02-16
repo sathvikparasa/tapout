@@ -34,7 +34,7 @@ struct EmailVerificationView: View {
                 VStack(spacing: 32) {
                     // Icon + Header
                     VStack(spacing: 16) {
-                        Image(systemName: "p.circle.fill")
+                        Image(systemName: "p.square.fill")
                             .font(.system(size: 48, weight: .light))
                             .foregroundColor(AppColors.accent)
 
@@ -53,7 +53,7 @@ struct EmailVerificationView: View {
                         Text("UNIVERSITY EMAIL")
                             .appFont(size: 10, weight: .bold)
                             .tracking(1)
-                            .foregroundColor(AppColors.textMuted)
+                            .foregroundColor(AppColors.accent)
 
                         HStack(spacing: 12) {
                             TextField("yourname@ucdavis.edu", text: $email)

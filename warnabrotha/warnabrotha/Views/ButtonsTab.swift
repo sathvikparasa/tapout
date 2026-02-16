@@ -16,28 +16,28 @@ struct ButtonsTab: View {
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 28) {
                     // Lot selector
                     lotSelector
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
 
                     // Action buttons row
-                    HStack(spacing: 12) {
+                    HStack(spacing: 20) {
                         // Check-in / Check-out button
                         if viewModel.isParked {
-                            PrimaryButton(
+                            DashboardActionButton(
                                 title: "CHECK OUT",
-                                icon: "arrow.right.circle",
+                                systemIcon: "arrow.right.circle",
                                 color: AppColors.warning,
                                 textColor: AppColors.textPrimary
                             ) {
                                 Task { await viewModel.checkOut() }
                             }
                         } else {
-                            PrimaryButton(
+                            DashboardActionButton(
                                 title: "CHECK IN",
-                                icon: "p.circle.fill",
+                                systemIcon: "p.circle.fill",
                                 color: AppColors.accent
                             ) {
                                 Task { await viewModel.checkIn() }
@@ -45,15 +45,15 @@ struct ButtonsTab: View {
                         }
 
                         // Report button
-                        PrimaryButton(
+                        DashboardActionButton(
                             title: "REPORT TAPS",
-                            icon: "exclamationmark.triangle.fill",
+                            systemIcon: "exclamationmark.triangle.fill",
                             color: AppColors.danger
                         ) {
                             showReportConfirmation = true
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 24)
 
                     // Risk meter card
                     riskMeterCard
@@ -106,9 +106,11 @@ struct ButtonsTab: View {
 
     private var topBar: some View {
         HStack {
-            Text("TapOut")
-                .displayFont(size: 24)
+            (Text("Tap")
                 .foregroundColor(AppColors.textPrimary)
+            + Text("Out")
+                .foregroundColor(AppColors.accent))
+                .displayFont(size: 24)
                 .tracking(-0.5)
 
             Spacer()
@@ -147,7 +149,7 @@ struct ButtonsTab: View {
             Text("SELECT PARKING ZONE")
                 .appFont(size: 10, weight: .bold)
                 .tracking(1)
-                .foregroundColor(AppColors.textMuted)
+                .foregroundColor(AppColors.accent)
 
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -193,29 +195,59 @@ struct ButtonsTab: View {
     // MARK: - Risk Meter Card
 
     private var riskMeterCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let riskLevel = viewModel.prediction?.riskLevel ?? "UNKNOWN"
+        let activeBars = viewModel.riskBars // 1=LOW, 2=MEDIUM, 3=HIGH
+
+        return VStack(alignment: .leading, spacing: 16) {
+            // Header row: label + LIVE badge
             HStack {
                 Text("Current Risk Meter")
-                    .appFont(size: 12, weight: .bold)
+                    .appFont(size: 10, weight: .bold)
                     .textCase(.uppercase)
-                    .tracking(0.5)
-                    .foregroundColor(AppColors.textSecondary)
+                    .foregroundColor(AppColors.textPrimary.opacity(0.4))
 
                 Spacer()
 
                 LiveBadge()
             }
 
-            HStack(spacing: 12) {
-                RiskBadge(level: viewModel.prediction?.riskLevel ?? "UNKNOWN")
+            // Risk bars + level text + message
+            HStack(spacing: 16) {
+                // Signal-strength bar chart
+                RiskBarChart(activeBars: activeBars)
 
-                Text(viewModel.riskMessage)
-                    .appFont(size: 14, weight: .medium)
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(2)
+                // Risk level + message
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(riskLevel.uppercased())
+                        .displayFont(size: 30)
+                        .foregroundColor(riskLevelColor(riskLevel))
+
+                    Text(viewModel.riskMessage)
+                        .appFont(size: 11, weight: .medium)
+                        .foregroundColor(AppColors.textPrimary.opacity(0.6))
+                        .lineLimit(2)
+                }
             }
         }
-        .cardStyle()
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 32)
+                .fill(AppColors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 32)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+    }
+
+    private func riskLevelColor(_ level: String) -> Color {
+        switch level.uppercased() {
+        case "HIGH": return AppColors.dangerBright
+        case "MEDIUM": return AppColors.warning
+        case "LOW": return AppColors.success
+        default: return AppColors.textMuted
+        }
     }
 
     // MARK: - Recent Activity
@@ -245,30 +277,43 @@ struct ButtonsTab: View {
             }
 
             if let feed = viewModel.feed, let sighting = feed.sightings.first {
-                HStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(AppColors.danger)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(AppColors.dangerLight)
-                        )
+                let stackCount = min(feed.sightings.count, 3)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(sighting.notes ?? "Taps spotted: \(sighting.parkingLotCode)")
-                            .appFont(size: 14, weight: .semibold)
-                            .foregroundColor(AppColors.textPrimary)
-                            .lineLimit(1)
+                VStack(spacing: 0) {
+                    // Front card (most recent)
+                    HStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppColors.danger)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(AppColors.dangerLight)
+                            )
 
-                        Text("\(sighting.minutesAgo)m ago")
-                            .appFont(size: 12)
-                            .foregroundColor(AppColors.textMuted)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(sighting.notes ?? "Taps spotted: \(sighting.parkingLotCode)")
+                                .appFont(size: 14, weight: .semibold)
+                                .foregroundColor(AppColors.textPrimary)
+                                .lineLimit(1)
+
+                            Text("\(sighting.minutesAgo)m ago")
+                                .appFont(size: 12)
+                                .foregroundColor(AppColors.textMuted)
+                        }
+
+                        Spacer()
                     }
+                    .cardStyle(cornerRadius: 12)
 
-                    Spacer()
+                    // Stacked card edges below
+                    if stackCount >= 2 {
+                        StackedCardEdge(inset: 8)
+                    }
+                    if stackCount >= 3 {
+                        StackedCardEdge(inset: 16)
+                    }
                 }
-                .cardStyle(cornerRadius: 12)
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle")

@@ -117,7 +117,7 @@ struct TabBarItem: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: isSelected ? icon + ".fill" : icon)
+                    Image(systemName: icon)
                         .font(.system(size: 24, weight: isSelected ? .bold : .regular))
                         .frame(width: 28, height: 28)
 
@@ -134,7 +134,7 @@ struct TabBarItem: View {
                 Text(label)
                     .appFont(size: 10, weight: isSelected ? .bold : .medium)
             }
-            .foregroundColor(isSelected ? AppColors.textPrimary : AppColors.textMuted)
+            .foregroundColor(isSelected ? AppColors.accent : AppColors.textMuted)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(PlainButtonStyle())
@@ -149,7 +149,7 @@ struct WelcomeView: View {
 
     var body: some View {
         ZStack {
-            AppColors.darkBackground
+            Color.white
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -162,14 +162,16 @@ struct WelcomeView: View {
                         .foregroundColor(AppColors.accent)
 
                     VStack(spacing: 8) {
-                        Text("TapOut")
+                        (Text("Tap")
+                            .foregroundColor(AppColors.textPrimary)
+                        + Text("Out")
+                            .foregroundColor(AppColors.accent))
                             .displayFont(size: 36)
-                            .foregroundColor(.white)
                             .tracking(-1)
 
                         Text("Tap out of parking")
                             .appFont(size: 16, weight: .medium)
-                            .foregroundColor(AppColors.textMuted)
+                            .foregroundColor(AppColors.textSecondary)
                     }
                 }
 
@@ -202,7 +204,7 @@ struct WelcomeView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white.opacity(0.05))
+                        .fill(AppColors.accent.opacity(0.05))
                 )
                 .padding(.horizontal, 24)
 
@@ -234,7 +236,7 @@ struct WelcomeView: View {
 
                     Text("Already have an account? **Log In**")
                         .appFont(size: 14)
-                        .foregroundColor(AppColors.textMuted)
+                        .foregroundColor(AppColors.textSecondary)
                 }
                 .padding(.bottom, 48)
             }
@@ -261,10 +263,10 @@ struct FeatureRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .appFont(size: 14, weight: .bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppColors.textPrimary)
                 Text(description)
                     .appFont(size: 12)
-                    .foregroundColor(AppColors.textMuted)
+                    .foregroundColor(AppColors.textSecondary)
             }
 
             Spacer()

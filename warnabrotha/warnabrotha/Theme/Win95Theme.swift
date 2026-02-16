@@ -281,6 +281,96 @@ struct RiskBadge: View {
     }
 }
 
+// MARK: - Dashboard Action Button (tall square, icon on top)
+
+struct DashboardActionButton: View {
+    let title: String
+    let systemIcon: String
+    let color: Color
+    var textColor: Color = .white
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            action()
+        }) {
+            VStack(spacing: 12) {
+                Image(systemName: systemIcon)
+                    .font(.system(size: 48, weight: .regular))
+                    .foregroundColor(textColor)
+
+                Text(title)
+                    .displayFont(size: 12)
+                    .foregroundColor(textColor)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 196)
+            .background(
+                RoundedRectangle(cornerRadius: 40)
+                    .fill(color)
+            )
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+// MARK: - Risk Bar Chart (signal-strength bars)
+
+struct RiskBarChart: View {
+    let activeBars: Int // 1=LOW, 2=MEDIUM, 3=HIGH
+
+    private let barWidth: CGFloat = 8
+    private let gap: CGFloat = 3
+    private let barHeights: [CGFloat] = [12, 24, 36]
+
+    private let activeColors: [Color] = [
+        Color(hex: "81C784"),  // green (LOW bar)
+        Color(hex: "FFD54F"),  // yellow (MEDIUM bar)
+        Color(hex: "EF4444"),  // red (HIGH bar)
+    ]
+    private let inactiveColor = Color(hex: "F2F2EB")
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: gap) {
+            ForEach(0..<3) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(index < activeBars ? activeColors[index] : inactiveColor)
+                    .frame(width: barWidth, height: barHeights[index])
+            }
+        }
+        .frame(width: 30, height: 40, alignment: .bottom)
+    }
+}
+
+// MARK: - Stacked Card Edge
+
+struct StackedCardEdge: View {
+    var inset: CGFloat = 8
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(AppColors.cardBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppColors.border, lineWidth: 1)
+            )
+            .frame(height: 8)
+            .padding(.horizontal, inset)
+            .offset(y: -2)
+    }
+}
+
 // MARK: - Notification Badge
 
 struct NotificationBadge: View {

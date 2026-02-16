@@ -13,36 +13,36 @@ struct ProbabilityTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top bar
-            HStack {
-                Text("Recent Taps")
-                    .displayFont(size: 24)
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                (Text("Tap")
                     .foregroundColor(AppColors.textPrimary)
-                    .tracking(-0.5)
+                + Text("Out")
+                    .foregroundColor(AppColors.accent))
+                    .appFont(size: 11, weight: .bold)
 
-                Spacer()
-
-                Text("TapOut")
-                    .appFont(size: 14, weight: .bold)
-                    .foregroundColor(AppColors.accent)
+                Text("Recent Reports")
+                    .appFont(size: 30, weight: .heavy)
+                    .foregroundColor(AppColors.textPrimary)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
 
             // Lot filter pills
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    PillView(
+                    FeedPill(
                         text: "ALL LOTS",
                         isSelected: selectedFilter == nil
                     ) {
                         selectedFilter = nil
-                        // When ALL is selected, load the current lot's feed
                         Task { await viewModel.refresh() }
                     }
 
                     ForEach(viewModel.parkingLots) { lot in
-                        PillView(
+                        FeedPill(
                             text: lot.code,
                             isSelected: selectedFilter == lot.id
                         ) {
@@ -51,37 +51,45 @@ struct ProbabilityTab: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
             }
             .padding(.vertical, 8)
 
             // Feed content
             ScrollView {
                 VStack(spacing: 0) {
-                    // Feed header
+                    // Sub-header
                     HStack {
                         Text("Showing reports from last 3 hours")
                             .appFont(size: 12, weight: .semibold)
-                            .textCase(.uppercase)
-                            .tracking(-0.5)
                             .foregroundColor(AppColors.textMuted)
 
                         Spacer()
 
-                        LiveBadge()
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(AppColors.live)
+                                .frame(width: 6, height: 6)
+                            Text("LIVE")
+                                .appFont(size: 10, weight: .bold)
+                                .foregroundColor(AppColors.live)
+                        }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 12)
 
                     // Feed items
                     if let feed = viewModel.feed {
                         if feed.sightings.isEmpty {
                             EmptyFeedView()
-                                .padding(20)
+                                .padding(16)
                         } else {
-                            VStack(spacing: 0) {
-                                ForEach(feed.sightings) { sighting in
-                                    FeedItemView(sighting: sighting) { voteType in
+                            VStack(spacing: 12) {
+                                ForEach(Array(feed.sightings.enumerated()), id: \.element.id) { index, sighting in
+                                    FeedCardView(
+                                        sighting: sighting,
+                                        isNewest: index == 0
+                                    ) { voteType in
                                         Task {
                                             await viewModel.vote(sightingId: sighting.id, type: voteType)
                                         }
@@ -89,21 +97,20 @@ struct ProbabilityTab: View {
                                 }
 
                                 // End of window marker
-                                HStack(spacing: 8) {
-                                    Rectangle()
+                                HStack(spacing: 12) {
+                                    Circle()
                                         .fill(AppColors.border)
-                                        .frame(height: 1)
+                                        .frame(width: 6, height: 6)
                                     Text("End of 3-hour window")
-                                        .appFont(size: 11, weight: .medium)
-                                        .foregroundColor(AppColors.textMuted)
-                                        .fixedSize()
-                                    Rectangle()
+                                        .appFont(size: 12, weight: .bold)
+                                        .foregroundColor(AppColors.pillBorder)
+                                    Circle()
                                         .fill(AppColors.border)
-                                        .frame(height: 1)
+                                        .frame(width: 6, height: 6)
                                 }
-                                .padding(.horizontal, 20)
                                 .padding(.vertical, 24)
                             }
+                            .padding(.horizontal, 16)
                         }
                     } else {
                         VStack(spacing: 12) {
@@ -126,88 +133,75 @@ struct ProbabilityTab: View {
     }
 }
 
-// MARK: - Feed Item
+// MARK: - Feed Card
 
-struct FeedItemView: View {
+struct FeedCardView: View {
     let sighting: FeedSighting
+    let isNewest: Bool
     let onVote: (VoteType) -> Void
 
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                // Time indicator
-                VStack(spacing: 4) {
-                    Circle()
-                        .fill(timeColor)
-                        .frame(width: 10, height: 10)
-                    Rectangle()
-                        .fill(AppColors.border)
-                        .frame(width: 2)
-                }
-                .frame(width: 10)
-
-                // Content
-                VStack(alignment: .leading, spacing: 8) {
-                    // Header
-                    HStack {
-                        Text(timeText)
-                            .appFont(size: 12, weight: .semibold)
-                            .foregroundColor(AppColors.textSecondary)
-
-                        Spacer()
-
-                        Text(sighting.parkingLotCode)
-                            .appFont(size: 11, weight: .bold)
-                            .textCase(.uppercase)
-                            .foregroundColor(AppColors.textMuted)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(AppColors.background)
-                            )
-                    }
-
-                    // Vote buttons
-                    HStack(spacing: 12) {
-                        Spacer()
-
-                        VoteButton(
-                            count: sighting.upvotes,
-                            icon: "hand.thumbsup.fill",
-                            isSelected: sighting.userVote == .upvote,
-                            color: AppColors.success
-                        ) {
-                            onVote(.upvote)
-                        }
-
-                        VoteButton(
-                            count: sighting.downvotes,
-                            icon: "hand.thumbsdown.fill",
-                            isSelected: sighting.userVote == .downvote,
-                            color: AppColors.danger
-                        ) {
-                            onVote(.downvote)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-
-            Divider()
-                .padding(.leading, 42)
-        }
+    private var isOld: Bool {
+        sighting.minutesAgo >= 120
     }
 
-    private var timeColor: Color {
-        if sighting.minutesAgo < 30 {
-            return AppColors.dangerBright
-        } else if sighting.minutesAgo < 90 {
-            return AppColors.warning
-        } else {
-            return AppColors.textMuted
+    var body: some View {
+        HStack(spacing: 0) {
+            // Left accent bar
+            if isNewest {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(AppColors.accent)
+                    .frame(width: 4)
+                    .padding(.vertical, 12)
+            }
+
+            HStack(alignment: .center, spacing: 16) {
+                // Text content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(timeText)
+                        .appFont(size: 11, weight: .bold)
+                        .foregroundColor(isNewest ? AppColors.accent : AppColors.textMuted)
+
+                    Text(sighting.parkingLotCode)
+                        .appFont(size: 22, weight: .bold)
+                        .foregroundColor(isOld ? AppColors.textSecondary : AppColors.textPrimary)
+                        .textCase(.uppercase)
+                }
+
+                Spacer()
+
+                // Vote buttons (no container)
+                HStack(spacing: 10) {
+                    Button {
+                        onVote(.upvote)
+                    } label: {
+                        Image(systemName: "hand.thumbsup.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(userVote == .upvote ? AppColors.accent : AppColors.textMuted)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Text("\(sighting.netScore)")
+                        .appFont(size: 16, weight: .heavy)
+                        .foregroundColor(isOld ? AppColors.textMuted : Color(hex: "334155"))
+
+                    Button {
+                        onVote(.downvote)
+                    } label: {
+                        Image(systemName: "hand.thumbsdown.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(userVote == .downvote ? Color(hex: "FCA5A5") : AppColors.pillBorder)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, isNewest ? 16 : 20)
+            .padding(.vertical, 20)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(AppColors.cardBackground)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     private var timeText: String {
@@ -218,36 +212,34 @@ struct FeedItemView: View {
             return "\(hours) hour\(hours > 1 ? "s" : "") ago"
         }
     }
+
+    private var userVote: VoteType? {
+        sighting.userVote
+    }
 }
 
-// MARK: - Vote Button
+// MARK: - Feed Pill (larger, matching Figma)
 
-struct VoteButton: View {
-    let count: Int
-    let icon: String
+struct FeedPill: View {
+    let text: String
     let isSelected: Bool
-    let color: Color
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                Text("\(count)")
-                    .appFont(size: 12, weight: .bold)
-            }
-            .foregroundColor(isSelected ? color : AppColors.textMuted)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(isSelected ? color.opacity(0.1) : AppColors.cardBackground)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(isSelected ? color.opacity(0.3) : AppColors.border, lineWidth: 1)
-            )
+            Text(text)
+                .appFont(size: 14, weight: .bold)
+                .foregroundColor(isSelected ? .white : AppColors.textSecondary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 11)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? AppColors.accent : AppColors.cardBackground)
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : AppColors.border, lineWidth: 1)
+                )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -290,7 +282,7 @@ struct FeedLotSelector: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(lots) { lot in
-                    PillView(
+                    FeedPill(
                         text: lot.code,
                         isSelected: lot.id == selectedId
                     ) {
