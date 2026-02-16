@@ -43,3 +43,9 @@ pytest-cov==4.1.0
 freezegun==1.4.0
 # Utilities
 python-dotenv==1.0.0
+
+# Rate limiting
+slowapi==0.1.9
+
+# Anthropic VLM for ticket OCR
+anthropic>=0.40.0

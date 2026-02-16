@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 GCP_PROJECT = "tapout-485821"
-SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON"]
+SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "SMTP_EMAIL", "SMTP_PASSWORD", "ANTHROPIC_API_KEY"]
 
 
 def _load_secrets_from_gcp():
@@ -50,10 +50,14 @@ class Settings(BaseSettings):
     # Secret key for JWT token signing
     secret_key: str = "development-secret-key-change-in-production"
     # Token expiration time in hours
-    access_token_expire_hours: int = 24 * 7  # 1 week
+    access_token_expire_hours: int = 24 * 365 * 10  # 10 years
 
     # UC Davis email domain for verification
     ucd_email_domain: str = "ucdavis.edu"
+
+    # SMTP settings for OTP emails
+    smtp_email: str = ""
+    smtp_password: str = ""
 
     # APNs (Apple Push Notification service) configuration
     apns_key_id: Optional[str] = None
@@ -64,6 +68,9 @@ class Settings(BaseSettings):
 
     # Firebase Cloud Messaging (Android push notifications)
     firebase_credentials_json: Optional[str] = None  # JSON string or file path to service account key
+
+    # Anthropic API key for ticket OCR
+    anthropic_api_key: str = ""
 
     # Reminder settings
     parking_reminder_hours: int = 3  # Hours before sending checkout reminder

@@ -2,6 +2,10 @@ package com.warnabrotha.app.data.repository
 
 import com.warnabrotha.app.data.api.ApiService
 import com.warnabrotha.app.data.model.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,14 +36,32 @@ class AppRepository @Inject constructor(
         }
     }
 
-    suspend fun verifyEmail(email: String): Result<EmailVerificationResponse> {
+    suspend fun sendOTP(email: String): Result<SendOTPResponse> {
         return try {
             val deviceId = tokenRepository.getOrCreateDeviceId()
-            val response = apiService.verifyEmail(EmailVerificationRequest(email, deviceId))
+            val response = apiService.sendOTP(SendOTPRequest(email, deviceId))
             if (response.isSuccessful && response.body() != null) {
                 Result.Success(response.body()!!)
             } else {
-                Result.Error(response.errorBody()?.string() ?: "Email verification failed")
+                Result.Error(response.errorBody()?.string() ?: "Failed to send OTP")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun verifyOTP(email: String, otpCode: String): Result<VerifyOTPResponse> {
+        return try {
+            val deviceId = tokenRepository.getOrCreateDeviceId()
+            val response = apiService.verifyOTP(VerifyOTPRequest(email, deviceId, otpCode))
+            if (response.isSuccessful && response.body() != null) {
+                val verifyResponse = response.body()!!
+                if (verifyResponse.success && verifyResponse.accessToken.isNotEmpty()) {
+                    tokenRepository.saveToken(verifyResponse.accessToken)
+                }
+                Result.Success(verifyResponse)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "OTP verification failed")
             }
         } catch (e: Exception) {
             Result.Error(e.message ?: "Network error")
@@ -252,9 +274,29 @@ class AppRepository @Inject constructor(
         }
     }
 
+    fun hasCompletedOnboarding(): Boolean = tokenRepository.hasCompletedOnboarding()
+
+    fun setCompletedOnboarding(completed: Boolean) = tokenRepository.setCompletedOnboarding(completed)
+
     fun hasToken(): Boolean = tokenRepository.hasToken()
 
     fun getSavedPushToken(): String? = tokenRepository.getPushToken()
 
     fun savePushToken(token: String) = tokenRepository.savePushToken(token)
+
+    suspend fun scanTicket(imageFile: File): Result<TicketScanResponse> {
+        return try {
+            val mediaType = "image/*"
+            val requestBody = imageFile.asRequestBody(mediaType.toMediaTypeOrNull())
+            val part = MultipartBody.Part.createFormData("image", imageFile.name, requestBody)
+            val response = apiService.scanTicket(part)
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.errorBody()?.string() ?: "Failed to scan ticket")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
 }

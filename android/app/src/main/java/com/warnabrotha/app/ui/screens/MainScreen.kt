@@ -1,5 +1,6 @@
 package com.warnabrotha.app.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.warnabrotha.app.ui.theme.*
 import com.warnabrotha.app.ui.viewmodel.AppUiState
+import com.warnabrotha.app.ui.viewmodel.ScanState
 
 @Composable
 fun MainScreen(
@@ -36,6 +38,10 @@ fun MainScreen(
     onDownvote: (Int) -> Unit,
     onClearError: () -> Unit,
     onClearSuccess: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickFromLibrary: () -> Unit,
+    onSubmitScan: () -> Unit,
+    onResetScan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -88,7 +94,19 @@ fun MainScreen(
                         onDownvote = onDownvote,
                         modifier = Modifier.fillMaxSize()
                     )
-                    2 -> MapTab(
+                    2 -> ScanTab(
+                        scanState = uiState.scanState,
+                        scanImageUri = uiState.scanImageUri,
+                        scanResult = uiState.scanResult,
+                        scanError = uiState.scanError,
+                        isLoading = uiState.isLoading,
+                        onTakePhoto = onTakePhoto,
+                        onPickFromLibrary = onPickFromLibrary,
+                        onSubmitScan = onSubmitScan,
+                        onResetScan = onResetScan,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    3 -> MapTab(
                         parkingLots = uiState.parkingLots,
                         lotStats = uiState.lotStats,
                         currentSession = uiState.currentSession,
@@ -209,10 +227,17 @@ private fun AppBottomNav(
         }
 
         NavTab(
-            icon = Icons.Outlined.Map,
-            label = "Map",
+            icon = Icons.Outlined.DocumentScanner,
+            label = "Scan",
             isSelected = selectedTab == 2,
             onClick = { onTabSelected(2) }
+        )
+
+        NavTab(
+            icon = Icons.Outlined.Map,
+            label = "Map",
+            isSelected = selectedTab == 3,
+            onClick = { onTabSelected(3) }
         )
     }
 }

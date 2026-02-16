@@ -75,12 +75,43 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int = Field(..., description="Token expiration time in seconds")
+    email_verified: bool = False
 
     class Config:
         json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer",
-                "expires_in": 604800
+                "expires_in": 604800,
+                "email_verified": False
             }
         }
+
+
+class SendOTPRequest(BaseModel):
+    """Schema for requesting an OTP code."""
+    email: EmailStr = Field(..., description="UC Davis email address")
+    device_id: str = Field(..., min_length=1, max_length=255, description="Device ID")
+
+
+class SendOTPResponse(BaseModel):
+    """Schema for OTP send response."""
+    success: bool
+    message: str
+
+
+class VerifyOTPRequest(BaseModel):
+    """Schema for verifying an OTP code."""
+    email: EmailStr = Field(..., description="UC Davis email address")
+    device_id: str = Field(..., min_length=1, max_length=255, description="Device ID")
+    otp_code: str = Field(..., min_length=6, max_length=6, description="6-digit OTP code")
+
+
+class VerifyOTPResponse(BaseModel):
+    """Schema for OTP verification response."""
+    success: bool
+    message: str
+    email_verified: bool = False
+    access_token: str = ""
+    token_type: str = "bearer"
+    expires_in: int = 0

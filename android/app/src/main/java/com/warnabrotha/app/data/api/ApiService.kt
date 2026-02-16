@@ -1,6 +1,7 @@
 package com.warnabrotha.app.data.api
 
 import com.warnabrotha.app.data.model.*
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -10,8 +11,11 @@ interface ApiService {
     @POST("auth/register")
     suspend fun register(@Body registration: DeviceRegistration): Response<TokenResponse>
 
-    @POST("auth/verify-email")
-    suspend fun verifyEmail(@Body request: EmailVerificationRequest): Response<EmailVerificationResponse>
+    @POST("auth/send-otp")
+    suspend fun sendOTP(@Body request: SendOTPRequest): Response<SendOTPResponse>
+
+    @POST("auth/verify-otp")
+    suspend fun verifyOTP(@Body request: VerifyOTPRequest): Response<VerifyOTPResponse>
 
     @GET("auth/me")
     suspend fun getDeviceInfo(): Response<DeviceResponse>
@@ -80,4 +84,9 @@ interface ApiService {
     // Global Stats
     @GET("stats")
     suspend fun getGlobalStats(): Response<GlobalStatsResponse>
+
+    // Ticket Scan
+    @Multipart
+    @POST("ticket-scan")
+    suspend fun scanTicket(@Part image: MultipartBody.Part): Response<TicketScanResponse>
 }

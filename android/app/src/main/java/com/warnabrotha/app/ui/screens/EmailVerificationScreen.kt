@@ -24,12 +24,48 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.warnabrotha.app.ui.theme.*
+import com.warnabrotha.app.ui.viewmodel.OTPStep
 
 @Composable
 fun EmailVerificationScreen(
     isLoading: Boolean,
     error: String?,
-    onVerify: (String) -> Unit,
+    otpStep: OTPStep,
+    otpEmail: String,
+    canResendOTP: Boolean,
+    resendCooldownSeconds: Int,
+    onSendOTP: (String) -> Unit,
+    onVerifyOTP: (String) -> Unit,
+    onResendOTP: () -> Unit,
+    onChangeEmail: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when (otpStep) {
+        OTPStep.EMAIL_INPUT -> EmailInputStep(
+            isLoading = isLoading,
+            error = error,
+            onSendOTP = onSendOTP,
+            modifier = modifier
+        )
+        OTPStep.CODE_INPUT -> OTPCodeInputStep(
+            isLoading = isLoading,
+            error = error,
+            otpEmail = otpEmail,
+            canResendOTP = canResendOTP,
+            resendCooldownSeconds = resendCooldownSeconds,
+            onVerifyOTP = onVerifyOTP,
+            onResendOTP = onResendOTP,
+            onChangeEmail = onChangeEmail,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun EmailInputStep(
+    isLoading: Boolean,
+    error: String?,
+    onSendOTP: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var email by remember { mutableStateOf("") }
@@ -97,7 +133,7 @@ fun EmailVerificationScreen(
 
             // Description
             Text(
-                text = "Enter your UC Davis email to access the\nTapOut alert system and avoid parking\ntickets.",
+                text = "Enter your UC Davis email to receive\na verification code.",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
@@ -136,7 +172,7 @@ fun EmailVerificationScreen(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             if (isValidEmail && !isLoading) {
-                                onVerify(email)
+                                onSendOTP(email)
                             }
                         }
                     ),
@@ -234,7 +270,7 @@ fun EmailVerificationScreen(
                 )
             } else {
                 Button(
-                    onClick = { onVerify(email) },
+                    onClick = { onSendOTP(email) },
                     enabled = isValidEmail,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -256,7 +292,7 @@ fun EmailVerificationScreen(
                     )
                 ) {
                     Text(
-                        text = "SUBMIT",
+                        text = "SEND CODE",
                         style = MaterialTheme.typography.titleSmall.copy(
                             letterSpacing = 0.35.sp
                         ),
@@ -293,6 +329,258 @@ fun EmailVerificationScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun OTPCodeInputStep(
+    isLoading: Boolean,
+    error: String?,
+    otpEmail: String,
+    canResendOTP: Boolean,
+    resendCooldownSeconds: Int,
+    onVerifyOTP: (String) -> Unit,
+    onResendOTP: () -> Unit,
+    onChangeEmail: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var otpCode by remember { mutableStateOf("") }
+    val isValidCode = otpCode.length == 6
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Background)
+    ) {
+        // Back button → change email
+        IconButton(
+            onClick = onChangeEmail,
+            modifier = Modifier.padding(start = 16.dp, top = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBackIosNew,
+                contentDescription = "Back",
+                tint = Green500,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Lock icon
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .shadow(
+                        elevation = 10.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = GreenShadow,
+                        spotColor = GreenShadow
+                    )
+                    .background(Green500, RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = TextOnPrimary,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Enter Verification Code",
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextPrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Code sent to $otpEmail",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // OTP input
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "6-DIGIT CODE",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Green500
+                )
+
+                OutlinedTextField(
+                    value = otpCode,
+                    onValueChange = { newValue ->
+                        val filtered = newValue.filter { it.isDigit() }.take(6)
+                        otpCode = filtered
+                    },
+                    placeholder = {
+                        Text("000000", color = TextMuted)
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (isValidCode && !isLoading) {
+                                onVerifyOTP(otpCode)
+                            }
+                        }
+                    ),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Pin,
+                            contentDescription = null,
+                            tint = if (isValidCode) Green500 else TextMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (otpCode.isNotEmpty()) {
+                            Icon(
+                                imageVector = if (isValidCode) Icons.Default.CheckCircle else Icons.Default.Error,
+                                contentDescription = null,
+                                tint = if (isValidCode) Green500 else Red500,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Green500,
+                        unfocusedBorderColor = BorderLight,
+                        errorBorderColor = Red500,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = Green500,
+                        focusedContainerColor = Surface,
+                        unfocusedContainerColor = Surface
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Error
+            if (error != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(RedOverlay10, RoundedCornerShape(12.dp))
+                        .border(1.dp, Red500.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = Red500,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Red500
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Verify button
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(32.dp),
+                    color = Green500,
+                    strokeWidth = 3.dp
+                )
+            } else {
+                Button(
+                    onClick = { onVerifyOTP(otpCode) },
+                    enabled = isValidCode,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .then(
+                            if (isValidCode) Modifier.shadow(
+                                elevation = 10.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                ambientColor = GreenShadow,
+                                spotColor = GreenShadow
+                            ) else Modifier
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Green500,
+                        contentColor = TextOnPrimary,
+                        disabledContainerColor = Green500.copy(alpha = 0.4f),
+                        disabledContentColor = TextOnPrimary.copy(alpha = 0.6f)
+                    )
+                ) {
+                    Text(
+                        text = "VERIFY",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            letterSpacing = 0.35.sp
+                        ),
+                        color = TextOnPrimary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Resend / Change email
+            if (canResendOTP) {
+                TextButton(onClick = onResendOTP) {
+                    Text(
+                        text = "Resend Code",
+                        color = Green500,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            } else if (resendCooldownSeconds > 0) {
+                Text(
+                    text = "Resend in ${resendCooldownSeconds}s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted
+                )
+            }
+
+            TextButton(onClick = onChangeEmail) {
+                Text(
+                    text = "Change Email",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
 
             Spacer(modifier = Modifier.height(24.dp))
         }
