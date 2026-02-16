@@ -72,7 +72,7 @@ async def scan_ticket(
         ticket_data = TicketOCRService.extract_ticket_data(image_bytes, image.content_type)
     except ValueError as e:
         logger.warning(f"Ticket OCR failed: {e}")
-        return TicketScanResponse(success=True, is_recent=False)
+        return TicketScanResponse(success=False, is_recent=False)
     except Exception as e:
         logger.error(f"Ticket OCR error: {e}")
         raise HTTPException(
