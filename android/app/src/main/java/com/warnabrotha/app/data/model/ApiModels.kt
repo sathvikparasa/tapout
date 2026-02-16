@@ -221,3 +221,17 @@ data class GlobalStatsResponse(
     @SerializedName("total_parked") val totalParked: Int,
     @SerializedName("total_sightings_today") val totalSightingsToday: Int
 )
+
+// Ticket Scan
+data class TicketScanResponse(
+    val success: Boolean,
+    @SerializedName("ticket_date") val ticketDate: String?,
+    @SerializedName("ticket_time") val ticketTime: String?,
+    @SerializedName("ticket_location") val ticketLocation: String?,
+    @SerializedName("mapped_lot_id") val mappedLotId: Int?,
+    @SerializedName("mapped_lot_name") val mappedLotName: String?,
+    @SerializedName("mapped_lot_code") val mappedLotCode: String?,
+    @SerializedName("is_recent") val isRecent: Boolean,
+    @SerializedName("sighting_id") val sightingId: Int?,
+    @SerializedName("users_notified") val usersNotified: Int
+)
