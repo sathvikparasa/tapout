@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.warnabrotha.app.ui.screens.EmailVerificationScreen
+import com.warnabrotha.app.ui.viewmodel.OTPStep
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -21,7 +22,14 @@ class EmailVerificationScreenTest {
                 EmailVerificationScreen(
                     isLoading = false,
                     error = null,
-                    onVerify = { }
+                    otpStep = OTPStep.EMAIL_INPUT,
+                    otpEmail = "",
+                    canResendOTP = false,
+                    resendCooldownSeconds = 0,
+                    onSendOTP = { },
+                    onVerifyOTP = { },
+                    onResendOTP = { },
+                    onChangeEmail = { }
                 )
             }
         }
@@ -33,13 +41,20 @@ class EmailVerificationScreenTest {
 
     @Test
     fun submitWithValidEmail() {
-        var verifiedEmail = ""
+        var sentEmail = ""
         composeTestRule.setContent {
             MaterialTheme {
                 EmailVerificationScreen(
                     isLoading = false,
                     error = null,
-                    onVerify = { verifiedEmail = it }
+                    otpStep = OTPStep.EMAIL_INPUT,
+                    otpEmail = "",
+                    canResendOTP = false,
+                    resendCooldownSeconds = 0,
+                    onSendOTP = { sentEmail = it },
+                    onVerifyOTP = { },
+                    onResendOTP = { },
+                    onChangeEmail = { }
                 )
             }
         }
@@ -47,10 +62,10 @@ class EmailVerificationScreenTest {
         // Type a valid UCD email
         composeTestRule.onNodeWithText("yourname@ucdavis.edu").performTextInput("testuser@ucdavis.edu")
 
-        // SUBMIT should now be clickable
-        composeTestRule.onNodeWithText("SUBMIT").performClick()
+        // SEND CODE should now be clickable
+        composeTestRule.onNodeWithText("SEND CODE").performClick()
 
-        assertEquals("testuser@ucdavis.edu", verifiedEmail)
+        assertEquals("testuser@ucdavis.edu", sentEmail)
     }
 
     @Test
@@ -61,7 +76,14 @@ class EmailVerificationScreenTest {
                 EmailVerificationScreen(
                     isLoading = false,
                     error = null,
-                    onVerify = { called = true }
+                    otpStep = OTPStep.EMAIL_INPUT,
+                    otpEmail = "",
+                    canResendOTP = false,
+                    resendCooldownSeconds = 0,
+                    onSendOTP = { called = true },
+                    onVerifyOTP = { },
+                    onResendOTP = { },
+                    onChangeEmail = { }
                 )
             }
         }
@@ -69,9 +91,9 @@ class EmailVerificationScreenTest {
         // Type an invalid email
         composeTestRule.onNodeWithText("yourname@ucdavis.edu").performTextInput("user@gmail.com")
 
-        // SUBMIT button should be disabled — click should not trigger callback
-        composeTestRule.onNodeWithText("SUBMIT").assertIsDisplayed()
-        composeTestRule.onNodeWithText("SUBMIT").performClick()
+        // SEND CODE button should be disabled -- click should not trigger callback
+        composeTestRule.onNodeWithText("SEND CODE").assertIsDisplayed()
+        composeTestRule.onNodeWithText("SEND CODE").performClick()
 
         assertTrue(!called)
     }

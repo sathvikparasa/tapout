@@ -23,6 +23,8 @@ from app.models.notification import Notification, NotificationType
 from app.services.auth import AuthService
 from app.services.notification import NotificationService
 from app.services.reminder import ReminderService
+from app.services.otp import OTPService
+from app.services.email import EmailService
 
 API = "/api/v1"
 
@@ -734,12 +736,21 @@ class TestAuthFlowProtectedEndpoints:
         r = await client.post(f"{API}/sessions/checkin", json={"parking_lot_id": lot.id}, headers=hdrs)
         assert r.status_code == 403
 
-        # Verify email
+        # Verify email via OTP
+        with patch.object(OTPService, "generate_otp", return_value="123456"), \
+             patch.object(EmailService, "send_otp_email", new_callable=AsyncMock):
+            r = await client.post(
+                f"{API}/auth/send-otp",
+                json={"device_id": device_id, "email": "test@ucdavis.edu"},
+            )
+            assert r.status_code == 200
+
         r = await client.post(
-            f"{API}/auth/verify-email",
-            json={"device_id": device_id, "email": "test@ucdavis.edu"},
+            f"{API}/auth/verify-otp",
+            json={"device_id": device_id, "email": "test@ucdavis.edu", "otp_code": "123456"},
         )
         assert r.status_code == 200
+        assert r.json()["email_verified"] is True
 
         # Now checkin works
         r = await client.post(f"{API}/sessions/checkin", json={"parking_lot_id": lot.id}, headers=hdrs)

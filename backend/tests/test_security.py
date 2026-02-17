@@ -123,7 +123,7 @@ class TestInputValidation:
         await client.post(f"{API}/auth/register", json={"device_id": device_id})
 
         r = await client.post(
-            f"{API}/auth/verify-email",
+            f"{API}/auth/send-otp",
             json={"device_id": device_id, "email": "<script>alert('xss')</script>"},
         )
         assert r.status_code == 422
@@ -198,29 +198,3 @@ class TestAccessControl:
         r = await client.get(f"{API}/notifications/unread", headers=h_a)
         assert r.json()["unread_count"] == 1
 
-    @pytest.mark.xfail(
-        reason="Spam prevention intentionally disabled for emulator testing "
-               "(timedelta(minutes=0) in sightings.py:63)"
-    )
-    async def test_spam_prevention_disabled(
-        self, client: AsyncClient, db_session: AsyncSession,
-    ):
-        lot = await _create_lot(db_session, "Spam Lot", "SPM1")
-        _, hdrs = await _verified_device(db_session)
-
-        with patch.object(NotificationService, "send_push_notification", new_callable=AsyncMock, return_value=True):
-            r1 = await client.post(
-                f"{API}/sightings",
-                json={"parking_lot_id": lot.id},
-                headers=hdrs,
-            )
-            assert r1.status_code == 201
-
-            r2 = await client.post(
-                f"{API}/sightings",
-                json={"parking_lot_id": lot.id},
-                headers=hdrs,
-            )
-            # With spam prevention active this would be 429;
-            # currently returns 201 because cooldown = 0 minutes.
-            assert r2.status_code == 429

@@ -39,7 +39,11 @@ class MainScreenAdvancedTest {
                     onUpvote = noopInt,
                     onDownvote = noopInt,
                     onClearError = noop,
-                    onClearSuccess = noop
+                    onClearSuccess = noop,
+                    onTakePhoto = noop,
+                    onPickFromLibrary = noop,
+                    onSubmitScan = noop,
+                    onResetScan = noop
                 )
             }
         }

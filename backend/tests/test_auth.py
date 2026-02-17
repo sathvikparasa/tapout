@@ -4,6 +4,7 @@ Tests for authentication endpoints and services.
 
 import uuid
 from datetime import timedelta
+from unittest.mock import patch, AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.device import Device
 from app.services.auth import AuthService
+from app.services.otp import OTPService
+from app.services.email import EmailService
 
 
 class TestAuthService:
@@ -199,26 +202,26 @@ class TestAuthEndpoints:
         assert response2.status_code == 201
 
     @pytest.mark.asyncio
-    async def test_verify_email_valid(self, client: AsyncClient, test_device):
-        """Test email verification with valid UC Davis email."""
-        response = await client.post(
-            "/api/v1/auth/verify-email",
-            json={
-                "device_id": test_device.device_id,
-                "email": "student@ucdavis.edu"
-            }
-        )
+    async def test_send_otp_valid_email(self, client: AsyncClient, test_device):
+        """Test sending OTP to valid UC Davis email."""
+        with patch.object(EmailService, "send_otp_email", new_callable=AsyncMock):
+            response = await client.post(
+                "/api/v1/auth/send-otp",
+                json={
+                    "device_id": test_device.device_id,
+                    "email": "student@ucdavis.edu"
+                }
+            )
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["email_verified"] is True
 
     @pytest.mark.asyncio
-    async def test_verify_email_invalid_domain(self, client: AsyncClient, test_device):
-        """Test email verification with non-UC Davis email."""
+    async def test_send_otp_invalid_domain(self, client: AsyncClient, test_device):
+        """Test sending OTP to non-UC Davis email."""
         response = await client.post(
-            "/api/v1/auth/verify-email",
+            "/api/v1/auth/send-otp",
             json={
                 "device_id": test_device.device_id,
                 "email": "student@gmail.com"
@@ -228,17 +231,85 @@ class TestAuthEndpoints:
         assert response.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_verify_email_unregistered_device(self, client: AsyncClient):
-        """Test email verification for unregistered device."""
+    async def test_send_otp_unregistered_device(self, client: AsyncClient):
+        """Test sending OTP for unregistered device."""
         response = await client.post(
-            "/api/v1/auth/verify-email",
+            "/api/v1/auth/send-otp",
             json={
                 "device_id": str(uuid.uuid4()),
                 "email": "student@ucdavis.edu"
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_verify_otp_success(self, client: AsyncClient, test_device):
+        """Test OTP verification with correct code."""
+        with patch.object(OTPService, "generate_otp", return_value="123456"), \
+             patch.object(EmailService, "send_otp_email", new_callable=AsyncMock):
+            await client.post(
+                "/api/v1/auth/send-otp",
+                json={
+                    "device_id": test_device.device_id,
+                    "email": "student@ucdavis.edu"
+                }
+            )
+
+        response = await client.post(
+            "/api/v1/auth/verify-otp",
+            json={
+                "device_id": test_device.device_id,
+                "email": "student@ucdavis.edu",
+                "otp_code": "123456"
+            }
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["email_verified"] is True
+        assert "access_token" in data
+
+    @pytest.mark.asyncio
+    async def test_verify_otp_wrong_code(self, client: AsyncClient, test_device):
+        """Test OTP verification with wrong code."""
+        with patch.object(OTPService, "generate_otp", return_value="123456"), \
+             patch.object(EmailService, "send_otp_email", new_callable=AsyncMock):
+            await client.post(
+                "/api/v1/auth/send-otp",
+                json={
+                    "device_id": test_device.device_id,
+                    "email": "student@ucdavis.edu"
+                }
+            )
+
+        response = await client.post(
+            "/api/v1/auth/verify-otp",
+            json={
+                "device_id": test_device.device_id,
+                "email": "student@ucdavis.edu",
+                "otp_code": "000000"
+            }
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_verify_otp_unregistered_device(self, client: AsyncClient):
+        """Test OTP verification for unregistered device."""
+        response = await client.post(
+            "/api/v1/auth/verify-otp",
+            json={
+                "device_id": str(uuid.uuid4()),
+                "email": "student@ucdavis.edu",
+                "otp_code": "123456"
+            }
+        )
+
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_get_device_info(self, client: AsyncClient, auth_headers):

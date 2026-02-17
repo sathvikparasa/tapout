@@ -23,6 +23,7 @@ from app.models.parking_session import ParkingSession
 from app.models.taps_sighting import TapsSighting
 from app.models.notification import Notification
 from app.models.vote import Vote
+from app.models.email_otp import EmailOTP
 from app.services.auth import AuthService
 
 # Use SQLite for tests (in-memory)

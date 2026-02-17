@@ -73,21 +73,40 @@ class ApiServiceTest {
     }
 
     @Test
-    fun verifyEmailSendsCorrectRequest() = runTest {
+    fun sendOTPSendsCorrectRequest() = runTest {
         mockWebServer.enqueue(
             MockResponse()
                 .setResponseCode(200)
-                .setBody("""{"success":true,"message":"ok","email_verified":true}""")
+                .setBody("""{"success":true,"message":"OTP sent"}""")
         )
 
-        apiService.verifyEmail(EmailVerificationRequest("user@ucdavis.edu", "dev-1"))
+        apiService.sendOTP(SendOTPRequest("user@ucdavis.edu", "dev-1"))
 
         val request = mockWebServer.takeRequest()
         assertEquals("POST", request.method)
-        assertEquals("/auth/verify-email", request.path)
+        assertEquals("/auth/send-otp", request.path)
         val body = request.body.readUtf8()
         assertTrue(body.contains("\"email\":\"user@ucdavis.edu\""))
         assertTrue(body.contains("\"device_id\":\"dev-1\""))
+    }
+
+    @Test
+    fun verifyOTPSendsCorrectRequest() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"success":true,"message":"Verified","email_verified":true,"access_token":"tok","token_type":"bearer","expires_in":3600}""")
+        )
+
+        apiService.verifyOTP(VerifyOTPRequest("user@ucdavis.edu", "dev-1", "123456"))
+
+        val request = mockWebServer.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/auth/verify-otp", request.path)
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("\"email\":\"user@ucdavis.edu\""))
+        assertTrue(body.contains("\"device_id\":\"dev-1\""))
+        assertTrue(body.contains("\"otp_code\":\"123456\""))
     }
 
     @Test

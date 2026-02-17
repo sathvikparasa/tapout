@@ -150,23 +150,45 @@ class AppRepositoryTest {
     }
 
     @Test
-    fun verifyEmailSuccess() = runTest {
-        val response = EmailVerificationResponse(
-            success = true, message = "Verified", emailVerified = true
-        )
-        coEvery { apiService.verifyEmail(any()) } returns Response.success(response)
+    fun sendOTPSuccess() = runTest {
+        val response = SendOTPResponse(success = true, message = "OTP sent")
+        coEvery { apiService.sendOTP(any()) } returns Response.success(response)
 
-        val result = repository.verifyEmail("user@ucdavis.edu")
+        val result = repository.sendOTP("user@ucdavis.edu")
 
         assertTrue(result is Result.Success)
-        assertTrue((result as Result.Success).data.emailVerified)
+        assertTrue((result as Result.Success).data.success)
     }
 
     @Test
-    fun verifyEmailFailure() = runTest {
-        coEvery { apiService.verifyEmail(any()) } returns errorResponse(400, "Invalid email")
+    fun sendOTPFailure() = runTest {
+        coEvery { apiService.sendOTP(any()) } returns errorResponse(400, "Invalid email")
 
-        val result = repository.verifyEmail("user@gmail.com")
+        val result = repository.sendOTP("user@gmail.com")
+
+        assertTrue(result is Result.Error)
+    }
+
+    @Test
+    fun verifyOTPSuccess() = runTest {
+        val response = VerifyOTPResponse(
+            success = true, message = "Verified", emailVerified = true,
+            accessToken = "new-token", tokenType = "bearer", expiresIn = 3600
+        )
+        coEvery { apiService.verifyOTP(any()) } returns Response.success(response)
+
+        val result = repository.verifyOTP("user@ucdavis.edu", "123456")
+
+        assertTrue(result is Result.Success)
+        assertTrue((result as Result.Success).data.emailVerified)
+        verify { tokenRepository.saveToken("new-token") }
+    }
+
+    @Test
+    fun verifyOTPFailure() = runTest {
+        coEvery { apiService.verifyOTP(any()) } returns errorResponse(400, "Invalid OTP")
+
+        val result = repository.verifyOTP("user@ucdavis.edu", "000000")
 
         assertTrue(result is Result.Error)
     }

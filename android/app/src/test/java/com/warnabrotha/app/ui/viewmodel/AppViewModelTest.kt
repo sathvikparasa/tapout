@@ -106,7 +106,10 @@ class AppViewModelTest {
 
     private fun createAuthenticatedViewModel(): AppViewModel {
         every { repository.hasToken() } returns true
-        coEvery { repository.getDeviceInfo() } returns Result.Success(testDeviceResponse)
+        every { repository.hasCompletedOnboarding() } returns true
+        coEvery { repository.register() } returns Result.Success(
+            TokenResponse("test-token", "bearer", 3600, emailVerified = true)
+        )
         mockLoadInitialData()
         return AppViewModel(repository)
     }
@@ -142,8 +145,9 @@ class AppViewModelTest {
     @Test
     fun checkAuthStatusWithTokenUnverified() {
         every { repository.hasToken() } returns true
-        val unverifiedDevice = testDeviceResponse.copy(emailVerified = false)
-        coEvery { repository.getDeviceInfo() } returns Result.Success(unverifiedDevice)
+        coEvery { repository.register() } returns Result.Success(
+            TokenResponse("test-token", "bearer", 3600, emailVerified = false)
+        )
 
         val viewModel = createViewModel()
         val state = viewModel.uiState.value
@@ -192,13 +196,50 @@ class AppViewModelTest {
     }
 
     @Test
-    fun verifyEmailSuccess() {
+    fun sendOTPSuccess() {
         val viewModel = createViewModel()
-        val response = EmailVerificationResponse(true, "Verified", true)
-        coEvery { repository.verifyEmail("user@ucdavis.edu") } returns Result.Success(response)
+        coEvery { repository.sendOTP("user@ucdavis.edu") } returns Result.Success(
+            SendOTPResponse(true, "OTP sent")
+        )
+
+        viewModel.sendOTP("user@ucdavis.edu")
+        val state = viewModel.uiState.value
+
+        assertEquals(OTPStep.CODE_INPUT, state.otpStep)
+        assertEquals("user@ucdavis.edu", state.otpEmail)
+        assertFalse(state.isLoading)
+    }
+
+    @Test
+    fun sendOTPFailure() {
+        val viewModel = createViewModel()
+        coEvery { repository.sendOTP("user@gmail.com") } returns Result.Success(
+            SendOTPResponse(false, "Invalid email domain")
+        )
+
+        viewModel.sendOTP("user@gmail.com")
+        val state = viewModel.uiState.value
+
+        assertEquals("Invalid email domain", state.error)
+        assertFalse(state.isLoading)
+    }
+
+    @Test
+    fun verifyOTPSuccess() {
+        val viewModel = createViewModel()
+        coEvery { repository.sendOTP("user@ucdavis.edu") } returns Result.Success(
+            SendOTPResponse(true, "OTP sent")
+        )
+        coEvery { repository.verifyOTP("user@ucdavis.edu", "123456") } returns Result.Success(
+            VerifyOTPResponse(
+                success = true, message = "Verified", emailVerified = true,
+                accessToken = "tok", tokenType = "bearer", expiresIn = 3600
+            )
+        )
         mockLoadInitialData()
 
-        viewModel.verifyEmail("user@ucdavis.edu")
+        viewModel.sendOTP("user@ucdavis.edu")
+        viewModel.verifyOTP("123456")
         val state = viewModel.uiState.value
 
         assertTrue(state.isEmailVerified)
@@ -208,25 +249,15 @@ class AppViewModelTest {
     }
 
     @Test
-    fun verifyEmailNotVerified() {
+    fun verifyOTPError() {
         val viewModel = createViewModel()
-        val response = EmailVerificationResponse(false, "Invalid email domain", false)
-        coEvery { repository.verifyEmail("user@gmail.com") } returns Result.Success(response)
+        coEvery { repository.sendOTP("user@ucdavis.edu") } returns Result.Success(
+            SendOTPResponse(true, "OTP sent")
+        )
+        coEvery { repository.verifyOTP("user@ucdavis.edu", "000000") } returns Result.Error("Server error")
 
-        viewModel.verifyEmail("user@gmail.com")
-        val state = viewModel.uiState.value
-
-        assertFalse(state.isEmailVerified)
-        assertEquals("Invalid email domain", state.error)
-        assertFalse(state.isLoading)
-    }
-
-    @Test
-    fun verifyEmailError() {
-        val viewModel = createViewModel()
-        coEvery { repository.verifyEmail(any()) } returns Result.Error("Server error")
-
-        viewModel.verifyEmail("user@ucdavis.edu")
+        viewModel.sendOTP("user@ucdavis.edu")
+        viewModel.verifyOTP("000000")
         val state = viewModel.uiState.value
 
         assertFalse(state.isEmailVerified)
@@ -377,7 +408,10 @@ class AppViewModelTest {
             totalSightings = 1
         )
         every { repository.hasToken() } returns true
-        coEvery { repository.getDeviceInfo() } returns Result.Success(testDeviceResponse)
+        every { repository.hasCompletedOnboarding() } returns true
+        coEvery { repository.register() } returns Result.Success(
+            TokenResponse("test-token", "bearer", 3600, emailVerified = true)
+        )
         coEvery { repository.getParkingLots() } returns Result.Success(testLots)
         coEvery { repository.getParkingLot(any()) } returns Result.Success(testLotWithStats)
         coEvery { repository.getAllFeeds() } returns Result.Success(feedsWithSighting)
@@ -414,7 +448,10 @@ class AppViewModelTest {
             totalSightings = 1
         )
         every { repository.hasToken() } returns true
-        coEvery { repository.getDeviceInfo() } returns Result.Success(testDeviceResponse)
+        every { repository.hasCompletedOnboarding() } returns true
+        coEvery { repository.register() } returns Result.Success(
+            TokenResponse("test-token", "bearer", 3600, emailVerified = true)
+        )
         coEvery { repository.getParkingLots() } returns Result.Success(testLots)
         coEvery { repository.getParkingLot(any()) } returns Result.Success(testLotWithStats)
         coEvery { repository.getAllFeeds() } returns Result.Success(feedsWithSighting)

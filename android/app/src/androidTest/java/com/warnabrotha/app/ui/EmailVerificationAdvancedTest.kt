@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.warnabrotha.app.ui.screens.EmailVerificationScreen
+import com.warnabrotha.app.ui.viewmodel.OTPStep
 import org.junit.Rule
 import org.junit.Test
 
@@ -19,7 +20,14 @@ class EmailVerificationAdvancedTest {
                 EmailVerificationScreen(
                     isLoading = false,
                     error = "Invalid email domain",
-                    onVerify = { }
+                    otpStep = OTPStep.EMAIL_INPUT,
+                    otpEmail = "",
+                    canResendOTP = false,
+                    resendCooldownSeconds = 0,
+                    onSendOTP = { },
+                    onVerifyOTP = { },
+                    onResendOTP = { },
+                    onChangeEmail = { }
                 )
             }
         }

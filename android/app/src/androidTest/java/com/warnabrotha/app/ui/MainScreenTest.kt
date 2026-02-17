@@ -46,7 +46,11 @@ class MainScreenTest {
                     onUpvote = noopInt,
                     onDownvote = noopInt,
                     onClearError = noop,
-                    onClearSuccess = noop
+                    onClearSuccess = noop,
+                    onTakePhoto = noop,
+                    onPickFromLibrary = noop,
+                    onSubmitScan = noop,
+                    onResetScan = noop
                 )
             }
         }
@@ -73,7 +77,11 @@ class MainScreenTest {
                     onUpvote = noopInt,
                     onDownvote = noopInt,
                     onClearError = noop,
-                    onClearSuccess = noop
+                    onClearSuccess = noop,
+                    onTakePhoto = noop,
+                    onPickFromLibrary = noop,
+                    onSubmitScan = noop,
+                    onResetScan = noop
                 )
             }
         }
