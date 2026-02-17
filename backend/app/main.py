@@ -23,10 +23,14 @@ from app.api import (
     notifications_router,
     predictions_router,
     feed_router,
+    ticket_scan_router,
 )
 from app.services.reminder import run_reminder_job
 from app.models.parking_lot import ParkingLot
 from app.database import Base
+from app.api.auth import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 # Configure logging
 logging.basicConfig(
@@ -48,7 +52,7 @@ async def seed_initial_data():
         lots_to_seed = [
             {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.5382, "longitude": -121.7617},
             {"name": "Quad Structure", "code": "MU", "latitude": 38.5425, "longitude": -121.7490},
-            {"name": "Parking Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
+            {"name": "Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
         ]
 
         for lot_data in lots_to_seed:
@@ -152,6 +156,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Add CORS middleware for iOS app
 app.add_middleware(
     CORSMiddleware,
@@ -169,6 +176,7 @@ app.include_router(sightings_router, prefix=f"/api/{settings.api_version}")
 app.include_router(notifications_router, prefix=f"/api/{settings.api_version}")
 app.include_router(predictions_router, prefix=f"/api/{settings.api_version}")
 app.include_router(feed_router, prefix=f"/api/{settings.api_version}")
+app.include_router(ticket_scan_router, prefix=f"/api/{settings.api_version}")
 
 
 @app.get("/", tags=["Health"])

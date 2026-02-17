@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
@@ -48,14 +48,18 @@ async def get_sighting_with_votes(
     Returns:
         FeedSighting with vote information
     """
-    # Count upvotes and downvotes using raw SQL to avoid enum type issues
+    # Count upvotes and downvotes using ORM queries
     upvote_result = await db.execute(
-        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'upvote'"),
-        {"sid": sighting.id}
+        select(func.count()).select_from(Vote).where(
+            Vote.sighting_id == sighting.id,
+            Vote.vote_type == VoteTypeModel.UPVOTE
+        )
     )
     downvote_result = await db.execute(
-        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'downvote'"),
-        {"sid": sighting.id}
+        select(func.count()).select_from(Vote).where(
+            Vote.sighting_id == sighting.id,
+            Vote.vote_type == VoteTypeModel.DOWNVOTE
+        )
     )
     upvotes = upvote_result.scalar() or 0
     downvotes = downvote_result.scalar() or 0
@@ -358,14 +362,18 @@ async def get_sighting_votes(
             detail=f"Sighting {sighting_id} not found"
         )
 
-    # Count votes using raw SQL to avoid enum type issues
+    # Count votes using ORM queries
     upvote_result = await db.execute(
-        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'upvote'"),
-        {"sid": sighting_id}
+        select(func.count()).select_from(Vote).where(
+            Vote.sighting_id == sighting_id,
+            Vote.vote_type == VoteTypeModel.UPVOTE
+        )
     )
     downvote_result = await db.execute(
-        text("SELECT COUNT(*) FROM votes WHERE sighting_id = :sid AND vote_type::text = 'downvote'"),
-        {"sid": sighting_id}
+        select(func.count()).select_from(Vote).where(
+            Vote.sighting_id == sighting_id,
+            Vote.vote_type == VoteTypeModel.DOWNVOTE
+        )
     )
     upvotes = upvote_result.scalar() or 0
     downvotes = downvote_result.scalar() or 0

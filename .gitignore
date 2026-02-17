@@ -73,6 +73,14 @@ android/.cxx/
 backend/__pycache__/
 backend/**/__pycache__/
 
+# Test artifacts
+.pytest_cache/
+**/.pytest_cache/
+htmlcov/
+coverage.xml
+.coverage
+*.cover
+
 # Android Secrets
 android/secrets.properties
 android/local.defaults.properties

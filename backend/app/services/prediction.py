@@ -41,6 +41,7 @@ class PredictionService:
         cls,
         db: AsyncSession,
         timestamp: Optional[datetime] = None,
+        lot_id: Optional[int] = None,
     ) -> PredictionResponse:
         now = timestamp or datetime.now(timezone.utc)
 
@@ -50,23 +51,37 @@ class PredictionService:
         today_start_pacific = now_pacific.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_pacific.astimezone(timezone.utc)
 
-        # Find the most recent sighting globally (across all lots) from today
+        # Find the most recent sighting from today, filtered by lot if provided
         query = (
             select(TapsSighting, ParkingLot)
             .join(ParkingLot, TapsSighting.parking_lot_id == ParkingLot.id)
             .where(TapsSighting.reported_at >= today_start_utc)
-            .order_by(TapsSighting.reported_at.desc())
-            .limit(1)
         )
+
+        if lot_id is not None:
+            query = query.where(TapsSighting.parking_lot_id == lot_id)
+
+        query = query.order_by(TapsSighting.reported_at.desc()).limit(1)
 
         result = await db.execute(query)
         row = result.first()
 
+        # If filtering by lot, fetch the lot name for a better no-sighting message
+        lot_name = None
+        if row is None and lot_id is not None:
+            lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
+            lot_obj = lot_result.scalar_one_or_none()
+            if lot_obj:
+                lot_name = lot_obj.name
+
         if row is None:
-            return cls._build_no_sighting_response(now)
+            return cls._build_no_sighting_response(now, lot_name=lot_name)
 
         sighting, lot = row
-        hours_ago = (now - sighting.reported_at).total_seconds() / 3600
+        reported_at = sighting.reported_at
+        if reported_at.tzinfo is None:
+            reported_at = reported_at.replace(tzinfo=timezone.utc)
+        hours_ago = (now - reported_at).total_seconds() / 3600
 
         return cls._build_sighting_response(now, hours_ago, sighting, lot)
 
@@ -96,10 +111,11 @@ class PredictionService:
         return f"{hours_int} hour{'s' if hours_int != 1 else ''} ago"
 
     @classmethod
-    def _build_no_sighting_response(cls, now: datetime) -> PredictionResponse:
+    def _build_no_sighting_response(cls, now: datetime, lot_name: Optional[str] = None) -> PredictionResponse:
+        message = f"TAPS has not been sighted at {lot_name} today" if lot_name else "TAPS has not been sighted today"
         return PredictionResponse(
             risk_level="MEDIUM",
-            risk_message="TAPS has not been sighted today",
+            risk_message=message,
             last_sighting_lot_name=None,
             last_sighting_lot_code=None,
             last_sighting_at=None,

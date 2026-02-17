@@ -103,7 +103,7 @@ async def get_parking_lot(
 
     # Get probability prediction
     try:
-        prediction = await PredictionService.predict(db, lot_id)
+        prediction = await PredictionService.predict(db, lot_id=lot_id)
         taps_probability = prediction.probability
     except Exception:
         taps_probability = 0.0

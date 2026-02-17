@@ -1,5 +1,7 @@
 package com.warnabrotha.app.ui.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
@@ -8,17 +10,32 @@ import com.warnabrotha.app.data.repository.AppRepository
 import com.warnabrotha.app.data.repository.Result
 import kotlinx.coroutines.async
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.File
 import javax.inject.Inject
+
+enum class OTPStep {
+    EMAIL_INPUT,
+    CODE_INPUT
+}
+
+enum class ScanState {
+    IDLE, PREVIEW, PROCESSING, SUCCESS, ERROR
+}
 
 data class AppUiState(
     val isAuthenticated: Boolean = false,
     val isEmailVerified: Boolean = false,
     val showEmailVerification: Boolean = false,
+    val otpStep: OTPStep = OTPStep.EMAIL_INPUT,
+    val otpEmail: String = "",
+    val canResendOTP: Boolean = false,
+    val resendCooldownSeconds: Int = 0,
     val parkingLots: List<ParkingLot> = emptyList(),
     val lotStats: Map<Int, ParkingLotWithStats> = emptyMap(),
     val selectedLot: ParkingLotWithStats? = null,
@@ -37,7 +54,12 @@ data class AppUiState(
     // Notification fields
     val pushToken: String? = null,
     val notificationPermissionGranted: Boolean = false,
-    val unreadNotificationCount: Int = 0
+    val unreadNotificationCount: Int = 0,
+    // Scan fields
+    val scanState: ScanState = ScanState.IDLE,
+    val scanImageUri: Uri? = null,
+    val scanResult: TicketScanResponse? = null,
+    val scanError: String? = null
 )
 
 @HiltViewModel
@@ -49,28 +71,46 @@ class AppViewModel @Inject constructor(
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
     init {
-        checkAuthStatus()
+        if (repository.hasToken() && repository.hasCompletedOnboarding()) {
+            _uiState.value = _uiState.value.copy(
+                isAuthenticated = true,
+                isEmailVerified = true
+            )
+            silentRefresh()
+        } else if (repository.hasToken()) {
+            _uiState.value = _uiState.value.copy(isAuthenticated = true)
+            silentRefresh()
+        }
     }
 
-    fun checkAuthStatus() {
+    private fun silentRefresh() {
         viewModelScope.launch {
-            if (repository.hasToken()) {
-                when (val result = repository.getDeviceInfo()) {
-                    is Result.Success -> {
+            when (val result = repository.register()) {
+                is Result.Success -> {
+                    if (result.data.emailVerified) {
+                        repository.setCompletedOnboarding(true)
                         _uiState.value = _uiState.value.copy(
                             isAuthenticated = true,
-                            isEmailVerified = result.data.emailVerified,
-                            showEmailVerification = !result.data.emailVerified
+                            isEmailVerified = true,
+                            showEmailVerification = false
                         )
-                        if (result.data.emailVerified) {
-                            loadInitialData()
-                        }
-                    }
-                    is Result.Error -> {
+                        loadInitialData()
+                    } else {
                         _uiState.value = _uiState.value.copy(
-                            isAuthenticated = false,
-                            isEmailVerified = false
+                            isAuthenticated = true,
+                            showEmailVerification = true
                         )
+                    }
+                }
+                is Result.Error -> {
+                    // Network error — use existing token optimistically
+                    if (repository.hasCompletedOnboarding()) {
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = true,
+                            isEmailVerified = true,
+                            showEmailVerification = false
+                        )
+                        loadInitialData()
                     }
                 }
             }
@@ -83,11 +123,22 @@ class AppViewModel @Inject constructor(
 
             when (val result = repository.register()) {
                 is Result.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        isAuthenticated = true,
-                        isLoading = false,
-                        showEmailVerification = true
-                    )
+                    if (result.data.emailVerified) {
+                        repository.setCompletedOnboarding(true)
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = true,
+                            isEmailVerified = true,
+                            showEmailVerification = false,
+                            isLoading = false
+                        )
+                        loadInitialData()
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = true,
+                            isLoading = false,
+                            showEmailVerification = true
+                        )
+                    }
                 }
                 is Result.Error -> {
                     _uiState.value = _uiState.value.copy(
@@ -99,16 +150,48 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun verifyEmail(email: String) {
+    fun sendOTP(email: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, otpEmail = email)
+
+            when (val result = repository.sendOTP(email)) {
+                is Result.Success -> {
+                    if (result.data.success) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            otpStep = OTPStep.CODE_INPUT
+                        )
+                        startResendCooldown()
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = result.data.message
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = result.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun verifyOTP(otpCode: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            val email = _uiState.value.otpEmail
 
-            when (val result = repository.verifyEmail(email)) {
+            when (val result = repository.verifyOTP(email, otpCode)) {
                 is Result.Success -> {
-                    if (result.data.emailVerified) {
+                    if (result.data.success && result.data.emailVerified) {
+                        repository.setCompletedOnboarding(true)
                         _uiState.value = _uiState.value.copy(
                             isEmailVerified = true,
                             showEmailVerification = false,
+                            otpStep = OTPStep.EMAIL_INPUT,
                             isLoading = false
                         )
                         loadInitialData()
@@ -126,6 +209,28 @@ class AppViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    fun resendOTP() {
+        sendOTP(_uiState.value.otpEmail)
+    }
+
+    fun changeEmail() {
+        _uiState.value = _uiState.value.copy(
+            otpStep = OTPStep.EMAIL_INPUT,
+            error = null
+        )
+    }
+
+    private fun startResendCooldown() {
+        _uiState.value = _uiState.value.copy(canResendOTP = false, resendCooldownSeconds = 30)
+        viewModelScope.launch {
+            for (i in 29 downTo 0) {
+                delay(1000)
+                _uiState.value = _uiState.value.copy(resendCooldownSeconds = i)
+            }
+            _uiState.value = _uiState.value.copy(canResendOTP = true, resendCooldownSeconds = 0)
         }
     }
 
@@ -386,24 +491,30 @@ class AppViewModel @Inject constructor(
 
     fun vote(sightingId: Int, voteType: String) {
         viewModelScope.launch {
-            val currentVote = _uiState.value.feed?.sightings
-                ?.find { it.id == sightingId }?.userVote
+            // Check the correct data source based on current feed filter
+            val filterLotId = _uiState.value.feedFilterLotId
+            val currentVote = if (filterLotId == null) {
+                _uiState.value.allFeedSightings
+                    .find { it.id == sightingId }?.userVote
+            } else {
+                _uiState.value.feed?.sightings
+                    ?.find { it.id == sightingId }?.userVote
+            }
 
-            if (currentVote == voteType) {
-                // Remove vote
-                when (repository.removeVote(sightingId)) {
-                    is Result.Success -> {
-                        _uiState.value.selectedLotId?.let { loadLotData(it) }
-                    }
-                    is Result.Error -> { /* Handle error */ }
-                }
+            val result = if (currentVote == voteType) {
+                // Remove vote (toggle)
+                repository.removeVote(sightingId)
             } else {
                 // Add or change vote
-                when (repository.vote(sightingId, voteType)) {
-                    is Result.Success -> {
-                        _uiState.value.selectedLotId?.let { loadLotData(it) }
-                    }
-                    is Result.Error -> { /* Handle error */ }
+                repository.vote(sightingId, voteType)
+            }
+
+            if (result is Result.Success) {
+                // Refresh the correct feed view
+                if (filterLotId == null) {
+                    loadAllFeeds()
+                } else {
+                    loadFeedForLot(filterLotId)
                 }
             }
         }
@@ -473,5 +584,85 @@ class AppViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // Scan methods
+    fun selectScanImage(uri: Uri) {
+        _uiState.value = _uiState.value.copy(
+            scanState = ScanState.PREVIEW,
+            scanImageUri = uri,
+            scanResult = null,
+            scanError = null
+        )
+    }
+
+    fun submitTicketScan(context: Context) {
+        val uri = _uiState.value.scanImageUri ?: return
+        _uiState.value = _uiState.value.copy(scanState = ScanState.PROCESSING)
+
+        viewModelScope.launch {
+            try {
+                // Copy URI content to a temp file
+                val tempFile = File(context.cacheDir, "images").also { it.mkdirs() }
+                    .let { File(it, "ticket_${System.currentTimeMillis()}.jpg") }
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tempFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: run {
+                    _uiState.value = _uiState.value.copy(
+                        scanState = ScanState.ERROR,
+                        scanError = "Could not read image file"
+                    )
+                    return@launch
+                }
+
+                when (val result = repository.scanTicket(tempFile)) {
+                    is Result.Success -> {
+                        val response = result.data
+                        if (response.success && (response.ticketDate != null || response.ticketTime != null || response.ticketLocation != null)) {
+                            _uiState.value = _uiState.value.copy(
+                                scanState = ScanState.SUCCESS,
+                                scanResult = response
+                            )
+                            // Refresh feed if a sighting was created
+                            if (response.sightingId != null) {
+                                loadAllFeeds()
+                                refreshAllLotStats()
+                            }
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                scanState = ScanState.ERROR,
+                                scanError = "Could not read ticket. Make sure the photo is clear and shows a UC Davis parking ticket."
+                            )
+                        }
+                    }
+                    is Result.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            scanState = ScanState.ERROR,
+                            scanError = result.message
+                        )
+                    }
+                }
+
+                // Clean up temp file
+                tempFile.delete()
+            } catch (e: Exception) {
+                android.util.Log.e("AppViewModel", "Ticket scan failed", e)
+                _uiState.value = _uiState.value.copy(
+                    scanState = ScanState.ERROR,
+                    scanError = e.message ?: "An unexpected error occurred"
+                )
+            }
+        }
+    }
+
+    fun resetScan() {
+        _uiState.value = _uiState.value.copy(
+            scanState = ScanState.IDLE,
+            scanImageUri = null,
+            scanResult = null,
+            scanError = null
+        )
     }
 }

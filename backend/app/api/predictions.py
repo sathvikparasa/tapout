@@ -41,8 +41,8 @@ async def get_prediction_global(
 @router.get(
     "/{lot_id}",
     response_model=PredictionResponse,
-    summary="Get TAPS risk level",
-    description="Get the current TAPS risk level. The lot_id is accepted for backward compatibility but risk is calculated globally."
+    summary="Get TAPS risk level for a lot",
+    description="Get the current TAPS risk level filtered by a specific parking lot."
 )
 async def get_prediction(
     lot_id: int,
@@ -50,12 +50,11 @@ async def get_prediction(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get TAPS risk prediction for a parking lot.
+    Get TAPS risk prediction for a specific parking lot.
 
-    The lot_id parameter is accepted for backward compatibility.
-    Risk is calculated globally based on the most recent sighting across all lots.
+    Returns risk based on the most recent sighting at this lot today.
     """
-    prediction = await PredictionService.predict(db=db)
+    prediction = await PredictionService.predict(db=db, lot_id=lot_id)
     return prediction
 
 
@@ -73,11 +72,12 @@ async def predict_for_time(
     """
     Get TAPS risk prediction for a specific time.
 
-    - **parking_lot_id**: Accepted for backward compatibility (ignored)
+    - **parking_lot_id**: Optional lot to filter by
     - **timestamp**: Time to predict for (defaults to now)
     """
     prediction = await PredictionService.predict(
         db=db,
         timestamp=request.timestamp or datetime.now(timezone.utc),
+        lot_id=request.parking_lot_id,
     )
     return prediction

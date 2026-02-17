@@ -2,76 +2,108 @@ package com.warnabrotha.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// === TACTICAL COMMAND CENTER PALETTE ===
+// === TAPOUT LIGHT THEME PALETTE ===
 
-// Deep blacks - layered depth
-val Black900 = Color(0xFF050507)
-val Black800 = Color(0xFF0A0A0D)
-val Black700 = Color(0xFF111115)
-val Black600 = Color(0xFF18181D)
-val Black500 = Color(0xFF1F1F26)
+// Primary green
+val Green500 = Color(0xFF9CAF88)
+val Green400 = Color(0xFFB0BF9F)
+val Green600 = Color(0xFF7D8E6D)
+val GreenOverlay5 = Color(0x0D9CAF88)   // 5% opacity
+val GreenOverlay10 = Color(0x1A9CAF88)  // 10% opacity
+val GreenOverlay20 = Color(0x339CAF88)  // 20% opacity
+val GreenShadow = Color(0x339CAF88)     // for button shadows
 
-// Hot amber - primary action color
-val Amber500 = Color(0xFFFF6B00)
-val Amber400 = Color(0xFFFF8C33)
-val Amber600 = Color(0xFFCC5500)
-val AmberGlow = Color(0x33FF6B00)
+// Alert red
+val Red500 = Color(0xFFE57373)
+val Red400 = Color(0xFFEF5350)
+val Red600 = Color(0xFFEF4444)
+val RedOverlay10 = Color(0x1AE57373)
+val RedShadow = Color(0x4DE57373)       // for button shadows
 
-// Alert red - danger/urgent
-val Red500 = Color(0xFFFF3B3B)
-val Red400 = Color(0xFFFF5C5C)
-val Red600 = Color(0xFFCC2F2F)
-val RedGlow = Color(0x33FF3B3B)
+// Risk level colors
+val RiskLow = Color(0xFF81C784)
+val RiskMedium = Color(0xFFFFD54F)
+val RiskHigh = Color(0xFFE57373)
+val RiskBarEmpty = Color(0xFFF2F2EB)
 
-// Status green - safe/success
-val Green500 = Color(0xFF00D26A)
-val Green400 = Color(0xFF33DB88)
-val GreenGlow = Color(0x3300D26A)
+// Live indicator
+val LiveGreen = Color(0xFF22C55E)
 
-// Cool blue - info/secondary
-val Blue500 = Color(0xFF00A3FF)
-val Blue400 = Color(0xFF33B5FF)
-val Blue600 = Color(0xFF0082CC)
-val BlueGlow = Color(0x3300A3FF)
+// Backgrounds
+val Background = Color(0xFFF7F7F7)
+val Surface = Color(0xFFFFFFFF)
 
 // Text hierarchy
-val TextWhite = Color(0xFFF0F0F2)
-val TextGray = Color(0xFF8A8A94)
-val TextMuted = Color(0xFF5A5A64)
+val TextPrimary = Color(0xFF0F172A)
+val TextPrimaryAlt = Color(0xFF2D2D27)  // used in dashboard
+val TextSecondary = Color(0xFF64748B)
+val TextMuted = Color(0xFF94A3B8)
+val TextMutedDark = Color(0xFF6B7280)   // search placeholder
+val TextOnPrimary = Color(0xFFFFFFFF)
 
 // Borders and dividers
-val Border = Color(0xFF2A2A32)
-val BorderLight = Color(0xFF3A3A44)
+val Border = Color(0xFFE2E8F0)
+val BorderLight = Color(0xFFF1F5F9)
+val BorderSubtle = Color(0x0D000000)    // rgba(0,0,0,0.05)
+
+// Shadows (used as tint colors in Compose shadow/elevation)
+val ShadowLight = Color(0x1A000000)     // rgba(0,0,0,0.1)
+
+// Nav inactive
+val NavInactive = Color(0x4D2D2D27)     // #2D2D27 at 30% opacity
+
+// Chip / badge
+val ChipActiveBg = Green500
+val ChipActiveText = Color(0xFFFFFFFF)
+val ChipInactiveBg = Color(0xFFFFFFFF)
+val ChipInactiveBorder = Border
+val ChipInactiveText = TextSecondary
+val BadgeRed = Color(0xFFEF4444)
+
+// Home bar indicator
+val HomeIndicator = Border
 
 // === SEMANTIC ALIASES ===
-val DarkBackground = Black900
-val DarkSurface = Black800
-val DarkCard = Black700
-val DarkCardElevated = Black600
-
-val AccentPrimary = Amber500
-val AccentPrimaryLight = Amber400
-val AccentPrimaryDark = Amber600
-
+val AccentPrimary = Green500
+val AccentPrimaryLight = Green400
+val AccentPrimaryDark = Green600
 val AlertRed = Red500
 val AlertRedLight = Red400
-val SafeGreen = Green500
-val SafeGreenLight = Green400
-val InfoBlue = Blue500
+val SafeGreen = LiveGreen
+val InfoBlue = Color(0xFF3B82F6)
 
-val TextPrimary = TextWhite
-val TextSecondary = TextGray
-val TextTertiary = TextMuted
+// Card backgrounds
+val CardBackground = Surface
+val CardBackgroundMuted = Background
 
+// Legacy compat - keep these so existing screen code compiles during migration
+val DarkBackground = Background
+val DarkSurface = Surface
+val DarkCard = Surface
+val DarkCardElevated = Surface
+val Amber500 = Green500
+val Amber400 = Green400
+val Amber600 = Green600
+val AmberGlow = GreenOverlay20
+val Black900 = Background
+val Black800 = Surface
+val Black700 = Surface
+val Black600 = Surface
+val Black500 = Surface
+val Blue500 = InfoBlue
+val Blue400 = InfoBlue
+val Blue600 = InfoBlue
+val BlueGlow = Color(0x333B82F6)
+val Green500Legacy = LiveGreen
+val Green400Legacy = Color(0xFF4ADE80)
+val GreenGlow = Color(0x3322C55E)
+val Red400Legacy = Red400
+val Red600Legacy = Red600
+val RedGlow = RedOverlay10
+val TextWhite = TextPrimary
+val TextGray = TextSecondary
+val BorderColor = Border
 val DividerColor = Border
-val BorderColor = BorderLight
-
-// Risk colors
-val RiskLow = Green500
-val RiskMedium = Amber500
-val RiskHigh = Red500
-
-// Legacy compatibility
-val AccentBlue = Blue500
-val BrandBlue = Blue500
-val WarningAmber = Amber500
+val AccentBlue = InfoBlue
+val BrandBlue = InfoBlue
+val WarningAmber = RiskMedium
