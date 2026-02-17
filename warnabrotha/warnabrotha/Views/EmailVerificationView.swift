@@ -1,6 +1,6 @@
 //
 //  EmailVerificationView.swift
-//  warnabrotha
+//  TapOut
 //
 //  Windows 95 style email verification - two-step OTP flow.
 //
@@ -15,23 +15,19 @@ struct EmailVerificationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Title bar
-            HStack(spacing: 6) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Win95Colors.titleBarText)
-
-                Text("Verify Email")
-                    .win95Font(size: 14)
-                    .foregroundColor(Win95Colors.titleBarText)
+            // Back button area
+            HStack {
+                Button {
+                    viewModel.isAuthenticated = false
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(AppColors.textPrimary)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(PlainButtonStyle())
 
                 Spacer()
-
-                HStack(spacing: 2) {
-                    Win95TitleButton(symbol: "−")
-                    Win95TitleButton(symbol: "□")
-                    Win95TitleButton(symbol: "×")
-                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
@@ -181,6 +177,29 @@ struct EmailVerificationView: View {
                         if filtered != newValue {
                             otpCode = filtered
                         }
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppColors.cardBackground)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    email.isEmpty
+                                        ? AppColors.border
+                                        : (isValidEmail ? AppColors.accent : AppColors.danger),
+                                    lineWidth: 1
+                                )
+                        )
+
+                        // Validation hint
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12))
+                            Text("Must use UC Davis email address")
+                                .appFont(size: 12)
+                        }
+                        .foregroundColor(AppColors.textMuted)
                     }
 
                 // Error display

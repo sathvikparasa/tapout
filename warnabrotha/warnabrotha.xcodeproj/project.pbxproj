@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B62F3E74030050CF10 /* PushNotificationService.swift */; };
+		570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B82F3E9CB40050CF10 /* MapTab.swift */; };
 		AA000001 /* warnabrothaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* warnabrothaApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* ContentView.swift */; };
 		AA000003 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003 /* APIModels.swift */; };
@@ -46,6 +47,7 @@
 /* Begin PBXFileReference section */
 		570EB4B52F3E737F0050CF10 /* warnabrotha.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = warnabrotha.entitlements; sourceTree = "<group>"; };
 		570EB4B62F3E74030050CF10 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
+		570EB4B82F3E9CB40050CF10 /* MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTab.swift; sourceTree = "<group>"; };
 		5733877D2F2010FB0053D6A8 /* warnabrotha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = warnabrotha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5733878D2F2010FE0053D6A8 /* warnabrothaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -186,6 +188,7 @@
 		AA200008 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				570EB4B82F3E9CB40050CF10 /* MapTab.swift */,
 				AA100008 /* ButtonsTab.swift */,
 				AA100009 /* EmailVerificationView.swift */,
 				AA10000A /* ProbabilityTab.swift */,
@@ -342,6 +345,7 @@
 				570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
 				AA000003 /* APIModels.swift in Sources */,
+				570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */,
 				AA000004 /* APIClient.swift in Sources */,
 				AA000005 /* KeychainService.swift in Sources */,
 				AA000006 /* Win95Theme.swift in Sources */,

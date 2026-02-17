@@ -1,8 +1,8 @@
 //
 //  ContentView.swift
-//  warnabrotha
+//  TapOut
 //
-//  Windows 95 style main content view.
+//  Main content view with TapOut design.
 //
 
 import SwiftUI
@@ -13,8 +13,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            // Fullscreen gray background
-            Win95Colors.windowBackground
+            AppColors.background
                 .ignoresSafeArea()
 
             Group {
@@ -23,202 +22,195 @@ struct ContentView: View {
                 } else if viewModel.showEmailVerification && !viewModel.isEmailVerified {
                     EmailVerificationView(viewModel: viewModel)
                 } else {
-                    // Main app layout - title bar at top, content fills screen
                     VStack(spacing: 0) {
-                        // Title bar - extends edge to edge
-                        Win95TitleBar(title: "WarnABrotha", icon: "car.fill")
-
-                        // Tab content
                         Group {
-                            if selectedTab == 0 {
+                            switch selectedTab {
+                            case 0:
                                 ButtonsTab(viewModel: viewModel)
-                            } else {
+                            case 1:
                                 ProbabilityTab(viewModel: viewModel)
+                            case 2:
+                                MapTab()
+                            default:
+                                ButtonsTab(viewModel: viewModel)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        // Tab bar at bottom
-                        Win95TabBar(selectedTab: $selectedTab)
+                        AppTabBar(
+                            selectedTab: $selectedTab,
+                            feedBadgeCount: viewModel.unreadNotificationCount
+                        )
                     }
-                    .background(Win95Colors.windowBackground)
                 }
             }
             .overlay {
                 if viewModel.isLoading {
-                    Win95LoadingOverlay()
+                    LoadingOverlay()
                 }
             }
         }
     }
 }
 
-// MARK: - Windows 95 Title Bar (Standalone)
+// MARK: - Tab Bar
 
-struct Win95TitleBar: View {
-    let title: String
-    let icon: String?
-
-    init(title: String, icon: String? = nil) {
-        self.title = title
-        self.icon = icon
-    }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if let icon = icon {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Win95Colors.titleBarText)
-            }
-
-            Text(title)
-                .win95Font(size: 14)
-                .foregroundColor(Win95Colors.titleBarText)
-
-            Spacer()
-
-            // Window buttons (decorative)
-            HStack(spacing: 2) {
-                Win95TitleButton(symbol: "−")
-                Win95TitleButton(symbol: "□")
-                Win95TitleButton(symbol: "×")
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            LinearGradient(
-                colors: [Win95Colors.titleBarActive, Win95Colors.titleBarActive.opacity(0.85)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
-    }
-}
-
-// MARK: - Windows 95 Tab Bar
-
-struct Win95TabBar: View {
+struct AppTabBar: View {
     @Binding var selectedTab: Int
+    var feedBadgeCount: Int = 0
 
     var body: some View {
         HStack(spacing: 0) {
-            Win95Tab(
-                title: "Report",
-                icon: "hand.tap.fill",
+            TabBarItem(
+                icon: "square.grid.2x2",
+                label: "Home",
                 isSelected: selectedTab == 0
             ) {
                 selectedTab = 0
             }
 
-            Rectangle()
-                .fill(Win95Colors.buttonShadow)
-                .frame(width: 1)
-
-            Win95Tab(
-                title: "Feed",
-                icon: "chart.bar.fill",
-                isSelected: selectedTab == 1
+            TabBarItem(
+                icon: "dot.radiowaves.left.and.right",
+                label: "Feed",
+                isSelected: selectedTab == 1,
+                badgeCount: feedBadgeCount
             ) {
                 selectedTab = 1
             }
+
+            TabBarItem(
+                icon: "map",
+                label: "Map",
+                isSelected: selectedTab == 2
+            ) {
+                selectedTab = 2
+            }
         }
-        .frame(height: 44)
-        .background(Win95Colors.buttonFace)
-        .overlay(
-            Rectangle()
-                .fill(Win95Colors.buttonHighlight)
-                .frame(height: 1),
-            alignment: .top
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .padding(.horizontal, 40)
+        .background(
+            AppColors.frosted
+                .ignoresSafeArea(edges: .bottom)
         )
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .bottom)
+        )
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(AppColors.border.opacity(0.5))
+                .frame(height: 1)
+        }
     }
 }
 
-struct Win95Tab: View {
-    let title: String
+struct TabBarItem: View {
     let icon: String
+    let label: String
     let isSelected: Bool
+    var badgeCount: Int = 0
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                Text(title)
-                    .win95Font(size: 14)
-            }
-            .foregroundColor(isSelected ? Win95Colors.titleBarActive : Win95Colors.textPrimary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(
-                isSelected ? Win95Colors.windowBackground : Win95Colors.buttonFace
-            )
-            .overlay(
-                // Selected indicator
-                Group {
-                    if isSelected {
-                        VStack {
-                            Rectangle()
-                                .fill(Win95Colors.titleBarActive)
-                                .frame(height: 3)
-                            Spacer()
-                        }
+            VStack(spacing: 4) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: icon)
+                        .font(.system(size: 24, weight: isSelected ? .bold : .regular))
+                        .frame(width: 28, height: 28)
+
+                    if badgeCount > 0 {
+                        Text("\(badgeCount)")
+                            .appFont(size: 10, weight: .bold)
+                            .foregroundColor(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .background(Circle().fill(AppColors.dangerBright))
+                            .offset(x: 8, y: -4)
                     }
                 }
-            )
+
+                Text(label)
+                    .appFont(size: 10, weight: isSelected ? .bold : .medium)
+            }
+            .foregroundColor(isSelected ? AppColors.accent : AppColors.textMuted)
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(PlainButtonStyle())
     }
 }
 
-// MARK: - Welcome View (Clean Fullscreen Style)
+// MARK: - Welcome View
 
 struct WelcomeView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var isRegistering = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Title bar
-            Win95TitleBar(title: "Welcome", icon: "car.fill")
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer()
 
-                // Logo area
-                VStack(spacing: 12) {
-                    Text("🚗")
-                        .font(.system(size: 48))
+                // Logo + branding
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .font(.system(size: 48, weight: .light))
+                        .foregroundColor(AppColors.accent)
 
-                    Text("WARNABROTHA")
-                        .win95Font(size: 24)
-                        .foregroundColor(Win95Colors.textPrimary)
+                    VStack(spacing: 8) {
+                        (Text("Tap")
+                            .foregroundColor(AppColors.textPrimary)
+                        + Text("Out")
+                            .foregroundColor(AppColors.accent))
+                            .displayFont(size: 36)
+                            .tracking(-1)
 
-                    Text("TAPS Alert System for UC Davis")
-                        .win95Font(size: 14)
-                        .foregroundColor(Win95Colors.textDisabled)
+                        Text("Tap out of parking")
+                            .appFont(size: 16, weight: .medium)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
                 }
 
                 Spacer()
-                    .frame(height: 40)
+                    .frame(height: 48)
 
-                // Features
-                VStack(alignment: .leading, spacing: 12) {
-                    Win95FeatureRow(icon: "bell.fill", text: "Real-time TAPS alerts")
-                    Win95FeatureRow(icon: "person.2.fill", text: "Community reports")
-                    Win95FeatureRow(icon: "chart.bar.fill", text: "AI probability predictions")
-                    Win95FeatureRow(icon: "hand.thumbsup.fill", text: "Vote on reliability")
+                // Feature list
+                VStack(spacing: 0) {
+                    FeatureRow(
+                        icon: "bell.badge.fill",
+                        title: "Real-time alerts",
+                        description: "Get notified when TAPS is spotted near your car"
+                    )
+                    FeatureRow(
+                        icon: "person.2.fill",
+                        title: "Community-powered",
+                        description: "Reports from fellow UC Davis students"
+                    )
+                    FeatureRow(
+                        icon: "timer",
+                        title: "Check in/out tracking",
+                        description: "Track your parking sessions easily"
+                    )
+                    FeatureRow(
+                        icon: "map.fill",
+                        title: "Campus-wide coverage",
+                        description: "All major parking structures covered"
+                    )
                 }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Win95Colors.inputBackground)
-                .beveledBorder(raised: false, width: 1)
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(AppColors.accent.opacity(0.05))
+                )
                 .padding(.horizontal, 24)
 
                 Spacer()
 
-                // Start button
+                // CTA
                 VStack(spacing: 16) {
                     Button {
                         Task {
@@ -228,91 +220,83 @@ struct WelcomeView: View {
                         }
                     } label: {
                         Text(isRegistering ? "Please wait..." : "Get Started")
-                            .win95Font(size: 16)
+                            .appFont(size: 16, weight: .bold)
                             .foregroundColor(.white)
-                            .frame(width: 200, height: 48)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
                             .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Win95Colors.titleBarActive)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 9999)
+                                    .fill(AppColors.accent)
                             )
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(isRegistering)
                     .opacity(isRegistering ? 0.7 : 1)
+                    .padding(.horizontal, 24)
 
-                    Text("For UC Davis students only")
-                        .win95Font(size: 12)
-                        .foregroundColor(Win95Colors.textDisabled)
+                    Text("Already have an account? **Log In**")
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textSecondary)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 48)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Win95Colors.windowBackground)
         }
     }
 }
 
-struct Win95FeatureRow: View {
+struct FeatureRow: View {
     let icon: String
-    let text: String
+    let title: String
+    let description: String
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundColor(Win95Colors.titleBarActive)
-                .frame(width: 20)
+                .font(.system(size: 20))
+                .foregroundColor(AppColors.accent)
+                .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppColors.accentLight)
+                )
 
-            Text(text)
-                .win95Font(size: 14)
-                .foregroundColor(Win95Colors.textPrimary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .appFont(size: 14, weight: .bold)
+                    .foregroundColor(AppColors.textPrimary)
+                Text(description)
+                    .appFont(size: 12)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            Spacer()
         }
+        .padding(.vertical, 12)
     }
 }
 
-// MARK: - Loading Overlay (Windows 95 Style)
+// MARK: - Loading Overlay
 
-struct Win95LoadingOverlay: View {
-    @State private var dots = ""
-
+struct LoadingOverlay: View {
     var body: some View {
         ZStack {
-            Color.black.opacity(0.3)
+            Color.black.opacity(0.2)
                 .ignoresSafeArea()
 
-            Win95Popup(title: "Please Wait", icon: "hourglass") {
-                HStack(spacing: 16) {
-                    // Hourglass animation
-                    Image(systemName: "hourglass")
-                        .font(.system(size: 32))
-                        .foregroundColor(Win95Colors.textPrimary)
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .tint(AppColors.accent)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Loading\(dots)")
-                            .win95Font(size: 14)
-                            .foregroundColor(Win95Colors.textPrimary)
-
-                        Text("Please wait while the operation completes.")
-                            .win95Font(size: 12)
-                            .foregroundColor(Win95Colors.textDisabled)
-                    }
-                }
-                .padding(8)
+                Text("Loading...")
+                    .appFont(size: 14, weight: .medium)
+                    .foregroundColor(AppColors.textSecondary)
             }
-            .frame(width: 300)
-        }
-        .onAppear {
-            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-                if dots.count >= 3 {
-                    dots = ""
-                } else {
-                    dots += "."
-                }
-            }
+            .padding(32)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial)
+            )
         }
     }
 }

@@ -1,149 +1,162 @@
 //
-//  Win95Theme.swift
-//  warnabrotha
+//  TapOutTheme.swift
+//  TapOut
 //
-//  Windows 95 aesthetic - classic gray, beveled borders, W95FA font.
+//  TapOut design system — sage green accent, clean modern UI.
 //
 
 import SwiftUI
+import UIKit
 
-// MARK: - Windows 95 Colors
+// MARK: - Colors
 
-struct Win95Colors {
-    // Classic Windows grays
-    static let windowBackground = Color(red: 0.75, green: 0.75, blue: 0.75)  // #C0C0C0
-    static let desktop = Color(red: 0.0, green: 0.5, blue: 0.5)  // Teal desktop
-    static let buttonFace = Color(red: 0.75, green: 0.75, blue: 0.75)
-    static let buttonHighlight = Color.white
-    static let buttonShadow = Color(red: 0.5, green: 0.5, blue: 0.5)  // #808080
-    static let buttonDarkShadow = Color.black
+struct AppColors {
+    // Backgrounds
+    static let background = Color(hex: "F7F7F7")
+    static let cardBackground = Color.white
+    static let darkBackground = Color(hex: "1E293B")
 
-    // Title bar
-    static let titleBarActive = Color(red: 0.0, green: 0.0, blue: 0.5)  // Navy blue
-    static let titleBarInactive = Color(red: 0.5, green: 0.5, blue: 0.5)
-    static let titleBarText = Color.white
+    // Text
+    static let textPrimary = Color(hex: "0F172A")
+    static let textSecondary = Color(hex: "64748B")
+    static let textMuted = Color(hex: "94A3B8")
+    static let textOnDark = Color.white
 
-    // Text colors
-    static let textPrimary = Color.black
-    static let textDisabled = Color(red: 0.5, green: 0.5, blue: 0.5)
-    static let textHighlight = Color.white
+    // Accent (sage green)
+    static let accent = Color(hex: "9CAF88")
+    static let accentLight = Color(hex: "9CAF88").opacity(0.1)
+    static let accentVeryLight = Color(hex: "9CAF88").opacity(0.05)
+    static let accentMedium = Color(hex: "9CAF88").opacity(0.6)
 
-    // Accent colors (simple, accessible)
-    static let dangerRed = Color(red: 0.8, green: 0.0, blue: 0.0)
-    static let safeGreen = Color(red: 0.0, green: 0.5, blue: 0.0)
-    // Changed to darker olive/brown for better contrast on gray
-    static let warningYellow = Color(red: 0.6, green: 0.5, blue: 0.0)
-    static let infoBlue = Color(red: 0.0, green: 0.0, blue: 0.8)
-    // Neutral gray for secondary actions
-    static let neutralGray = Color(red: 0.6, green: 0.6, blue: 0.6)
+    // Status
+    static let danger = Color(hex: "E57373")
+    static let dangerBright = Color(hex: "EF4444")
+    static let dangerLight = Color(hex: "E57373").opacity(0.1)
+    static let warning = Color(hex: "FFD54F")
+    static let success = Color(hex: "22C55E")
+    static let live = Color(hex: "22C55E")
 
-    // Selection
-    static let selectionBackground = Color(red: 0.0, green: 0.0, blue: 0.5)
-    static let selectionText = Color.white
+    // Borders & Dividers
+    static let border = Color(hex: "E2E8F0")
+    static let borderLight = Color(hex: "F1F5F9")
+    static let pillBorder = Color(hex: "CBD5E1")
 
-    // Input fields
-    static let inputBackground = Color.white
-    static let inputBorder = Color(red: 0.5, green: 0.5, blue: 0.5)
+    // Overlays
+    static let overlayDark = Color(hex: "2D2D27").opacity(0.4)
+    static let overlayLight = Color.white.opacity(0.8)
+    static let frosted = Color.white.opacity(0.9)
 }
 
-// MARK: - Windows 95 Font (W95FA)
+// MARK: - Color Extension
 
-struct Win95Font: ViewModifier {
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 6:
+            (a, r, g, b) = (255, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
+}
+
+// MARK: - Typography
+
+struct AppFont: ViewModifier {
+    enum Family {
+        case primary   // Plus Jakarta Sans
+        case display   // DM Sans
+    }
+
+    let family: Family
     let size: CGFloat
     let weight: Font.Weight
 
     func body(content: Content) -> some View {
-        // Use W95FA custom font - PostScript name is W95FARegular
-        content
-            .font(.custom("W95FARegular", size: size))
+        content.font(font)
+    }
+
+    private var font: Font {
+        // Use system font with matching weight — swap to custom fonts when bundled
+        switch family {
+        case .primary:
+            return .system(size: size, weight: weight, design: .default)
+        case .display:
+            return .system(size: size, weight: .heavy, design: .default)
+        }
     }
 }
 
 extension View {
-    func win95Font(size: CGFloat = 14, weight: Font.Weight = .regular) -> some View {
-        modifier(Win95Font(size: size, weight: weight))
+    func appFont(size: CGFloat = 14, weight: Font.Weight = .regular) -> some View {
+        modifier(AppFont(family: .primary, size: size, weight: weight))
+    }
+
+    func displayFont(size: CGFloat = 30) -> some View {
+        modifier(AppFont(family: .display, size: size, weight: .heavy))
     }
 }
 
-// MARK: - Beveled Border (Classic 3D Effect)
+// MARK: - Card Style
 
-struct BeveledBorder: ViewModifier {
-    let raised: Bool
-    let width: CGFloat
+struct CardModifier: ViewModifier {
+    var padding: CGFloat = 16
+    var cornerRadius: CGFloat = 16
 
     func body(content: Content) -> some View {
         content
-            .overlay(
-                GeometryReader { geo in
-                    // Top and left edges (light when raised, dark when sunken)
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: geo.size.height))
-                        path.addLine(to: CGPoint(x: 0, y: 0))
-                        path.addLine(to: CGPoint(x: geo.size.width, y: 0))
-                    }
-                    .stroke(raised ? Win95Colors.buttonHighlight : Win95Colors.buttonDarkShadow, lineWidth: width)
-
-                    // Inner top-left highlight
-                    Path { path in
-                        path.move(to: CGPoint(x: width, y: geo.size.height - width))
-                        path.addLine(to: CGPoint(x: width, y: width))
-                        path.addLine(to: CGPoint(x: geo.size.width - width, y: width))
-                    }
-                    .stroke(raised ? Win95Colors.buttonHighlight.opacity(0.7) : Win95Colors.buttonShadow, lineWidth: width)
-
-                    // Bottom and right edges (dark when raised, light when sunken)
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: geo.size.height))
-                        path.addLine(to: CGPoint(x: geo.size.width, y: geo.size.height))
-                        path.addLine(to: CGPoint(x: geo.size.width, y: 0))
-                    }
-                    .stroke(raised ? Win95Colors.buttonDarkShadow : Win95Colors.buttonHighlight, lineWidth: width)
-
-                    // Inner bottom-right shadow
-                    Path { path in
-                        path.move(to: CGPoint(x: width, y: geo.size.height - width))
-                        path.addLine(to: CGPoint(x: geo.size.width - width, y: geo.size.height - width))
-                        path.addLine(to: CGPoint(x: geo.size.width - width, y: width))
-                    }
-                    .stroke(raised ? Win95Colors.buttonShadow : Win95Colors.buttonHighlight.opacity(0.7), lineWidth: width)
-                }
+            .padding(padding)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(AppColors.cardBackground)
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(AppColors.border, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
     }
 }
 
 extension View {
-    func beveledBorder(raised: Bool = true, width: CGFloat = 2) -> some View {
-        modifier(BeveledBorder(raised: raised, width: width))
+    func cardStyle(padding: CGFloat = 16, cornerRadius: CGFloat = 16) -> some View {
+        modifier(CardModifier(padding: padding, cornerRadius: cornerRadius))
     }
 }
 
-// MARK: - Windows 95 Title Button
+// MARK: - Primary Button
 
-struct Win95TitleButton: View {
-    let symbol: String
-
-    var body: some View {
-        Text(symbol)
-            .win95Font(size: 12)
-            .foregroundColor(Win95Colors.textPrimary)
-            .frame(width: 18, height: 16)
-            .background(Win95Colors.buttonFace)
-            .beveledBorder(raised: true, width: 1)
-    }
-}
-
-// MARK: - Windows 95 Button
-
-struct Win95Button: View {
+struct PrimaryButton: View {
     let title: String
+    let icon: String?
     let color: Color
     let textColor: Color
     let action: () -> Void
 
     @State private var isPressed = false
 
-    init(title: String, color: Color = Win95Colors.buttonFace, textColor: Color = Win95Colors.textPrimary, action: @escaping () -> Void) {
+    init(
+        title: String,
+        icon: String? = nil,
+        color: Color = AppColors.accent,
+        textColor: Color = .white,
+        action: @escaping () -> Void
+    ) {
         self.title = title
+        self.icon = icon
         self.color = color
         self.textColor = textColor
         self.action = action
@@ -155,86 +168,22 @@ struct Win95Button: View {
             generator.impactOccurred()
             action()
         }) {
-            Text(title)
-                .win95Font(size: 14)
-                .foregroundColor(textColor)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(color)
-                .beveledBorder(raised: !isPressed, width: 2)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
-    }
-}
-
-// MARK: - Big Action Button (Configurable Size)
-
-struct Win95BigButton: View {
-    let title: String
-    let subtitle: String?
-    let color: Color
-    let height: CGFloat
-    let action: () -> Void
-
-    @State private var isPressed = false
-
-    // Determine text color based on background
-    private var textColor: Color {
-        // Use white for dark colors, black for light colors
-        if color == Win95Colors.dangerRed || color == Win95Colors.safeGreen ||
-           color == Win95Colors.infoBlue || color == Win95Colors.neutralGray ||
-           color == Win95Colors.warningYellow {
-            return .white
-        }
-        return .black
-    }
-
-    init(title: String, subtitle: String? = nil, color: Color, height: CGFloat = 120, action: @escaping () -> Void) {
-        self.title = title
-        self.subtitle = subtitle
-        self.color = color
-        self.height = height
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: {
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-            action()
-        }) {
-            VStack(spacing: 6) {
-                Text(title)
-                    .win95Font(size: 18)
-                    .foregroundColor(textColor)
-                    .multilineTextAlignment(.center)
-
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .win95Font(size: 13)
-                        .foregroundColor(textColor.opacity(0.85))
+            HStack(spacing: 8) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
                 }
+                Text(title)
+                    .appFont(size: 14, weight: .bold)
             }
+            .foregroundColor(textColor)
             .frame(maxWidth: .infinity)
-            .frame(height: height)
+            .frame(height: 56)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 16)
                     .fill(color)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(
-                        isPressed ? Color.black.opacity(0.3) : Color.white.opacity(0.3),
-                        lineWidth: 2
-                    )
-            )
-            .scaleEffect(isPressed ? 0.98 : 1.0)
+            .scaleEffect(isPressed ? 0.97 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
         .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -246,46 +195,194 @@ struct Win95BigButton: View {
     }
 }
 
-// MARK: - Windows 95 Alert Popup
+// MARK: - Pill / Tag
 
-struct Win95Popup<Content: View>: View {
-    let title: String
-    let icon: String
-    let content: () -> Content
+struct PillView: View {
+    let text: String
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Title bar
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(Win95Colors.titleBarText)
-
-                Text(title)
-                    .win95Font(size: 12)
-                    .foregroundColor(Win95Colors.titleBarText)
-
-                Spacer()
-
-                // Close button
-                Text("×")
-                    .win95Font(size: 12)
-                    .foregroundColor(Win95Colors.textPrimary)
-                    .frame(width: 16, height: 14)
-                    .background(Win95Colors.buttonFace)
-                    .beveledBorder(raised: true, width: 1)
-            }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
-            .background(Win95Colors.titleBarActive)
-
-            // Content
-            content()
-                .padding(8)
-                .background(Win95Colors.windowBackground)
+        Button(action: action) {
+            Text(text)
+                .appFont(size: 12, weight: .bold)
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .foregroundColor(isSelected ? .white : AppColors.textSecondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? AppColors.accent : AppColors.cardBackground)
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(isSelected ? Color.clear : AppColors.pillBorder, lineWidth: 1)
+                )
         }
-        .background(Win95Colors.windowBackground)
-        .beveledBorder(raised: true, width: 2)
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
+// MARK: - Live Badge
+
+struct LiveBadge: View {
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(AppColors.live)
+                .frame(width: 6, height: 6)
+            Text("LIVE")
+                .appFont(size: 10, weight: .bold)
+                .foregroundColor(AppColors.live)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(AppColors.live.opacity(0.1))
+        )
+    }
+}
+
+// MARK: - Risk Level Badge
+
+struct RiskBadge: View {
+    let level: String
+
+    private var color: Color {
+        switch level.uppercased() {
+        case "HIGH": return AppColors.dangerBright
+        case "MEDIUM": return AppColors.warning
+        case "LOW": return AppColors.success
+        default: return AppColors.textMuted
+        }
+    }
+
+    private var textColor: Color {
+        switch level.uppercased() {
+        case "HIGH": return AppColors.dangerBright
+        case "MEDIUM": return Color(hex: "F59E0B")
+        case "LOW": return AppColors.success
+        default: return AppColors.textMuted
+        }
+    }
+
+    var body: some View {
+        Text(level.uppercased())
+            .appFont(size: 14, weight: .bold)
+            .foregroundColor(textColor)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(color.opacity(0.15))
+            )
+    }
+}
+
+// MARK: - Dashboard Action Button (tall square, icon on top)
+
+struct DashboardActionButton: View {
+    let title: String
+    let systemIcon: String
+    let color: Color
+    var textColor: Color = .white
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            action()
+        }) {
+            VStack(spacing: 12) {
+                Image(systemName: systemIcon)
+                    .font(.system(size: 48, weight: .regular))
+                    .foregroundColor(textColor)
+
+                Text(title)
+                    .displayFont(size: 12)
+                    .foregroundColor(textColor)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 196)
+            .background(
+                RoundedRectangle(cornerRadius: 40)
+                    .fill(color)
+            )
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
+    }
+}
+
+// MARK: - Risk Bar Chart (signal-strength bars)
+
+struct RiskBarChart: View {
+    let activeBars: Int // 1=LOW, 2=MEDIUM, 3=HIGH
+
+    private let barWidth: CGFloat = 8
+    private let gap: CGFloat = 3
+    private let barHeights: [CGFloat] = [12, 24, 36]
+
+    private let activeColors: [Color] = [
+        Color(hex: "81C784"),  // green (LOW bar)
+        Color(hex: "FFD54F"),  // yellow (MEDIUM bar)
+        Color(hex: "EF4444"),  // red (HIGH bar)
+    ]
+    private let inactiveColor = Color(hex: "F2F2EB")
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: gap) {
+            ForEach(0..<3) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(index < activeBars ? activeColors[index] : inactiveColor)
+                    .frame(width: barWidth, height: barHeights[index])
+            }
+        }
+        .frame(width: 30, height: 40, alignment: .bottom)
+    }
+}
+
+// MARK: - Stacked Card Edge
+
+struct StackedCardEdge: View {
+    var inset: CGFloat = 8
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(AppColors.cardBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppColors.border, lineWidth: 1)
+            )
+            .frame(height: 8)
+            .padding(.horizontal, inset)
+            .offset(y: -2)
+    }
+}
+
+// MARK: - Notification Badge
+
+struct NotificationBadge: View {
+    let count: Int
+
+    var body: some View {
+        if count > 0 {
+            Text("\(count)")
+                .appFont(size: 10, weight: .bold)
+                .foregroundColor(.white)
+                .frame(minWidth: 18, minHeight: 18)
+                .background(Circle().fill(AppColors.dangerBright))
+        }
+    }
+}
