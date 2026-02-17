@@ -2,7 +2,11 @@ package com.warnabrotha.app.data.service
 
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
 import com.google.firebase.messaging.RemoteMessage
+import com.warnabrotha.app.MainActivity
 import com.warnabrotha.app.data.api.ApiService
 import com.warnabrotha.app.data.model.DeviceUpdate
 import com.warnabrotha.app.data.repository.TokenRepository
@@ -21,6 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.io.IOException
 
@@ -159,5 +164,86 @@ class FCMServiceTest {
                 .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         )
         assertEquals(0, shadowManager.activeNotifications.size)
+    }
+
+    // ── createNotificationIntent ──
+
+    @Test
+    fun createNotificationIntent_ampInstalled_returnsAmpLaunchIntent() {
+        val shadowPm = Shadows.shadowOf(RuntimeEnvironment.getApplication().packageManager)
+        val ampLaunchIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setPackage(FCMService.AMP_PARK_PACKAGE)
+            setClassName(FCMService.AMP_PARK_PACKAGE, "${FCMService.AMP_PARK_PACKAGE}.MainActivity")
+        }
+        val resolveInfo = ResolveInfo().apply {
+            activityInfo = ActivityInfo().apply {
+                packageName = FCMService.AMP_PARK_PACKAGE
+                name = "${FCMService.AMP_PARK_PACKAGE}.MainActivity"
+            }
+        }
+        shadowPm.addResolveInfoForIntent(ampLaunchIntent, resolveInfo)
+
+        val intent = fcmService.createNotificationIntent("TAPS_SPOTTED", "1")
+        assertEquals(FCMService.AMP_PARK_PACKAGE, intent.`package`)
+    }
+
+    @Test
+    fun createNotificationIntent_ampNotInstalled_returnsPlayStoreIntent() {
+        val shadowPm = Shadows.shadowOf(RuntimeEnvironment.getApplication().packageManager)
+        // Register only the Play Store market:// handler
+        val marketIntent = Intent(
+            Intent.ACTION_VIEW,
+            android.net.Uri.parse("market://details?id=${FCMService.AMP_PARK_PACKAGE}")
+        )
+        val resolveInfo = ResolveInfo().apply {
+            activityInfo = ActivityInfo().apply {
+                packageName = "com.android.vending"
+                name = "com.android.vending.AssetBrowserActivity"
+            }
+        }
+        shadowPm.addResolveInfoForIntent(marketIntent, resolveInfo)
+
+        val intent = fcmService.createNotificationIntent("TAPS_SPOTTED", "1")
+        assertEquals(Intent.ACTION_VIEW, intent.action)
+        assertEquals("market", intent.data?.scheme)
+    }
+
+    @Test
+    fun createNotificationIntent_nonTapsType_goesToMainActivity() {
+        // Even if AMP Park is installed, non-TAPS notifications should open our app
+        val shadowPm = Shadows.shadowOf(RuntimeEnvironment.getApplication().packageManager)
+        val ampLaunchIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setPackage(FCMService.AMP_PARK_PACKAGE)
+            setClassName(FCMService.AMP_PARK_PACKAGE, "${FCMService.AMP_PARK_PACKAGE}.MainActivity")
+        }
+        val resolveInfo = ResolveInfo().apply {
+            activityInfo = ActivityInfo().apply {
+                packageName = FCMService.AMP_PARK_PACKAGE
+                name = "${FCMService.AMP_PARK_PACKAGE}.MainActivity"
+            }
+        }
+        shadowPm.addResolveInfoForIntent(ampLaunchIntent, resolveInfo)
+
+        val intent = fcmService.createNotificationIntent("reminder", "5")
+        assertEquals(
+            MainActivity::class.java.name,
+            intent.component?.className
+        )
+        assertEquals("reminder", intent.getStringExtra("notification_type"))
+        assertEquals("5", intent.getStringExtra("parking_lot_id"))
+    }
+
+    @Test
+    fun createNotificationIntent_nothingAvailable_fallsBackToMainActivity() {
+        // No packages registered — should fall back to MainActivity
+        val intent = fcmService.createNotificationIntent("TAPS_SPOTTED", "42")
+        assertEquals(
+            MainActivity::class.java.name,
+            intent.component?.className
+        )
+        assertEquals("TAPS_SPOTTED", intent.getStringExtra("notification_type"))
+        assertEquals("42", intent.getStringExtra("parking_lot_id"))
     }
 }
