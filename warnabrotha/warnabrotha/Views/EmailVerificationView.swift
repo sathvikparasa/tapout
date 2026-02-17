@@ -2,7 +2,7 @@
 //  EmailVerificationView.swift
 //  TapOut
 //
-//  Windows 95 style email verification - two-step OTP flow.
+//  TapOut email verification — two-step OTP flow.
 //
 
 import SwiftUI
@@ -15,10 +15,15 @@ struct EmailVerificationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Back button area
+            // Back button
             HStack {
                 Button {
-                    viewModel.isAuthenticated = false
+                    if viewModel.otpStep == .codeInput {
+                        otpCode = ""
+                        viewModel.changeEmail()
+                    } else {
+                        viewModel.isAuthenticated = false
+                    }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .semibold))
@@ -29,89 +34,109 @@ struct EmailVerificationView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                LinearGradient(
-                    colors: [Win95Colors.titleBarActive, Win95Colors.titleBarActive.opacity(0.85)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .padding(.horizontal, 12)
 
             // Content
-            VStack(spacing: 0) {
-                Spacer()
+            ScrollView {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 32)
 
-                switch viewModel.otpStep {
-                case .emailInput:
-                    emailInputStep
-                case .codeInput:
-                    otpInputStep
+                    switch viewModel.otpStep {
+                    case .emailInput:
+                        emailInputStep
+                    case .codeInput:
+                        otpInputStep
+                    }
+
+                    Spacer(minLength: 40)
                 }
-
-                Spacer()
-
-                // Privacy notice
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12))
-                    Text("We don't store your email address")
-                        .win95Font(size: 11)
-                }
-                .foregroundColor(Win95Colors.textDisabled)
-                .padding(.bottom, 24)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Win95Colors.windowBackground)
+
+            // Privacy notice
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 12))
+                Text("We don't store your email address")
+                    .appFont(size: 11)
+            }
+            .foregroundColor(AppColors.textMuted)
+            .padding(.bottom, 24)
+        }
+        .background(AppColors.background)
+        .alert("Error", isPresented: $viewModel.showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.error ?? "An error occurred")
         }
     }
 
     // MARK: - Step 1: Email Input
 
     private var emailInputStep: some View {
-        VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(Win95Colors.titleBarActive)
+        VStack(spacing: 32) {
+            // Icon + Header
+            VStack(spacing: 16) {
+                Image(systemName: "p.circle.fill")
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundColor(AppColors.accent)
 
-                Text("Email Verification")
-                    .win95Font(size: 18)
-                    .foregroundColor(Win95Colors.textPrimary)
+                VStack(spacing: 8) {
+                    Text("Verify Your Student Email")
+                        .displayFont(size: 24)
+                        .foregroundColor(AppColors.textPrimary)
+                        .tracking(-0.5)
+                        .multilineTextAlignment(.center)
 
-                Text("Enter your UC Davis email to continue")
-                    .win95Font(size: 13)
-                    .foregroundColor(Win95Colors.textDisabled)
+                    Text("Enter your UC Davis email to continue")
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textSecondary)
+                }
             }
 
             // Email input
-            VStack(alignment: .leading, spacing: 8) {
-                Text("UC Davis Email:")
-                    .win95Font(size: 13)
-                    .foregroundColor(Win95Colors.textPrimary)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("UNIVERSITY EMAIL")
+                    .appFont(size: 10, weight: .bold)
+                    .tracking(1)
+                    .foregroundColor(AppColors.textMuted)
 
-                TextField("you@ucdavis.edu", text: $email)
-                    .win95Font(size: 15)
-                    .foregroundColor(Win95Colors.textPrimary)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    .autocorrectionDisabled()
-                    .padding(12)
-                    .background(Win95Colors.inputBackground)
-                    .beveledBorder(raised: false, width: 1)
+                HStack(spacing: 12) {
+                    TextField("yourname@ucdavis.edu", text: $email)
+                        .appFont(size: 16, weight: .medium)
+                        .foregroundColor(AppColors.textPrimary)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
 
-                // Validation
-                if !email.isEmpty {
-                    HStack(spacing: 6) {
+                    if !email.isEmpty {
                         Image(systemName: isValidEmail ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .font(.system(size: 12))
-                        Text(isValidEmail ? "Valid email" : "Must end with @ucdavis.edu")
-                            .win95Font(size: 12)
+                            .font(.system(size: 16))
+                            .foregroundColor(isValidEmail ? AppColors.accent : AppColors.danger)
                     }
-                    .foregroundColor(isValidEmail ? Win95Colors.safeGreen : Win95Colors.dangerRed)
                 }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(AppColors.cardBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            email.isEmpty
+                                ? AppColors.border
+                                : (isValidEmail ? AppColors.accent : AppColors.danger),
+                            lineWidth: 1
+                        )
+                )
+
+                // Validation hint
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12))
+                    Text("Must use UC Davis email address")
+                        .appFont(size: 12)
+                }
+                .foregroundColor(AppColors.textMuted)
             }
             .padding(.horizontal, 24)
 
@@ -123,83 +148,85 @@ struct EmailVerificationView: View {
                     isValidating = false
                 }
             } label: {
-                Text(isValidating ? "Sending..." : "Send Code")
-                    .win95Font(size: 16)
-                    .foregroundColor(.white)
-                    .frame(width: 200, height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(isValidEmail ? Win95Colors.titleBarActive : Win95Colors.buttonShadow)
-                    )
+                HStack(spacing: 8) {
+                    Text(isValidating ? "Sending..." : "Send Code")
+                        .appFont(size: 16, weight: .bold)
+                    if !isValidating {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 16, weight: .bold))
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    RoundedRectangle(cornerRadius: 9999)
+                        .fill(isValidEmail ? AppColors.accent : AppColors.textMuted)
+                )
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(!isValidEmail || isValidating)
+            .padding(.horizontal, 24)
+
+            Text("Having trouble? **Contact Support**")
+                .appFont(size: 14)
+                .foregroundColor(AppColors.textMuted)
         }
     }
 
     // MARK: - Step 2: OTP Code Input
 
     private var otpInputStep: some View {
-        VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
+        VStack(spacing: 32) {
+            // Icon + Header
+            VStack(spacing: 16) {
                 Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(Win95Colors.titleBarActive)
+                    .font(.system(size: 48, weight: .light))
+                    .foregroundColor(AppColors.accent)
 
-                Text("Enter Verification Code")
-                    .win95Font(size: 18)
-                    .foregroundColor(Win95Colors.textPrimary)
+                VStack(spacing: 8) {
+                    Text("Enter Verification Code")
+                        .displayFont(size: 24)
+                        .foregroundColor(AppColors.textPrimary)
+                        .tracking(-0.5)
+                        .multilineTextAlignment(.center)
 
-                Text("Code sent to \(viewModel.otpEmail)")
-                    .win95Font(size: 13)
-                    .foregroundColor(Win95Colors.textDisabled)
+                    Text("Code sent to \(viewModel.otpEmail)")
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textSecondary)
+                }
             }
 
             // OTP input
-            VStack(alignment: .leading, spacing: 8) {
-                Text("6-Digit Code:")
-                    .win95Font(size: 13)
-                    .foregroundColor(Win95Colors.textPrimary)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("6-DIGIT CODE")
+                    .appFont(size: 10, weight: .bold)
+                    .tracking(1)
+                    .foregroundColor(AppColors.textMuted)
 
                 TextField("000000", text: $otpCode)
-                    .win95Font(size: 24)
-                    .foregroundColor(Win95Colors.textPrimary)
+                    .appFont(size: 28, weight: .bold)
+                    .foregroundColor(AppColors.textPrimary)
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
                     .autocorrectionDisabled()
-                    .padding(12)
-                    .background(Win95Colors.inputBackground)
-                    .beveledBorder(raised: false, width: 1)
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppColors.cardBackground)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                otpCode.count == 6 ? AppColors.accent : AppColors.border,
+                                lineWidth: 1
+                            )
+                    )
                     .onChange(of: otpCode) { _, newValue in
-                        // Limit to 6 digits
                         let filtered = String(newValue.filter { $0.isNumber }.prefix(6))
                         if filtered != newValue {
                             otpCode = filtered
                         }
-                        .padding(16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(AppColors.cardBackground)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    email.isEmpty
-                                        ? AppColors.border
-                                        : (isValidEmail ? AppColors.accent : AppColors.danger),
-                                    lineWidth: 1
-                                )
-                        )
-
-                        // Validation hint
-                        HStack(spacing: 6) {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 12))
-                            Text("Must use UC Davis email address")
-                                .appFont(size: 12)
-                        }
-                        .foregroundColor(AppColors.textMuted)
                     }
 
                 // Error display
@@ -208,9 +235,9 @@ struct EmailVerificationView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
                         Text(error)
-                            .win95Font(size: 12)
+                            .appFont(size: 12)
                     }
-                    .foregroundColor(Win95Colors.dangerRed)
+                    .foregroundColor(AppColors.danger)
                 }
             }
             .padding(.horizontal, 24)
@@ -223,35 +250,41 @@ struct EmailVerificationView: View {
                     isValidating = false
                 }
             } label: {
-                Text(isValidating ? "Verifying..." : "Verify")
-                    .win95Font(size: 16)
-                    .foregroundColor(.white)
-                    .frame(width: 200, height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(otpCode.count == 6 ? Win95Colors.titleBarActive : Win95Colors.buttonShadow)
-                    )
+                HStack(spacing: 8) {
+                    Text(isValidating ? "Verifying..." : "Verify")
+                        .appFont(size: 16, weight: .bold)
+                    if !isValidating {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 16, weight: .bold))
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    RoundedRectangle(cornerRadius: 9999)
+                        .fill(otpCode.count == 6 ? AppColors.accent : AppColors.textMuted)
+                )
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(otpCode.count != 6 || isValidating)
+            .padding(.horizontal, 24)
 
             // Resend / Change email
             VStack(spacing: 12) {
                 if viewModel.canResendOTP {
                     Button {
-                        Task {
-                            await viewModel.resendOTP()
-                        }
+                        Task { await viewModel.resendOTP() }
                     } label: {
                         Text("Resend Code")
-                            .win95Font(size: 13)
-                            .foregroundColor(Win95Colors.titleBarActive)
+                            .appFont(size: 14, weight: .semibold)
+                            .foregroundColor(AppColors.accent)
                     }
                     .buttonStyle(PlainButtonStyle())
                 } else if viewModel.resendCooldown > 0 {
                     Text("Resend in \(viewModel.resendCooldown)s")
-                        .win95Font(size: 13)
-                        .foregroundColor(Win95Colors.textDisabled)
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textMuted)
                 }
 
                 Button {
@@ -259,8 +292,8 @@ struct EmailVerificationView: View {
                     viewModel.changeEmail()
                 } label: {
                     Text("Change Email")
-                        .win95Font(size: 13)
-                        .foregroundColor(Win95Colors.textDisabled)
+                        .appFont(size: 14)
+                        .foregroundColor(AppColors.textMuted)
                         .underline()
                 }
                 .buttonStyle(PlainButtonStyle())
