@@ -210,6 +210,32 @@ class FCMServiceTest {
     }
 
     @Test
+    fun createNotificationIntent_nonTapsType_goesToMainActivity() {
+        // Even if AMP Park is installed, non-TAPS notifications should open our app
+        val shadowPm = Shadows.shadowOf(RuntimeEnvironment.getApplication().packageManager)
+        val ampLaunchIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            setPackage(FCMService.AMP_PARK_PACKAGE)
+            setClassName(FCMService.AMP_PARK_PACKAGE, "${FCMService.AMP_PARK_PACKAGE}.MainActivity")
+        }
+        val resolveInfo = ResolveInfo().apply {
+            activityInfo = ActivityInfo().apply {
+                packageName = FCMService.AMP_PARK_PACKAGE
+                name = "${FCMService.AMP_PARK_PACKAGE}.MainActivity"
+            }
+        }
+        shadowPm.addResolveInfoForIntent(ampLaunchIntent, resolveInfo)
+
+        val intent = fcmService.createNotificationIntent("reminder", "5")
+        assertEquals(
+            MainActivity::class.java.name,
+            intent.component?.className
+        )
+        assertEquals("reminder", intent.getStringExtra("notification_type"))
+        assertEquals("5", intent.getStringExtra("parking_lot_id"))
+    }
+
+    @Test
     fun createNotificationIntent_nothingAvailable_fallsBackToMainActivity() {
         // No packages registered — should fall back to MainActivity
         val intent = fcmService.createNotificationIntent("TAPS_SPOTTED", "42")

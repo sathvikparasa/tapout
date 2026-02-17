@@ -25,6 +25,7 @@ class FCMService : FirebaseMessagingService() {
 
     companion object {
         const val AMP_PARK_PACKAGE = "com.aimsparking.aimsmobilepay"
+        private const val TAPS_SPOTTED_TYPE = "TAPS_SPOTTED"
         private const val PLAY_STORE_MARKET_URI = "market://details?id=$AMP_PARK_PACKAGE"
         private const val PLAY_STORE_WEB_URL =
             "https://play.google.com/store/apps/details?id=$AMP_PARK_PACKAGE"
@@ -62,27 +63,32 @@ class FCMService : FirebaseMessagingService() {
     }
 
     internal fun createNotificationIntent(type: String?, lotId: String?): Intent {
-        // Tier 1: AMP Park app is installed — launch it directly
-        packageManager.getLaunchIntentForPackage(AMP_PARK_PACKAGE)?.let { ampIntent ->
-            ampIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            return ampIntent
+        val isTapsAlert = type == TAPS_SPOTTED_TYPE
+
+        if (isTapsAlert) {
+            // Tier 1: AMP Park app is installed — launch it directly
+            packageManager.getLaunchIntentForPackage(AMP_PARK_PACKAGE)?.let { ampIntent ->
+                ampIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                return ampIntent
+            }
+
+            // Tier 2: Open Play Store via market:// URI
+            val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_STORE_MARKET_URI))
+            if (marketIntent.resolveActivity(packageManager) != null) {
+                marketIntent.flags =
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                return marketIntent
+            }
+
+            // Tier 3: Open Play Store web URL (for devices without Play Store)
+            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_STORE_WEB_URL))
+            if (webIntent.resolveActivity(packageManager) != null) {
+                webIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                return webIntent
+            }
         }
 
-        // Tier 2: Open Play Store via market:// URI
-        val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_STORE_MARKET_URI))
-        if (marketIntent.resolveActivity(packageManager) != null) {
-            marketIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            return marketIntent
-        }
-
-        // Tier 3: Open Play Store web URL (for devices without Play Store)
-        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_STORE_WEB_URL))
-        if (webIntent.resolveActivity(packageManager) != null) {
-            webIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            return webIntent
-        }
-
-        // Tier 4: Fall back to our own MainActivity with original extras
+        // Non-TAPS notifications or Tier 4 fallback: open our own app
         return Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("notification_type", type)
