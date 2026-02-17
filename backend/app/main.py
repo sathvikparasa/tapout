@@ -52,7 +52,7 @@ async def seed_initial_data():
         lots_to_seed = [
             {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.5382, "longitude": -121.7617},
             {"name": "Quad Structure", "code": "MU", "latitude": 38.5425, "longitude": -121.7490},
-            {"name": "Parking Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
+            {"name": "Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
         ]
 
         for lot_data in lots_to_seed:
