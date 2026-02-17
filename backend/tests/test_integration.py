@@ -175,8 +175,6 @@ class TestSightingPredictionLotStats:
             )
             assert r.status_code == 201
 
-        # Use the predictions endpoint (the lots endpoint has a positional-arg
-        # bug in its predict() call that always falls through to 0.0).
         r = await client.get(f"{API}/predictions/{test_parking_lot.id}", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["probability"] == 0.8

@@ -129,7 +129,7 @@ class TestSightingEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.xfail(
-        reason="Spam prevention intentionally disabled for emulator testing (timedelta(minutes=0) in sightings.py:63)"
+        reason="Spam prevention intentionally disabled for emulator testing (SPAM_COOLDOWN set to timedelta(minutes=0) in api/sightings.py)"
     )
     @pytest.mark.asyncio
     async def test_report_sighting_spam_prevention(
