@@ -174,7 +174,6 @@ class FCMServiceTest {
         val ampLaunchIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
             setPackage(FCMService.AMP_PARK_PACKAGE)
-            setClassName(FCMService.AMP_PARK_PACKAGE, "${FCMService.AMP_PARK_PACKAGE}.MainActivity")
         }
         val resolveInfo = ResolveInfo().apply {
             activityInfo = ActivityInfo().apply {
@@ -216,7 +215,6 @@ class FCMServiceTest {
         val ampLaunchIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
             setPackage(FCMService.AMP_PARK_PACKAGE)
-            setClassName(FCMService.AMP_PARK_PACKAGE, "${FCMService.AMP_PARK_PACKAGE}.MainActivity")
         }
         val resolveInfo = ResolveInfo().apply {
             activityInfo = ActivityInfo().apply {
