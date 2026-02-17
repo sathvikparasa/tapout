@@ -97,7 +97,10 @@ class OTPService:
             return False, "Too many attempts. Please request a new code."
 
         now = datetime.now(timezone.utc)
-        if otp.expires_at < now:
+        expires_at = otp.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at < now:
             await db.commit()
             return False, "Code has expired. Please request a new code."
 

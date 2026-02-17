@@ -1,8 +1,13 @@
 """
-Tests for TAPS probability prediction endpoints and services.
+Tests for TAPS risk prediction service and endpoints.
+
+The prediction service uses time-since-last-sighting to classify risk:
+  0-1h → HIGH, 1-2h → LOW, 2-4h → MEDIUM, >4h → HIGH
+  No sighting today → MEDIUM
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,199 +17,298 @@ from app.models.taps_sighting import TapsSighting
 from app.services.prediction import PredictionService
 
 
-class TestPredictionService:
-    """Tests for PredictionService class."""
+# ---------------------------------------------------------------------------
+# Unit tests: _classify_risk
+# ---------------------------------------------------------------------------
 
-    def test_time_of_day_factor_night(self):
-        """Test that nighttime has low probability."""
-        # 2 AM - should be very low
-        dt = datetime(2024, 1, 15, 2, 0, 0, tzinfo=timezone.utc)
-        factor = PredictionService._calculate_time_of_day_factor(dt)
-        assert factor < 0.1
+class TestClassifyRisk:
+    """Pure unit tests for the risk classification logic."""
 
-    def test_time_of_day_factor_peak(self):
-        """Test that peak hours have high probability."""
-        # 10 AM - peak enforcement
-        dt = datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
-        factor = PredictionService._calculate_time_of_day_factor(dt)
-        assert factor > 0.7
+    def test_classify_risk_very_recent(self):
+        """Sighting 30 min ago → HIGH (actively patrolling)."""
+        assert PredictionService._classify_risk(0.5) == "HIGH"
 
-    def test_day_of_week_factor_weekday(self):
-        """Test that weekdays have higher probability."""
-        # Tuesday
-        dt = datetime(2024, 1, 16, 10, 0, 0, tzinfo=timezone.utc)
-        factor = PredictionService._calculate_day_of_week_factor(dt)
-        assert factor > 0.8
+    def test_classify_risk_zero(self):
+        """Sighting just now (0 hours) → HIGH."""
+        assert PredictionService._classify_risk(0.0) == "HIGH"
 
-    def test_day_of_week_factor_weekend(self):
-        """Test that weekends have lower probability."""
-        # Saturday
-        dt = datetime(2024, 1, 13, 10, 0, 0, tzinfo=timezone.utc)
-        factor = PredictionService._calculate_day_of_week_factor(dt)
-        assert factor < 0.2
+    def test_classify_risk_boundary_one_hour(self):
+        """Exactly 1 hour → HIGH (<=1 is HIGH)."""
+        assert PredictionService._classify_risk(1.0) == "HIGH"
 
-    def test_academic_calendar_factor_during_quarter(self):
-        """Test higher probability during active quarter."""
-        # October - fall quarter
-        dt = datetime(2024, 10, 15, 10, 0, 0, tzinfo=timezone.utc)
-        factor = PredictionService._calculate_academic_calendar_factor(dt)
-        assert factor > 0.5
+    def test_classify_risk_low_range(self):
+        """Sighting 1.5h ago → LOW (likely moved on)."""
+        assert PredictionService._classify_risk(1.5) == "LOW"
 
-    def test_academic_calendar_factor_summer(self):
-        """Test lower probability during summer."""
-        # July - summer
-        dt = datetime(2024, 7, 15, 10, 0, 0, tzinfo=timezone.utc)
-        factor = PredictionService._calculate_academic_calendar_factor(dt)
-        assert factor < 0.5
+    def test_classify_risk_boundary_two_hours(self):
+        """Exactly 2 hours → LOW (<=2 is LOW)."""
+        assert PredictionService._classify_risk(2.0) == "LOW"
 
-    def test_risk_level_low(self):
-        """Test LOW risk level for low probability."""
-        assert PredictionService._get_risk_level(0.1) == "LOW"
-        assert PredictionService._get_risk_level(0.29) == "LOW"
+    def test_classify_risk_medium_range(self):
+        """Sighting 3h ago → MEDIUM (uncertain)."""
+        assert PredictionService._classify_risk(3.0) == "MEDIUM"
 
-    def test_risk_level_medium(self):
-        """Test MEDIUM risk level for medium probability."""
-        assert PredictionService._get_risk_level(0.3) == "MEDIUM"
-        assert PredictionService._get_risk_level(0.59) == "MEDIUM"
+    def test_classify_risk_boundary_four_hours(self):
+        """Exactly 4 hours → MEDIUM (<=4 is MEDIUM)."""
+        assert PredictionService._classify_risk(4.0) == "MEDIUM"
 
-    def test_risk_level_high(self):
-        """Test HIGH risk level for high probability."""
-        assert PredictionService._get_risk_level(0.6) == "HIGH"
-        assert PredictionService._get_risk_level(0.9) == "HIGH"
+    def test_classify_risk_old(self):
+        """Sighting 6h ago → HIGH (overdue, likely returning)."""
+        assert PredictionService._classify_risk(6.0) == "HIGH"
 
-    @pytest.mark.asyncio
-    async def test_predict(
-        self,
-        db_session: AsyncSession,
-        test_parking_lot: ParkingLot
-    ):
-        """Test full prediction."""
-        prediction = await PredictionService.predict(
-            db=db_session,
-            parking_lot_id=test_parking_lot.id,
+
+# ---------------------------------------------------------------------------
+# Unit tests: _format_time_ago
+# ---------------------------------------------------------------------------
+
+class TestFormatTimeAgo:
+    """Pure unit tests for time formatting."""
+
+    def test_format_just_now(self):
+        """Very recent sighting (<=1 min) → 'just now'."""
+        result = PredictionService._format_time_ago(0.01)
+        assert result == "just now"
+
+    def test_format_minutes_ago(self):
+        """Half hour ago → '30 minutes ago'."""
+        result = PredictionService._format_time_ago(0.5)
+        assert "30 minutes ago" in result
+
+    def test_format_one_hour_exact(self):
+        """Exactly 1 hour → '1 hour ago'."""
+        result = PredictionService._format_time_ago(1.0)
+        assert "1 hour ago" in result
+
+    def test_format_hours_and_minutes(self):
+        """1.5 hours → '1h 30m ago'."""
+        result = PredictionService._format_time_ago(1.5)
+        assert "1h 30m ago" in result
+
+    def test_format_multiple_hours(self):
+        """3 hours exact → '3 hours ago'."""
+        result = PredictionService._format_time_ago(3.0)
+        assert "3 hours ago" in result
+
+
+# ---------------------------------------------------------------------------
+# Unit tests: response builders
+# ---------------------------------------------------------------------------
+
+class TestBuildResponses:
+    """Tests for the response-building helpers."""
+
+    def test_build_no_sighting_response(self):
+        """No sighting today → MEDIUM risk, descriptive message."""
+        now = datetime(2024, 10, 15, 14, 0, 0, tzinfo=timezone.utc)
+        resp = PredictionService._build_no_sighting_response(now)
+
+        assert resp.risk_level == "MEDIUM"
+        assert "not been sighted today" in resp.risk_message
+        assert resp.last_sighting_at is None
+        assert resp.hours_since_last_sighting is None
+        assert resp.predicted_for == now
+
+    def test_build_no_sighting_response_with_lot_name(self):
+        """No sighting with lot filter → message includes lot name."""
+        now = datetime(2024, 10, 15, 14, 0, 0, tzinfo=timezone.utc)
+        resp = PredictionService._build_no_sighting_response(now, lot_name="Pavilion Structure")
+
+        assert "Pavilion Structure" in resp.risk_message
+        assert resp.risk_level == "MEDIUM"
+
+    def test_build_sighting_response(self):
+        """With a recent sighting → correct risk, lot info, time_ago."""
+        now = datetime(2024, 10, 15, 14, 0, 0, tzinfo=timezone.utc)
+        sighting = TapsSighting(
+            id=1,
+            parking_lot_id=1,
+            reported_at=now - timedelta(minutes=30),
         )
-
-        assert prediction.parking_lot_id == test_parking_lot.id
-        assert prediction.parking_lot_name == test_parking_lot.name
-        assert 0.0 <= prediction.probability <= 1.0
-        assert prediction.risk_level in ["LOW", "MEDIUM", "HIGH"]
-        assert prediction.factors is not None
-        assert 0.0 <= prediction.confidence <= 1.0
-
-    @pytest.mark.asyncio
-    async def test_predict_nonexistent_lot(self, db_session: AsyncSession):
-        """Test prediction for non-existent lot raises error."""
-        with pytest.raises(ValueError):
-            await PredictionService.predict(
-                db=db_session,
-                parking_lot_id=99999,
-            )
-
-    @pytest.mark.asyncio
-    async def test_recent_sightings_increase_probability(
-        self,
-        db_session: AsyncSession,
-        test_parking_lot: ParkingLot
-    ):
-        """Test that recent sightings increase probability."""
-        # Get baseline prediction
-        baseline = await PredictionService.predict(
-            db=db_session,
-            parking_lot_id=test_parking_lot.id,
+        lot = ParkingLot(
+            id=1,
+            name="Test Lot",
+            code="TST",
+            latitude=38.0,
+            longitude=-121.0,
+            is_active=True,
         )
+        hours_ago = 0.5
 
-        # Add a recent sighting
+        resp = PredictionService._build_sighting_response(now, hours_ago, sighting, lot)
+
+        assert resp.risk_level == "HIGH"  # 0.5h → HIGH
+        assert "Test Lot" in resp.risk_message
+        assert resp.last_sighting_lot_name == "Test Lot"
+        assert resp.last_sighting_lot_code == "TST"
+        assert resp.hours_since_last_sighting == 0.5
+        assert resp.parking_lot_id == 1
+        assert resp.predicted_for == now
+
+
+# ---------------------------------------------------------------------------
+# Async tests: PredictionService.predict()
+# ---------------------------------------------------------------------------
+
+class TestPredict:
+    """Integration tests for the predict() method using a test DB."""
+
+    @pytest.mark.asyncio
+    async def test_predict_no_sightings_today(
+        self, db_session: AsyncSession, test_parking_lot: ParkingLot
+    ):
+        """No sightings at all → MEDIUM risk, no-sighting response."""
+        prediction = await PredictionService.predict(db=db_session)
+
+        assert prediction.risk_level == "MEDIUM"
+        assert prediction.last_sighting_at is None
+
+    @pytest.mark.asyncio
+    async def test_predict_with_recent_sighting(
+        self, db_session: AsyncSession, test_parking_lot: ParkingLot
+    ):
+        """Sighting 30 min ago → HIGH risk."""
+        now = datetime.now(timezone.utc)
         sighting = TapsSighting(
             parking_lot_id=test_parking_lot.id,
+            reported_at=now - timedelta(minutes=30),
         )
         db_session.add(sighting)
         await db_session.commit()
 
-        # Get new prediction
-        after_sighting = await PredictionService.predict(
-            db=db_session,
-            parking_lot_id=test_parking_lot.id,
-        )
+        prediction = await PredictionService.predict(db=db_session, timestamp=now)
 
-        # Probability should increase with recent sighting
-        assert after_sighting.factors.recent_sightings_factor > baseline.factors.recent_sightings_factor
-
-
-class TestPredictionEndpoints:
-    """Tests for prediction API endpoints."""
+        assert prediction.risk_level == "HIGH"
+        assert prediction.last_sighting_lot_name == test_parking_lot.name
 
     @pytest.mark.asyncio
-    async def test_get_prediction(
-        self,
-        client: AsyncClient,
-        auth_headers: dict,
-        test_parking_lot: ParkingLot
+    async def test_predict_with_old_sighting(
+        self, db_session: AsyncSession, test_parking_lot: ParkingLot
     ):
-        """Test getting a prediction."""
+        """Sighting 3h ago → MEDIUM risk."""
+        now = datetime.now(timezone.utc)
+        sighting = TapsSighting(
+            parking_lot_id=test_parking_lot.id,
+            reported_at=now - timedelta(hours=3),
+        )
+        db_session.add(sighting)
+        await db_session.commit()
+
+        prediction = await PredictionService.predict(db=db_session, timestamp=now)
+
+        assert prediction.risk_level == "MEDIUM"
+
+    @pytest.mark.asyncio
+    async def test_predict_specific_lot(
+        self, db_session: AsyncSession, test_parking_lot: ParkingLot
+    ):
+        """Filtering by lot_id returns sighting at that lot."""
+        now = datetime.now(timezone.utc)
+        sighting = TapsSighting(
+            parking_lot_id=test_parking_lot.id,
+            reported_at=now - timedelta(minutes=10),
+        )
+        db_session.add(sighting)
+        await db_session.commit()
+
+        prediction = await PredictionService.predict(
+            db=db_session, timestamp=now, lot_id=test_parking_lot.id
+        )
+
+        assert prediction.risk_level == "HIGH"
+        assert prediction.parking_lot_id == test_parking_lot.id
+
+    @pytest.mark.asyncio
+    async def test_predict_nonexistent_lot(self, db_session: AsyncSession):
+        """Querying a lot that has no sightings → MEDIUM, no-sighting response."""
+        prediction = await PredictionService.predict(
+            db=db_session, lot_id=99999
+        )
+
+        assert prediction.risk_level == "MEDIUM"
+        assert prediction.last_sighting_at is None
+
+    @pytest.mark.asyncio
+    async def test_predict_custom_timestamp(
+        self, db_session: AsyncSession, test_parking_lot: ParkingLot
+    ):
+        """Passing a specific timestamp uses it for time-since calculation."""
+        # Sighting at 10:00 UTC today
+        now = datetime.now(timezone.utc)
+        today_10am = now.replace(hour=10, minute=0, second=0, microsecond=0)
+        sighting = TapsSighting(
+            parking_lot_id=test_parking_lot.id,
+            reported_at=today_10am,
+        )
+        db_session.add(sighting)
+        await db_session.commit()
+
+        # Query at 10:30 → 0.5h ago → HIGH
+        query_time = today_10am + timedelta(minutes=30)
+        prediction = await PredictionService.predict(
+            db=db_session, timestamp=query_time
+        )
+
+        assert prediction.risk_level == "HIGH"
+        assert prediction.predicted_for == query_time
+
+
+# ---------------------------------------------------------------------------
+# Endpoint tests
+# ---------------------------------------------------------------------------
+
+class TestPredictionEndpoints:
+    """HTTP endpoint tests for the predictions API."""
+
+    @pytest.mark.asyncio
+    async def test_get_global_prediction(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        """GET /api/v1/predictions → 200, has risk_level."""
         response = await client.get(
-            f"/api/v1/predictions/{test_parking_lot.id}",
-            headers=auth_headers
+            "/api/v1/predictions",
+            headers=auth_headers,
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["parking_lot_id"] == test_parking_lot.id
-        assert "probability" in data
-        assert "risk_level" in data
-        assert "factors" in data
-        assert "confidence" in data
+        assert data["risk_level"] in ("LOW", "MEDIUM", "HIGH")
+        assert "risk_message" in data
 
     @pytest.mark.asyncio
-    async def test_get_prediction_invalid_lot(
-        self,
-        client: AsyncClient,
-        auth_headers: dict
-    ):
-        """Test getting prediction for non-existent lot."""
-        response = await client.get(
-            "/api/v1/predictions/99999",
-            headers=auth_headers
-        )
-
-        assert response.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_predict_for_specific_time(
+    async def test_get_lot_prediction(
         self,
         client: AsyncClient,
         auth_headers: dict,
-        test_parking_lot: ParkingLot
+        test_parking_lot: ParkingLot,
     ):
-        """Test predicting for a specific time."""
+        """GET /api/v1/predictions/{lot_id} → 200, has risk_level."""
+        response = await client.get(
+            f"/api/v1/predictions/{test_parking_lot.id}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["risk_level"] in ("LOW", "MEDIUM", "HIGH")
+
+    @pytest.mark.asyncio
+    async def test_post_prediction_specific_time(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot,
+    ):
+        """POST /api/v1/predictions with timestamp → 200."""
         response = await client.post(
             "/api/v1/predictions",
             headers=auth_headers,
             json={
                 "parking_lot_id": test_parking_lot.id,
-                "timestamp": "2024-10-15T10:00:00Z"
-            }
+                "timestamp": "2024-10-15T10:00:00Z",
+            },
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["predicted_for"] == "2024-10-15T10:00:00Z"
-
-    @pytest.mark.asyncio
-    async def test_predict_for_current_time(
-        self,
-        client: AsyncClient,
-        auth_headers: dict,
-        test_parking_lot: ParkingLot
-    ):
-        """Test predicting for current time (no timestamp)."""
-        response = await client.post(
-            "/api/v1/predictions",
-            headers=auth_headers,
-            json={
-                "parking_lot_id": test_parking_lot.id
-            }
-        )
-
-        assert response.status_code == 200
-        data = response.json()
+        assert data["risk_level"] in ("LOW", "MEDIUM", "HIGH")
         assert "predicted_for" in data

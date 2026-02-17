@@ -94,6 +94,98 @@ class TestNotificationService:
         )
         assert len(unread) == 0
 
+    @pytest.mark.asyncio
+    async def test_create_notification_checkout_reminder(
+        self,
+        db_session: AsyncSession,
+        verified_device: Device,
+        test_parking_lot: ParkingLot,
+    ):
+        """Test creating a CHECKOUT_REMINDER notification."""
+        notification = await NotificationService.create_notification(
+            db=db_session,
+            device=verified_device,
+            notification_type=NotificationType.CHECKOUT_REMINDER,
+            title="Still parked?",
+            message="You've been parked for 3 hours",
+            parking_lot_id=test_parking_lot.id,
+        )
+
+        assert notification.notification_type == NotificationType.CHECKOUT_REMINDER
+        assert notification.parking_lot_id == test_parking_lot.id
+
+    @pytest.mark.asyncio
+    async def test_get_unread_respects_limit(
+        self,
+        db_session: AsyncSession,
+        verified_device: Device,
+    ):
+        """Limit parameter caps number of returned notifications."""
+        for i in range(5):
+            await NotificationService.create_notification(
+                db=db_session,
+                device=verified_device,
+                notification_type=NotificationType.TAPS_SPOTTED,
+                title=f"Alert {i}",
+                message=f"Message {i}",
+            )
+
+        unread = await NotificationService.get_unread_notifications(
+            db=db_session, device=verified_device, limit=2
+        )
+
+        assert len(unread) == 2
+
+    @pytest.mark.asyncio
+    async def test_get_all_notifications_pagination(
+        self,
+        db_session: AsyncSession,
+        verified_device: Device,
+    ):
+        """Offset and limit paginate correctly."""
+        for i in range(5):
+            await NotificationService.create_notification(
+                db=db_session,
+                device=verified_device,
+                notification_type=NotificationType.TAPS_SPOTTED,
+                title=f"Alert {i}",
+                message=f"Message {i}",
+            )
+
+        notifications, unread_count, total_count = await NotificationService.get_all_notifications(
+            db=db_session, device=verified_device, limit=2, offset=0
+        )
+
+        assert len(notifications) == 2
+        assert total_count == 5
+        assert unread_count == 5
+
+    @pytest.mark.asyncio
+    async def test_mark_empty_list_read(
+        self,
+        db_session: AsyncSession,
+        verified_device: Device,
+    ):
+        """Marking an empty list of IDs → 0 updated."""
+        marked = await NotificationService.mark_notifications_read(
+            db=db_session, device=verified_device, notification_ids=[]
+        )
+
+        assert marked == 0
+
+    @pytest.mark.asyncio
+    async def test_get_unread_empty(
+        self,
+        db_session: AsyncSession,
+        verified_device: Device,
+    ):
+        """No notifications → empty list."""
+        unread = await NotificationService.get_unread_notifications(
+            db=db_session, device=verified_device
+        )
+
+        assert len(unread) == 0
+
 
 class TestNotificationEndpoints:
     """Tests for notification API endpoints."""
