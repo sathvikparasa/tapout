@@ -1,414 +1,156 @@
 """
-TAPS probability prediction service.
+TAPS risk prediction service.
 
-Uses a combination of:
-- Time of day patterns
-- Day of week patterns
-- Historical sighting data
-- Recent sighting activity
-- Academic calendar (quarters, finals, breaks)
-- Weather data (optional)
+Determines risk level based on time since the most recent TAPS sighting.
+Only considers sightings from today (Pacific time), since TAPS operates 7am-10pm.
+
+Risk rules:
+- 0-1 hours ago:  HIGH  (TAPS actively patrolling)
+- 1-2 hours ago:  LOW   (TAPS likely moved on)
+- 2-4 hours ago:  MEDIUM (Uncertain, could return)
+- >4 hours ago:   HIGH  (Overdue, likely coming)
+- Not spotted today: MEDIUM (No data, default)
 """
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
-import math
+from typing import Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.models.taps_sighting import TapsSighting
 from app.models.parking_lot import ParkingLot
-from app.schemas.prediction import PredictionFactors, PredictionResponse
+from app.schemas.prediction import PredictionResponse
 
 logger = logging.getLogger(__name__)
 
+# Mapping from risk level to backward-compatible probability
+_RISK_TO_PROBABILITY = {"LOW": 0.2, "MEDIUM": 0.5, "HIGH": 0.8}
+
+# UC Davis is in Pacific time
+_PACIFIC = ZoneInfo("America/Los_Angeles")
+
 
 class PredictionService:
-    """
-    Service for predicting TAPS presence probability.
-
-    The model combines multiple factors with learned weights to produce
-    a probability estimate. Without ML training data, we use heuristic
-    weights based on common parking enforcement patterns.
-    """
-
-    # Weight factors for combining predictions (sum to 1.0)
-    WEIGHTS = {
-        "time_of_day": 0.25,
-        "day_of_week": 0.20,
-        "historical": 0.20,
-        "recent_sightings": 0.20,
-        "academic_calendar": 0.15,
-    }
-
-    # UC Davis academic calendar approximate dates (2024-2025)
-    # In production, this would be fetched from an API or database
-    ACADEMIC_CALENDAR = {
-        "fall_start": (9, 25),  # September 25
-        "fall_end": (12, 13),   # December 13
-        "winter_start": (1, 6),  # January 6
-        "winter_end": (3, 21),   # March 21
-        "spring_start": (3, 31), # March 31
-        "spring_end": (6, 13),   # June 13
-        # Finals weeks (high enforcement)
-        "fall_finals": ((12, 7), (12, 13)),
-        "winter_finals": ((3, 15), (3, 21)),
-        "spring_finals": ((6, 7), (6, 13)),
-    }
-
-    @classmethod
-    def _calculate_time_of_day_factor(cls, dt: datetime) -> float:
-        """
-        Calculate probability factor based on time of day.
-
-        TAPS typically operates during business hours, with peak
-        enforcement during late morning and early afternoon.
-
-        Args:
-            dt: Datetime to evaluate
-
-        Returns:
-            Factor between 0.0 and 1.0
-        """
-        hour = dt.hour
-
-        # TAPS typically doesn't operate at night or very early morning
-        if hour < 6 or hour >= 22:
-            return 0.05
-
-        # Early morning ramp-up (6-8 AM)
-        if 6 <= hour < 8:
-            return 0.2 + (hour - 6) * 0.15
-
-        # Peak enforcement hours (8 AM - 5 PM)
-        if 8 <= hour < 17:
-            # Slight dip during lunch
-            if 12 <= hour < 13:
-                return 0.7
-            return 0.85
-
-        # Evening wind-down (5-10 PM)
-        return 0.6 - (hour - 17) * 0.11
-
-    @classmethod
-    def _calculate_day_of_week_factor(cls, dt: datetime) -> float:
-        """
-        Calculate probability factor based on day of week.
-
-        TAPS operates Monday-Friday primarily, with reduced
-        weekend enforcement.
-
-        Args:
-            dt: Datetime to evaluate
-
-        Returns:
-            Factor between 0.0 and 1.0
-        """
-        day = dt.weekday()  # 0 = Monday, 6 = Sunday
-
-        # Weekday patterns
-        weekday_factors = {
-            0: 0.85,  # Monday - high enforcement
-            1: 0.90,  # Tuesday - highest
-            2: 0.85,  # Wednesday
-            3: 0.80,  # Thursday
-            4: 0.70,  # Friday - reduced
-            5: 0.15,  # Saturday - minimal
-            6: 0.10,  # Sunday - minimal
-        }
-
-        return weekday_factors.get(day, 0.5)
-
-    @classmethod
-    async def _calculate_historical_factor(
-        cls,
-        db: AsyncSession,
-        parking_lot_id: int,
-        dt: datetime
-    ) -> float:
-        """
-        Calculate probability factor based on historical sighting patterns.
-
-        Looks at sightings from the past 90 days at similar times.
-
-        Args:
-            db: Database session
-            parking_lot_id: Parking lot ID
-            dt: Datetime to evaluate
-
-        Returns:
-            Factor between 0.0 and 1.0
-        """
-        # Get sightings from the past 90 days at similar time (+/- 2 hours)
-        start_date = dt - timedelta(days=90)
-        hour_start = (dt.hour - 2) % 24
-        hour_end = (dt.hour + 2) % 24
-
-        result = await db.execute(
-            select(func.count(TapsSighting.id))
-            .where(
-                TapsSighting.parking_lot_id == parking_lot_id,
-                TapsSighting.reported_at >= start_date,
-                func.extract('dow', TapsSighting.reported_at) == dt.weekday(),
-            )
-        )
-        count = result.scalar() or 0
-
-        # Normalize: 0 sightings = 0.3 (baseline), 10+ sightings = 0.95
-        if count == 0:
-            return 0.3
-        return min(0.3 + (count * 0.065), 0.95)
-
-    @classmethod
-    async def _calculate_recent_sightings_factor(
-        cls,
-        db: AsyncSession,
-        parking_lot_id: int,
-        dt: datetime
-    ) -> float:
-        """
-        Calculate probability factor based on recent sighting activity.
-
-        Recent sightings (last 24-48 hours) indicate TAPS activity in the area.
-
-        Args:
-            db: Database session
-            parking_lot_id: Parking lot ID
-            dt: Datetime to evaluate
-
-        Returns:
-            Factor between 0.0 and 1.0
-        """
-        # Sightings in last 2 hours suggest TAPS is still around
-        two_hours_ago = dt - timedelta(hours=2)
-        result = await db.execute(
-            select(func.count(TapsSighting.id))
-            .where(
-                TapsSighting.parking_lot_id == parking_lot_id,
-                TapsSighting.reported_at >= two_hours_ago,
-            )
-        )
-        very_recent = result.scalar() or 0
-
-        if very_recent > 0:
-            return 0.95  # TAPS was just seen, very high probability
-
-        # Sightings in last 24 hours
-        one_day_ago = dt - timedelta(hours=24)
-        result = await db.execute(
-            select(func.count(TapsSighting.id))
-            .where(
-                TapsSighting.parking_lot_id == parking_lot_id,
-                TapsSighting.reported_at >= one_day_ago,
-            )
-        )
-        recent = result.scalar() or 0
-
-        if recent == 0:
-            return 0.4  # No recent activity
-        return min(0.5 + (recent * 0.1), 0.85)
-
-    @classmethod
-    def _calculate_academic_calendar_factor(cls, dt: datetime) -> float:
-        """
-        Calculate probability factor based on academic calendar.
-
-        Higher enforcement during active quarters, especially finals.
-        Lower during breaks and summer.
-
-        Args:
-            dt: Datetime to evaluate
-
-        Returns:
-            Factor between 0.0 and 1.0
-        """
-        month, day = dt.month, dt.day
-
-        def in_range(start: Tuple[int, int], end: Tuple[int, int]) -> bool:
-            """Check if date is within range."""
-            start_m, start_d = start
-            end_m, end_d = end
-            if start_m <= end_m:
-                if month < start_m or month > end_m:
-                    return False
-                if month == start_m and day < start_d:
-                    return False
-                if month == end_m and day > end_d:
-                    return False
-                return True
-            else:  # Spans year boundary (e.g., fall to winter break)
-                if month >= start_m or month <= end_m:
-                    if month == start_m and day < start_d:
-                        return False
-                    if month == end_m and day > end_d:
-                        return False
-                    return True
-                return False
-
-        # Check finals weeks (highest enforcement)
-        for finals_key in ["fall_finals", "winter_finals", "spring_finals"]:
-            start, end = cls.ACADEMIC_CALENDAR[finals_key]
-            if in_range(start, end):
-                return 0.95
-
-        # Check active quarter periods
-        quarters = [
-            ("fall_start", "fall_end"),
-            ("winter_start", "winter_end"),
-            ("spring_start", "spring_end"),
-        ]
-
-        for start_key, end_key in quarters:
-            start = cls.ACADEMIC_CALENDAR[start_key]
-            end = cls.ACADEMIC_CALENDAR[end_key]
-            if in_range(start, end):
-                return 0.75
-
-        # Summer or break period
-        return 0.35
-
-    @classmethod
-    def _get_risk_level(cls, probability: float) -> str:
-        """
-        Convert probability to human-readable risk level.
-
-        Args:
-            probability: Probability value (0.0 - 1.0)
-
-        Returns:
-            Risk level string
-        """
-        if probability < 0.3:
-            return "LOW"
-        elif probability < 0.6:
-            return "MEDIUM"
-        else:
-            return "HIGH"
-
-    @classmethod
-    def _calculate_confidence(
-        cls,
-        historical_count: int,
-        recent_count: int
-    ) -> float:
-        """
-        Calculate model confidence based on available data.
-
-        More historical data = higher confidence in predictions.
-
-        Args:
-            historical_count: Number of historical sightings
-            recent_count: Number of recent sightings
-
-        Returns:
-            Confidence value (0.0 - 1.0)
-        """
-        # Base confidence
-        base = 0.4
-
-        # Historical data contribution
-        historical_contrib = min(historical_count * 0.02, 0.3)
-
-        # Recent data contribution
-        recent_contrib = min(recent_count * 0.05, 0.2)
-
-        return min(base + historical_contrib + recent_contrib, 0.95)
+    """Service for predicting TAPS risk based on time since last sighting."""
 
     @classmethod
     async def predict(
         cls,
         db: AsyncSession,
-        parking_lot_id: int,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
+        lot_id: Optional[int] = None,
     ) -> PredictionResponse:
-        """
-        Generate TAPS probability prediction for a parking lot.
+        now = timestamp or datetime.now(timezone.utc)
 
-        Args:
-            db: Database session
-            parking_lot_id: ID of the parking lot
-            timestamp: Time to predict for (defaults to now)
+        # Calculate start of today in Pacific time so yesterday's sightings
+        # don't bleed into today's risk calculation
+        now_pacific = now.astimezone(_PACIFIC)
+        today_start_pacific = now_pacific.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_utc = today_start_pacific.astimezone(timezone.utc)
 
-        Returns:
-            PredictionResponse with probability and factors
-
-        Raises:
-            ValueError: If parking lot not found
-        """
-        # Get parking lot
-        result = await db.execute(
-            select(ParkingLot).where(ParkingLot.id == parking_lot_id)
-        )
-        parking_lot = result.scalar_one_or_none()
-
-        if parking_lot is None:
-            raise ValueError(f"Parking lot {parking_lot_id} not found")
-
-        # Use current time if not specified
-        if timestamp is None:
-            timestamp = datetime.now(timezone.utc)
-
-        # Calculate individual factors
-        time_factor = cls._calculate_time_of_day_factor(timestamp)
-        day_factor = cls._calculate_day_of_week_factor(timestamp)
-        historical_factor = await cls._calculate_historical_factor(db, parking_lot_id, timestamp)
-        recent_factor = await cls._calculate_recent_sightings_factor(db, parking_lot_id, timestamp)
-        calendar_factor = cls._calculate_academic_calendar_factor(timestamp)
-
-        # Combine factors using weights
-        probability = (
-            time_factor * cls.WEIGHTS["time_of_day"] +
-            day_factor * cls.WEIGHTS["day_of_week"] +
-            historical_factor * cls.WEIGHTS["historical"] +
-            recent_factor * cls.WEIGHTS["recent_sightings"] +
-            calendar_factor * cls.WEIGHTS["academic_calendar"]
+        # Find the most recent sighting from today, filtered by lot if provided
+        query = (
+            select(TapsSighting, ParkingLot)
+            .join(ParkingLot, TapsSighting.parking_lot_id == ParkingLot.id)
+            .where(TapsSighting.reported_at >= today_start_utc)
         )
 
-        # Clamp probability to valid range
-        probability = max(0.0, min(1.0, probability))
+        if lot_id is not None:
+            query = query.where(TapsSighting.parking_lot_id == lot_id)
 
-        # Get counts for confidence calculation
-        ninety_days_ago = timestamp - timedelta(days=90)
-        hist_result = await db.execute(
-            select(func.count(TapsSighting.id))
-            .where(
-                TapsSighting.parking_lot_id == parking_lot_id,
-                TapsSighting.reported_at >= ninety_days_ago,
-            )
+        query = query.order_by(TapsSighting.reported_at.desc()).limit(1)
+
+        result = await db.execute(query)
+        row = result.first()
+
+        # If filtering by lot, fetch the lot name for a better no-sighting message
+        lot_name = None
+        if row is None and lot_id is not None:
+            lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
+            lot_obj = lot_result.scalar_one_or_none()
+            if lot_obj:
+                lot_name = lot_obj.name
+
+        if row is None:
+            return cls._build_no_sighting_response(now, lot_name=lot_name)
+
+        sighting, lot = row
+        reported_at = sighting.reported_at
+        if reported_at.tzinfo is None:
+            reported_at = reported_at.replace(tzinfo=timezone.utc)
+        hours_ago = (now - reported_at).total_seconds() / 3600
+
+        return cls._build_sighting_response(now, hours_ago, sighting, lot)
+
+    @classmethod
+    def _classify_risk(cls, hours_ago: float) -> str:
+        """Returns risk_level string."""
+        if hours_ago <= 1.0:
+            return "HIGH"
+        elif hours_ago <= 2.0:
+            return "LOW"
+        elif hours_ago <= 4.0:
+            return "MEDIUM"
+        else:
+            return "HIGH"
+
+    @classmethod
+    def _format_time_ago(cls, hours_ago: float) -> str:
+        if hours_ago < 1:
+            minutes_ago = int(hours_ago * 60)
+            if minutes_ago <= 1:
+                return "just now"
+            return f"{minutes_ago} minutes ago"
+        hours_int = int(hours_ago)
+        minutes_remaining = int((hours_ago - hours_int) * 60)
+        if minutes_remaining > 0:
+            return f"{hours_int}h {minutes_remaining}m ago"
+        return f"{hours_int} hour{'s' if hours_int != 1 else ''} ago"
+
+    @classmethod
+    def _build_no_sighting_response(cls, now: datetime, lot_name: Optional[str] = None) -> PredictionResponse:
+        message = f"TAPS has not been sighted at {lot_name} today" if lot_name else "TAPS has not been sighted today"
+        return PredictionResponse(
+            risk_level="MEDIUM",
+            risk_message=message,
+            last_sighting_lot_name=None,
+            last_sighting_lot_code=None,
+            last_sighting_at=None,
+            hours_since_last_sighting=None,
+            parking_lot_id=None,
+            parking_lot_name=None,
+            parking_lot_code=None,
+            probability=_RISK_TO_PROBABILITY["MEDIUM"],
+            predicted_for=now,
+            confidence=0.0,
         )
-        historical_count = hist_result.scalar() or 0
 
-        one_day_ago = timestamp - timedelta(hours=24)
-        recent_result = await db.execute(
-            select(func.count(TapsSighting.id))
-            .where(
-                TapsSighting.parking_lot_id == parking_lot_id,
-                TapsSighting.reported_at >= one_day_ago,
-            )
-        )
-        recent_count = recent_result.scalar() or 0
-
-        confidence = cls._calculate_confidence(historical_count, recent_count)
-
-        # Build response
-        factors = PredictionFactors(
-            time_of_day_factor=round(time_factor, 3),
-            day_of_week_factor=round(day_factor, 3),
-            historical_factor=round(historical_factor, 3),
-            recent_sightings_factor=round(recent_factor, 3),
-            academic_calendar_factor=round(calendar_factor, 3),
-            weather_factor=None,  # Not implemented yet
-        )
+    @classmethod
+    def _build_sighting_response(
+        cls,
+        now: datetime,
+        hours_ago: float,
+        sighting: TapsSighting,
+        lot: ParkingLot,
+    ) -> PredictionResponse:
+        risk_level = cls._classify_risk(hours_ago)
+        time_str = cls._format_time_ago(hours_ago)
+        risk_message = f"TAPS was last spotted {time_str} at {lot.name}"
 
         return PredictionResponse(
-            parking_lot_id=parking_lot.id,
-            parking_lot_name=parking_lot.name,
-            parking_lot_code=parking_lot.code,
-            probability=round(probability, 3),
-            risk_level=cls._get_risk_level(probability),
-            predicted_for=timestamp,
-            factors=factors,
-            confidence=round(confidence, 3),
+            risk_level=risk_level,
+            risk_message=risk_message,
+            last_sighting_lot_name=lot.name,
+            last_sighting_lot_code=lot.code,
+            last_sighting_at=sighting.reported_at,
+            hours_since_last_sighting=round(hours_ago, 2),
+            parking_lot_id=lot.id,
+            parking_lot_name=lot.name,
+            parking_lot_code=lot.code,
+            probability=_RISK_TO_PROBABILITY[risk_level],
+            predicted_for=now,
+            confidence=0.0,
         )

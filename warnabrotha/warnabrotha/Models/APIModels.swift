@@ -23,11 +23,21 @@ struct TokenResponse: Codable {
     let accessToken: String
     let tokenType: String
     let expiresIn: Int
+    let emailVerified: Bool
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType = "token_type"
         case expiresIn = "expires_in"
+        case emailVerified = "email_verified"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        tokenType = try container.decode(String.self, forKey: .tokenType)
+        expiresIn = try container.decode(Int.self, forKey: .expiresIn)
+        emailVerified = try container.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
     }
 }
 
@@ -53,6 +63,16 @@ struct EmailVerificationResponse: Codable {
     }
 }
 
+struct DeviceUpdate: Codable {
+    let pushToken: String?
+    let isPushEnabled: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case pushToken = "push_token"
+        case isPushEnabled = "is_push_enabled"
+    }
+}
+
 struct DeviceResponse: Codable {
     let id: Int
     let deviceId: String
@@ -68,6 +88,62 @@ struct DeviceResponse: Codable {
         case isPushEnabled = "is_push_enabled"
         case createdAt = "created_at"
         case lastSeenAt = "last_seen_at"
+    }
+}
+
+// MARK: - OTP Verification
+
+struct SendOTPRequest: Codable {
+    let email: String
+    let deviceId: String
+
+    enum CodingKeys: String, CodingKey {
+        case email
+        case deviceId = "device_id"
+    }
+}
+
+struct SendOTPResponse: Codable {
+    let success: Bool
+    let message: String
+}
+
+struct VerifyOTPRequest: Codable {
+    let email: String
+    let deviceId: String
+    let otpCode: String
+
+    enum CodingKeys: String, CodingKey {
+        case email
+        case deviceId = "device_id"
+        case otpCode = "otp_code"
+    }
+}
+
+struct VerifyOTPResponse: Codable {
+    let success: Bool
+    let message: String
+    let emailVerified: Bool
+    let accessToken: String
+    let tokenType: String
+    let expiresIn: Int
+
+    enum CodingKeys: String, CodingKey {
+        case success, message
+        case emailVerified = "email_verified"
+        case accessToken = "access_token"
+        case tokenType = "token_type"
+        case expiresIn = "expires_in"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        success = try container.decode(Bool.self, forKey: .success)
+        message = try container.decode(String.self, forKey: .message)
+        emailVerified = try container.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
+        accessToken = try container.decodeIfPresent(String.self, forKey: .accessToken) ?? ""
+        tokenType = try container.decodeIfPresent(String.self, forKey: .tokenType) ?? "bearer"
+        expiresIn = try container.decodeIfPresent(Int.self, forKey: .expiresIn) ?? 0
     }
 }
 
@@ -284,21 +360,34 @@ struct PredictionFactors: Codable {
 }
 
 struct PredictionResponse: Codable {
-    let parkingLotId: Int
-    let parkingLotName: String
-    let parkingLotCode: String
-    let probability: Double
+    // New fields
     let riskLevel: String
+    let riskMessage: String
+    let lastSightingLotName: String?
+    let lastSightingLotCode: String?
+    let lastSightingAt: String?
+    let hoursSinceLastSighting: Double?
+
+    // Backward-compatible fields
+    let parkingLotId: Int?
+    let parkingLotName: String?
+    let parkingLotCode: String?
+    let probability: Double
     let predictedFor: String
-    let factors: PredictionFactors
-    let confidence: Double
+    let factors: PredictionFactors?
+    let confidence: Double?
 
     enum CodingKeys: String, CodingKey {
+        case riskLevel = "risk_level"
+        case riskMessage = "risk_message"
+        case lastSightingLotName = "last_sighting_lot_name"
+        case lastSightingLotCode = "last_sighting_lot_code"
+        case lastSightingAt = "last_sighting_at"
+        case hoursSinceLastSighting = "hours_since_last_sighting"
         case parkingLotId = "parking_lot_id"
         case parkingLotName = "parking_lot_name"
         case parkingLotCode = "parking_lot_code"
         case probability
-        case riskLevel = "risk_level"
         case predictedFor = "predicted_for"
         case factors, confidence
     }

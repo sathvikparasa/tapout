@@ -38,7 +38,7 @@ class APIClient {
 
     // Change this to your backend URL
     #if DEBUG
-    private let baseURL = "http://localhost:8000/api/v1"
+    private let baseURL = "https://tapout-485821.wl.r.appspot.com/api/v1"
     #else
     private let baseURL = "https://api.warnabrotha.com/api/v1"
     #endif
@@ -73,19 +73,42 @@ class APIClient {
         return response
     }
 
-    func verifyEmail(_ email: String) async throws -> EmailVerificationResponse {
+    func sendOTP(_ email: String) async throws -> SendOTPResponse {
         let deviceId = keychain.getOrCreateDeviceId()
-        let body = EmailVerificationRequest(email: email, deviceId: deviceId)
+        let body = SendOTPRequest(email: email, deviceId: deviceId)
 
         return try await post(
-            endpoint: "/auth/verify-email",
+            endpoint: "/auth/send-otp",
             body: body,
             authenticated: false
         )
     }
 
+    func verifyOTP(email: String, code: String) async throws -> VerifyOTPResponse {
+        let deviceId = keychain.getOrCreateDeviceId()
+        let body = VerifyOTPRequest(email: email, deviceId: deviceId, otpCode: code)
+
+        let response: VerifyOTPResponse = try await post(
+            endpoint: "/auth/verify-otp",
+            body: body,
+            authenticated: false
+        )
+
+        // Save fresh token on success
+        if response.success && !response.accessToken.isEmpty {
+            _ = keychain.saveToken(response.accessToken)
+        }
+
+        return response
+    }
+
     func getDeviceInfo() async throws -> DeviceResponse {
         return try await get(endpoint: "/auth/me")
+    }
+
+    func updateDevice(pushToken: String, isPushEnabled: Bool) async throws -> DeviceResponse {
+        let body = DeviceUpdate(pushToken: pushToken, isPushEnabled: isPushEnabled)
+        return try await patch(endpoint: "/auth/me", body: body)
     }
 
     // MARK: - Parking Lots
@@ -187,6 +210,16 @@ class APIClient {
         authenticated: Bool = true
     ) async throws -> T {
         var request = try buildRequest(endpoint: endpoint, method: "POST", authenticated: authenticated)
+        request.httpBody = try JSONEncoder().encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await execute(request)
+    }
+
+    private func patch<T: Decodable, B: Encodable>(
+        endpoint: String,
+        body: B
+    ) async throws -> T {
+        var request = try buildRequest(endpoint: endpoint, method: "PATCH")
         request.httpBody = try JSONEncoder().encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await execute(request)

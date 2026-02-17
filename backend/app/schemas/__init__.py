@@ -9,6 +9,10 @@ from app.schemas.device import (
     EmailVerificationRequest,
     EmailVerificationResponse,
     TokenResponse,
+    SendOTPRequest,
+    SendOTPResponse,
+    VerifyOTPRequest,
+    VerifyOTPResponse,
 )
 from app.schemas.parking_lot import (
     ParkingLotCreate,
@@ -46,6 +50,7 @@ from app.schemas.feed import (
     FeedResponse,
     AllFeedsResponse,
 )
+from app.schemas.ticket_scan import TicketScanResponse
 
 __all__ = [
     # Device
@@ -55,6 +60,10 @@ __all__ = [
     "EmailVerificationRequest",
     "EmailVerificationResponse",
     "TokenResponse",
+    "SendOTPRequest",
+    "SendOTPResponse",
+    "VerifyOTPRequest",
+    "VerifyOTPResponse",
     # Parking Lot
     "ParkingLotCreate",
     "ParkingLotResponse",
@@ -84,4 +93,6 @@ __all__ = [
     "FeedSighting",
     "FeedResponse",
     "AllFeedsResponse",
+    # Ticket Scan
+    "TicketScanResponse",
 ]

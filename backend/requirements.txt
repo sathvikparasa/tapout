@@ -4,9 +4,12 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 gunicorn>=22.0.0
 
-# Database (Supabase PostgreSQL)
+# Database (Cloud SQL PostgreSQL)
 sqlalchemy==2.0.25
 asyncpg==0.29.0
+
+# GCP Secret Manager
+google-cloud-secret-manager==2.18.3
 
 # Validation and serialization
 pydantic==2.5.3
@@ -37,5 +40,12 @@ apscheduler==3.10.4
 pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0
+freezegun==1.4.0
 # Utilities
 python-dotenv==1.0.0
+
+# Rate limiting
+slowapi==0.1.9
+
+# Anthropic VLM for ticket OCR
+anthropic>=0.40.0

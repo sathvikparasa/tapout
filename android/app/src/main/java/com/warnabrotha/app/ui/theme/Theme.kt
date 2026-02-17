@@ -4,32 +4,31 @@ import android.app.Activity
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val TacticalColorScheme = darkColorScheme(
-    primary = Amber500,
-    onPrimary = Black900,
-    primaryContainer = Amber600,
-    onPrimaryContainer = TextWhite,
-    secondary = Blue500,
-    onSecondary = Black900,
-    secondaryContainer = Black600,
-    onSecondaryContainer = TextWhite,
-    tertiary = Green500,
-    onTertiary = Black900,
+private val TapOutColorScheme = lightColorScheme(
+    primary = Green500,
+    onPrimary = TextOnPrimary,
+    primaryContainer = GreenOverlay10,
+    onPrimaryContainer = TextPrimary,
+    secondary = Green400,
+    onSecondary = TextOnPrimary,
+    secondaryContainer = GreenOverlay5,
+    onSecondaryContainer = TextPrimary,
+    tertiary = LiveGreen,
+    onTertiary = TextOnPrimary,
     error = Red500,
-    onError = TextWhite,
-    errorContainer = Red600,
-    onErrorContainer = TextWhite,
-    background = Black900,
-    onBackground = TextWhite,
-    surface = Black800,
-    onSurface = TextWhite,
-    surfaceVariant = Black700,
-    onSurfaceVariant = TextGray,
+    onError = TextOnPrimary,
+    errorContainer = RedOverlay10,
+    onErrorContainer = TextPrimary,
+    background = Background,
+    onBackground = TextPrimary,
+    surface = Surface,
+    onSurface = TextPrimary,
+    surfaceVariant = Background,
+    onSurfaceVariant = TextSecondary,
     outline = Border,
     outlineVariant = BorderLight,
 )
@@ -43,15 +42,15 @@ fun WarnABrothaTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Black900.toArgb()
-            window.navigationBarColor = Black900.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+            window.statusBarColor = Background.toArgb()
+            window.navigationBarColor = Surface.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
         }
     }
 
     MaterialTheme(
-        colorScheme = TacticalColorScheme,
+        colorScheme = TapOutColorScheme,
         typography = AppTypography,
         content = content
     )

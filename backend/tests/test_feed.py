@@ -212,6 +212,56 @@ class TestFeedEndpoints:
         assert sighting_data["user_vote"] == "upvote"
 
 
+    @pytest.mark.asyncio
+    async def test_feed_user_vote_null_when_not_voted(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot,
+    ):
+        """Feed shows user_vote as null when current device hasn't voted."""
+        sighting = TapsSighting(parking_lot_id=test_parking_lot.id)
+        db_session.add(sighting)
+        await db_session.commit()
+
+        response = await client.get(
+            f"/api/v1/feed/{test_parking_lot.id}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sightings"][0]["user_vote"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_lot_feed_empty(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot,
+    ):
+        """Lot with no sightings → empty feed."""
+        response = await client.get(
+            f"/api/v1/feed/{test_parking_lot.id}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_sightings"] == 0
+        assert data["sightings"] == []
+
+    @pytest.mark.asyncio
+    async def test_feed_requires_auth(
+        self,
+        client: AsyncClient,
+    ):
+        """Feed without auth → 403."""
+        response = await client.get("/api/v1/feed")
+        assert response.status_code == 403
+
+
 class TestVotingEndpoints:
     """Tests for voting API endpoints."""
 
@@ -466,6 +516,39 @@ class TestVotingEndpoints:
         assert data["downvotes"] == 0
         assert data["net_score"] == 1
         assert data["user_vote"] == "upvote"
+
+    @pytest.mark.asyncio
+    async def test_get_votes_nonexistent_sighting(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+    ):
+        """Getting votes for nonexistent sighting → 404."""
+        response = await client.get(
+            "/api/v1/feed/sightings/99999/votes",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_vote_requires_auth(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_parking_lot: ParkingLot,
+    ):
+        """Voting without auth → 403."""
+        sighting = TapsSighting(parking_lot_id=test_parking_lot.id)
+        db_session.add(sighting)
+        await db_session.commit()
+        await db_session.refresh(sighting)
+
+        response = await client.post(
+            f"/api/v1/feed/sightings/{sighting.id}/vote",
+            json={"vote_type": "upvote"},
+        )
+        assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_feed_minutes_ago(

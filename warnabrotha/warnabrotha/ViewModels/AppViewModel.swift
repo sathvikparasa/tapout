@@ -8,6 +8,11 @@
 import Foundation
 import SwiftUI
 
+enum OTPStep {
+    case emailInput
+    case codeInput
+}
+
 @MainActor
 class AppViewModel: ObservableObject {
     // MARK: - Published State
@@ -16,6 +21,12 @@ class AppViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var isEmailVerified = false
     @Published var showEmailVerification = false
+
+    // OTP state
+    @Published var otpStep: OTPStep = .emailInput
+    @Published var otpEmail: String = ""
+    @Published var canResendOTP = false
+    @Published var resendCooldown: Int = 0
 
     // Parking state
     @Published var parkingLots: [ParkingLot] = []
@@ -31,6 +42,10 @@ class AppViewModel: ObservableObject {
     @Published var prediction: PredictionResponse?
     @Published var displayedProbability: Double = 0
     @Published var isAnimatingProbability = false
+
+    // Notification state
+    @Published var notificationPermissionGranted = false
+    @Published var unreadNotificationCount = 0
 
     // UI state
     @Published var isLoading = false
@@ -49,26 +64,49 @@ class AppViewModel: ObservableObject {
     private let api = APIClient.shared
     private let keychain = KeychainService.shared
 
+    private var resendTimer: Timer?
+
+    var hasCompletedOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
+    }
+
     // MARK: - Initialization
 
     init() {
-        // Check if we have a token
-        if keychain.getToken() != nil {
+        if keychain.getToken() != nil && hasCompletedOnboarding {
+            isAuthenticated = true
+            isEmailVerified = true
+            Task {
+                await silentRefresh()
+            }
+        } else if keychain.getToken() != nil {
             isAuthenticated = true
             Task {
-                await checkAuthAndLoad()
+                await silentRefresh()
             }
         }
     }
 
-    private func checkAuthAndLoad() async {
+    private func silentRefresh() async {
         do {
-            _ = try await api.getDeviceInfo()
-            await loadInitialData()
+            let response = try await api.register()
+            if response.emailVerified {
+                isEmailVerified = true
+                hasCompletedOnboarding = true
+                showEmailVerification = false
+                await loadInitialData()
+                await requestNotificationPermission()
+            } else {
+                showEmailVerification = true
+            }
         } catch {
-            // Token is stale or device no longer exists — force re-registration
-            isAuthenticated = false
-            keychain.clearAll()
+            // Network error — use existing token optimistically
+            if hasCompletedOnboarding {
+                isEmailVerified = true
+                showEmailVerification = false
+                await loadInitialData()
+            }
         }
     }
 
@@ -79,9 +117,18 @@ class AppViewModel: ObservableObject {
         error = nil
 
         do {
-            _ = try await api.register()
+            let response = try await api.register()
             isAuthenticated = true
-            showEmailVerification = true
+
+            if response.emailVerified {
+                isEmailVerified = true
+                hasCompletedOnboarding = true
+                showEmailVerification = false
+                await loadInitialData()
+                await requestNotificationPermission()
+            } else {
+                showEmailVerification = true
+            }
         } catch {
             self.error = error.localizedDescription
             showError = true
@@ -90,47 +137,75 @@ class AppViewModel: ObservableObject {
         isLoading = false
     }
 
-    func verifyEmail(_ email: String) async -> Bool {
+    func sendOTP(_ email: String) async {
         isLoading = true
         error = nil
+        otpEmail = email
 
         do {
-            let response = try await api.verifyEmail(email)
-            if response.emailVerified {
-                isEmailVerified = true
-                showEmailVerification = false
-                await loadInitialData()
-                return true
+            let response = try await api.sendOTP(email)
+            if response.success {
+                otpStep = .codeInput
+                startResendCooldown()
             } else {
                 self.error = response.message
                 showError = true
-                return false
             }
         } catch {
             self.error = error.localizedDescription
             showError = true
-            return false
         }
+
+        isLoading = false
     }
 
-    func checkAuthStatus() async {
-        guard keychain.getToken() != nil else {
-            isAuthenticated = false
-            return
-        }
+    func verifyOTP(_ code: String) async {
+        isLoading = true
+        error = nil
 
         do {
-            let device = try await api.getDeviceInfo()
-            isAuthenticated = true
-            isEmailVerified = device.emailVerified
-
-            if !isEmailVerified {
-                showEmailVerification = true
+            let response = try await api.verifyOTP(email: otpEmail, code: code)
+            if response.success && response.emailVerified {
+                isEmailVerified = true
+                hasCompletedOnboarding = true
+                showEmailVerification = false
+                otpStep = .emailInput
+                await loadInitialData()
+                await requestNotificationPermission()
+            } else {
+                self.error = response.message
+                showError = true
             }
         } catch {
-            // Token might be invalid
-            isAuthenticated = false
-            keychain.clearAll()
+            self.error = error.localizedDescription
+            showError = true
+        }
+
+        isLoading = false
+    }
+
+    func resendOTP() async {
+        await sendOTP(otpEmail)
+    }
+
+    func changeEmail() {
+        otpStep = .emailInput
+        error = nil
+    }
+
+    private func startResendCooldown() {
+        canResendOTP = false
+        resendCooldown = 30
+        resendTimer?.invalidate()
+        resendTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            Task { @MainActor in
+                guard let self = self else { timer.invalidate(); return }
+                self.resendCooldown -= 1
+                if self.resendCooldown <= 0 {
+                    self.canResendOTP = true
+                    timer.invalidate()
+                }
+            }
         }
     }
 
@@ -156,6 +231,9 @@ class AppViewModel: ObservableObject {
 
             // Load lot details and prediction
             await loadLotData()
+
+            // Fetch unread notification count
+            await fetchUnreadNotificationCount()
 
         } catch let apiError as APIClientError {
             if case .noToken = apiError {
@@ -191,6 +269,24 @@ class AppViewModel: ObservableObject {
 
     func refresh() async {
         await loadLotData()
+        await fetchUnreadNotificationCount()
+    }
+
+    // MARK: - Notifications
+
+    func requestNotificationPermission() async {
+        let granted = await PushNotificationService.shared.requestPermissionAndRegister()
+        notificationPermissionGranted = granted
+    }
+
+    func fetchUnreadNotificationCount() async {
+        do {
+            let list = try await api.getUnreadNotifications()
+            unreadNotificationCount = list.unreadCount
+        } catch {
+            // Non-critical — don't surface to UI
+            print("Failed to fetch unread notifications: \(error)")
+        }
     }
 
     // MARK: - Parking Actions
@@ -296,24 +392,31 @@ class AppViewModel: ObservableObject {
     // MARK: - Helpers
 
     var probabilityColor: Color {
-        let prob = displayedProbability / 100
-        if prob < 0.33 {
-            return .green
-        } else if prob < 0.66 {
-            return .yellow
-        } else {
-            return .red
+        guard let prediction = prediction else { return .gray }
+        switch prediction.riskLevel {
+        case "HIGH": return .red
+        case "MEDIUM": return .yellow
+        case "LOW": return .green
+        default: return .gray
         }
     }
 
     var riskLevelText: String {
-        let prob = displayedProbability / 100
-        if prob < 0.33 {
-            return "LOW RISK"
-        } else if prob < 0.66 {
-            return "MEDIUM RISK"
-        } else {
-            return "HIGH RISK"
+        guard let prediction = prediction else { return "UNKNOWN" }
+        return "\(prediction.riskLevel) RISK"
+    }
+
+    var riskMessage: String {
+        prediction?.riskMessage ?? "Loading..."
+    }
+
+    var riskBars: Int {
+        guard let prediction = prediction else { return 2 }
+        switch prediction.riskLevel {
+        case "HIGH": return 3
+        case "MEDIUM": return 2
+        case "LOW": return 1
+        default: return 2
         }
     }
 

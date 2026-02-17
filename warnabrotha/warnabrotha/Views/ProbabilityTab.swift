@@ -95,82 +95,58 @@ struct ProbabilityTab: View {
     }
 }
 
-// MARK: - Windows 95 Probability Meter (Loading Bar Style)
+// MARK: - Windows 95 Risk Card (Horizontal Card)
 
-struct Win95ProbabilityMeter: View {
-    let probability: Double
-    let color: Color
+struct Win95RiskCard: View {
+    let riskLevel: String
+    let riskMessage: String
 
-    @State private var animatedProgress: Double = 0
+    private var riskColor: Color {
+        switch riskLevel {
+        case "HIGH": return Win95Colors.dangerRed
+        case "MEDIUM": return Win95Colors.warningYellow
+        case "LOW": return Win95Colors.safeGreen
+        default: return Win95Colors.textDisabled
+        }
+    }
+
+    private var riskBars: Int {
+        switch riskLevel {
+        case "HIGH": return 3
+        case "MEDIUM": return 2
+        case "LOW": return 1
+        default: return 2
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header row
-            HStack(alignment: .firstTextBaseline) {
-                Text("TAPS Probability")
-                    .win95Font(size: 13)
-                    .foregroundColor(Win95Colors.textPrimary)
-
-                Spacer()
-
-                Text("\(Int(probability))%")
-                    .win95Font(size: 28)
-                    .foregroundColor(probabilityColor)
-            }
-
-            // Loading bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    // Sunken background
+        HStack(spacing: 12) {
+            // Risk bars (3 bars of increasing height)
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(1...3, id: \.self) { i in
                     Rectangle()
-                        .fill(Win95Colors.inputBackground)
-
-                    // Progress blocks
-                    HStack(spacing: 2) {
-                        let blockCount = Int(animatedProgress / 100 * 20)
-                        ForEach(0..<20, id: \.self) { index in
-                            Rectangle()
-                                .fill(colorForBlock(index))
-                                .opacity(index < blockCount ? 1.0 : 0.0)
-                        }
-                    }
-                    .padding(3)
+                        .fill(i <= riskBars ? riskColor : Win95Colors.buttonShadow.opacity(0.3))
+                        .frame(width: 8, height: CGFloat(i) * 10)
                 }
-                .beveledBorder(raised: false, width: 2)
             }
-            .frame(height: 24)
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) {
-                animatedProgress = probability
-            }
-        }
-        .onChange(of: probability) { _, newValue in
-            withAnimation(.easeOut(duration: 0.3)) {
-                animatedProgress = newValue
-            }
-        }
-    }
+            .frame(height: 30)
 
-    private var probabilityColor: Color {
-        if probability < 33 {
-            return Win95Colors.safeGreen
-        } else if probability < 66 {
-            return Win95Colors.warningYellow
-        } else {
-            return Win95Colors.dangerRed
-        }
-    }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(riskLevel) RISK")
+                    .win95Font(size: 14)
+                    .foregroundColor(riskColor)
 
-    private func colorForBlock(_ index: Int) -> Color {
-        let progress = Double(index) / 20.0
-        if progress < 0.33 {
-            return Win95Colors.safeGreen
-        } else if progress < 0.66 {
-            return Win95Colors.warningYellow
-        } else {
-            return Win95Colors.dangerRed
+                Text(riskMessage)
+                    .win95Font(size: 12)
+                    .foregroundColor(Win95Colors.textPrimary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
         }
+        .padding(12)
+        .background(Win95Colors.inputBackground)
+        .beveledBorder(raised: false, width: 1)
     }
 }
 

@@ -287,7 +287,7 @@ class NotificationService:
 
         notified_count = 0
         title = "⚠️ TAPS Alert!"
-        message = f"TAPS has been spotted at {parking_lot_name}. Move your vehicle!"
+        message = f"TAPS spotted at {parking_lot_name}! Tap to pay for parking."
 
         for session in active_sessions:
             device = session.device

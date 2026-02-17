@@ -9,6 +9,7 @@ from app.models.parking_session import ParkingSession
 from app.models.taps_sighting import TapsSighting
 from app.models.notification import Notification
 from app.models.vote import Vote, VoteType
+from app.models.email_otp import EmailOTP
 
 __all__ = [
     "ParkingLot",
@@ -18,4 +19,5 @@ __all__ = [
     "Notification",
     "Vote",
     "VoteType",
+    "EmailOTP",
 ]

@@ -1,10 +1,10 @@
 """
-Pydantic schemas for TAPS probability prediction.
+Pydantic schemas for TAPS risk prediction.
 """
 
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class PredictionRequest(BaseModel):
@@ -27,7 +27,7 @@ class PredictionRequest(BaseModel):
 class PredictionFactors(BaseModel):
     """
     Schema detailing the factors that contributed to the prediction.
-    Helps users understand why the probability is what it is.
+    Kept for backward compatibility with older clients.
     """
     time_of_day_factor: float = Field(..., ge=0.0, le=1.0, description="Contribution from time of day")
     day_of_week_factor: float = Field(..., ge=0.0, le=1.0, description="Contribution from day of week")
@@ -38,33 +38,56 @@ class PredictionFactors(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    """Schema for TAPS probability prediction response."""
-    parking_lot_id: int
-    parking_lot_name: str
-    parking_lot_code: str
-    probability: float = Field(..., ge=0.0, le=1.0, description="Predicted probability (0-1) of TAPS presence")
-    risk_level: str = Field(..., description="Human-readable risk level (LOW, MEDIUM, HIGH)")
-    predicted_for: datetime = Field(..., description="Timestamp the prediction is for")
-    factors: PredictionFactors = Field(..., description="Factors contributing to the prediction")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Model confidence in the prediction")
+    """Schema for TAPS risk prediction response."""
+    # New fields
+    risk_level: str = Field(..., description="Risk level: LOW, MEDIUM, HIGH")
+    risk_message: str = Field(..., description="Human-readable risk detail message")
+    last_sighting_lot_name: Optional[str] = Field(None, description="Name of lot where TAPS was last spotted")
+    last_sighting_lot_code: Optional[str] = Field(None, description="Code of lot where TAPS was last spotted")
+    last_sighting_at: Optional[datetime] = Field(None, description="When TAPS was last spotted")
+    hours_since_last_sighting: Optional[float] = Field(None, description="Hours since TAPS was last spotted")
+
+    # Backward-compatible fields for old clients
+    parking_lot_id: Optional[int] = Field(None)
+    parking_lot_name: Optional[str] = Field(None)
+    parking_lot_code: Optional[str] = Field(None)
+    probability: float = Field(0.0, ge=0.0, le=1.0, description="Mapped from risk level for backward compat")
+    predicted_for: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    factors: PredictionFactors = Field(
+        default_factory=lambda: PredictionFactors(
+            time_of_day_factor=0.0,
+            day_of_week_factor=0.0,
+            historical_factor=0.0,
+            recent_sightings_factor=0.0,
+            academic_calendar_factor=0.0,
+            weather_factor=None,
+        ),
+        description="Zeroed-out factors for backward compat",
+    )
+    confidence: float = Field(0.0, ge=0.0, le=1.0)
 
     class Config:
         json_schema_extra = {
             "example": {
+                "risk_level": "HIGH",
+                "risk_message": "TAPS was last spotted 45 minutes ago at Pavilion Structure",
+                "last_sighting_lot_name": "Pavilion Structure",
+                "last_sighting_lot_code": "HUTCH",
+                "last_sighting_at": "2024-01-15T13:45:00Z",
+                "hours_since_last_sighting": 0.75,
                 "parking_lot_id": 1,
-                "parking_lot_name": "Hutchinson Parking Structure",
+                "parking_lot_name": "Pavilion Structure",
                 "parking_lot_code": "HUTCH",
-                "probability": 0.65,
-                "risk_level": "MEDIUM",
+                "probability": 0.8,
                 "predicted_for": "2024-01-15T14:30:00Z",
                 "factors": {
-                    "time_of_day_factor": 0.7,
-                    "day_of_week_factor": 0.8,
-                    "historical_factor": 0.5,
-                    "recent_sightings_factor": 0.6,
-                    "academic_calendar_factor": 0.7,
-                    "weather_factor": 0.3
+                    "time_of_day_factor": 0.0,
+                    "day_of_week_factor": 0.0,
+                    "historical_factor": 0.0,
+                    "recent_sightings_factor": 0.0,
+                    "academic_calendar_factor": 0.0,
+                    "weather_factor": None
                 },
-                "confidence": 0.75
+                "confidence": 0.0
             }
         }
