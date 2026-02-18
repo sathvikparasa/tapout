@@ -538,13 +538,12 @@ class AppViewModel: ObservableObject {
 
         displayedProbability = 0
 
-        for i in 1...steps {
-            DispatchQueue.main.asyncAfter(deadline: .now() + stepDuration * Double(i)) {
+        Task { @MainActor in
+            for i in 1...steps {
+                try? await Task.sleep(nanoseconds: UInt64(stepDuration * 1_000_000_000))
                 self.displayedProbability = min(increment * Double(i), targetPercent)
-                if i == steps {
-                    self.isAnimatingProbability = false
-                }
             }
+            self.isAnimatingProbability = false
         }
     }
 

@@ -247,9 +247,9 @@ struct WelcomeView: View {
                     .opacity(isRegistering ? 0.7 : 1)
                     .padding(.horizontal, 24)
 
-                    Text("Already have an account? **Log In**")
-                        .appFont(size: 14)
-                        .foregroundColor(AppColors.textSecondary)
+//                    Text("Already have an account? **Log In**")
+//                        .appFont(size: 14)
+//                        .foregroundColor(AppColors.textSecondary)
                 }
                 .padding(.bottom, 48)
             }
