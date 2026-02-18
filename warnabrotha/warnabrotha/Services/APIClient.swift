@@ -175,6 +175,31 @@ class APIClient {
         try await delete(endpoint: "/feed/sightings/\(sightingId)/vote")
     }
 
+    // MARK: - Ticket Scanning
+
+    func scanTicket(imageData: Data) async throws -> TicketScanResponse {
+        var request = try buildRequest(endpoint: "/ticket-scan", method: "POST")
+
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"ticket.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        request.httpBody = body
+        return try await execute(request)
+    }
+
+    // MARK: - Global Stats
+
+    func getGlobalStats() async throws -> GlobalStatsResponse {
+        return try await get(endpoint: "/stats")
+    }
+
     // MARK: - Predictions
 
     func getPrediction(lotId: Int) async throws -> PredictionResponse {

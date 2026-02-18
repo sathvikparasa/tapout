@@ -30,7 +30,9 @@ struct ContentView: View {
                             case 1:
                                 ProbabilityTab(viewModel: viewModel)
                             case 2:
-                                MapTab()
+                                ScanTab(viewModel: viewModel)
+                            case 3:
+                                MapTab(viewModel: viewModel)
                             default:
                                 ButtonsTab(viewModel: viewModel)
                             }
@@ -62,7 +64,7 @@ struct AppTabBar: View {
     var body: some View {
         HStack(spacing: 0) {
             TabBarItem(
-                icon: "square.grid.2x2",
+                icon: "house",
                 label: "Home",
                 isSelected: selectedTab == 0
             ) {
@@ -79,11 +81,19 @@ struct AppTabBar: View {
             }
 
             TabBarItem(
-                icon: "map",
-                label: "Map",
+                icon: "doc.viewfinder",
+                label: "Scan",
                 isSelected: selectedTab == 2
             ) {
                 selectedTab = 2
+            }
+
+            TabBarItem(
+                icon: "map",
+                label: "Map",
+                isSelected: selectedTab == 3
+            ) {
+                selectedTab = 3
             }
         }
         .padding(.top, 12)
@@ -256,7 +266,7 @@ struct FeatureRow: View {
                 .foregroundColor(AppColors.accent)
                 .frame(width: 40, height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(AppColors.accentLight)
                 )
 

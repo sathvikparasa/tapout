@@ -359,10 +359,10 @@ struct StackedCardEdge: View {
     var inset: CGFloat = 8
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 16)
             .fill(AppColors.cardBackground)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(AppColors.border, lineWidth: 1)
             )
             .frame(height: 8)

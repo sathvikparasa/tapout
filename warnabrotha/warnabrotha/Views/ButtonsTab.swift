@@ -29,8 +29,7 @@ struct ButtonsTab: View {
                             DashboardActionButton(
                                 title: "CHECK OUT",
                                 systemIcon: "arrow.right.circle",
-                                color: AppColors.warning,
-                                textColor: AppColors.textPrimary
+                                color: AppColors.textSecondary
                             ) {
                                 Task { await viewModel.checkOut() }
                             }
@@ -229,7 +228,8 @@ struct ButtonsTab: View {
                 }
             }
         }
-        .padding(24)
+        .padding(20)
+        .frame(height: 155)
         .background(
             RoundedRectangle(cornerRadius: 32)
                 .fill(AppColors.cardBackground)
@@ -277,7 +277,6 @@ struct ButtonsTab: View {
             }
 
             if let feed = viewModel.feed, let sighting = feed.sightings.first {
-                let stackCount = min(feed.sightings.count, 3)
 
                 VStack(spacing: 0) {
                     // Front card (most recent)
@@ -297,22 +296,16 @@ struct ButtonsTab: View {
                                 .foregroundColor(AppColors.textPrimary)
                                 .lineLimit(1)
 
-                            Text("\(sighting.minutesAgo)m ago")
+                            Text(sighting.minutesAgo.formattedTimeAgo)
                                 .appFont(size: 12)
                                 .foregroundColor(AppColors.textMuted)
                         }
 
                         Spacer()
                     }
-                    .cardStyle(cornerRadius: 12)
-
-                    // Stacked card edges below
-                    if stackCount >= 2 {
-                        StackedCardEdge(inset: 8)
-                    }
-                    if stackCount >= 3 {
-                        StackedCardEdge(inset: 16)
-                    }
+                    .cardStyle(cornerRadius: 16)
+                    StackedCardEdge(inset: 8)
+                    StackedCardEdge(inset: 16)
                 }
             } else {
                 HStack(spacing: 12) {
@@ -325,7 +318,7 @@ struct ButtonsTab: View {
                         .foregroundColor(AppColors.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .cardStyle(cornerRadius: 12)
+                .cardStyle(cornerRadius: 16)
             }
         }
     }
