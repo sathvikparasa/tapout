@@ -9,8 +9,8 @@ import SwiftUI
 
 struct ButtonsTab: View {
     @ObservedObject var viewModel: AppViewModel
+    @Binding var selectedTab: Int
     @State private var showReportConfirmation = false
-    @State private var reportNotes = ""
     @State private var showLotDropdown = false
 
     var body: some View {
@@ -25,7 +25,8 @@ struct ButtonsTab: View {
                     // Action buttons row
                     HStack(spacing: 20) {
                         // Check-in / Check-out button
-                        if viewModel.isParked {
+                        if viewModel.isParked && viewModel.currentSession?.parkingLotId == viewModel.selectedLotId {
+                            // Viewing the lot we're parked at → CHECK OUT
                             DashboardActionButton(
                                 title: "CHECK OUT",
                                 systemIcon: "arrow.right.circle",
@@ -33,7 +34,19 @@ struct ButtonsTab: View {
                             ) {
                                 Task { await viewModel.checkOut() }
                             }
+                        } else if viewModel.isParked {
+                            // Parked elsewhere → tap to switch back
+                            DashboardActionButton(
+                                title: "AT \(viewModel.currentSession?.parkingLotCode ?? "LOT")",
+                                systemIcon: "checkmark.circle.fill",
+                                color: AppColors.textSecondary.opacity(0.5)
+                            ) {
+                                if let lotId = viewModel.currentSession?.parkingLotId {
+                                    viewModel.selectLot(lotId)
+                                }
+                            }
                         } else {
+                            // Not parked → CHECK IN
                             DashboardActionButton(
                                 title: "CHECK IN",
                                 systemIcon: "p.circle.fill",
@@ -76,14 +89,10 @@ struct ButtonsTab: View {
             }
         }
         .alert("Report TAPS Sighting", isPresented: $showReportConfirmation) {
-            TextField("Optional: Add details", text: $reportNotes)
-            Button("Cancel", role: .cancel) {
-                reportNotes = ""
-            }
+            Button("Cancel", role: .cancel) {}
             Button("Report", role: .destructive) {
                 Task {
-                    await viewModel.reportSighting(notes: reportNotes.isEmpty ? nil : reportNotes)
-                    reportNotes = ""
+                    await viewModel.reportSighting()
                 }
             }
         } message: {
@@ -197,8 +206,8 @@ struct ButtonsTab: View {
         let riskLevel = viewModel.prediction?.riskLevel ?? "UNKNOWN"
         let activeBars = viewModel.riskBars // 1=LOW, 2=MEDIUM, 3=HIGH
 
-        return VStack(alignment: .leading, spacing: 16) {
-            // Header row: label + LIVE badge
+        return VStack(alignment: .leading, spacing: 0) {
+            // Header row: label + LIVE badge — pinned to top
             HStack {
                 Text("Current Risk Meter")
                     .appFont(size: 10, weight: .bold)
@@ -209,6 +218,8 @@ struct ButtonsTab: View {
 
                 LiveBadge()
             }
+
+            Spacer()
 
             // Risk bars + level text + message
             HStack(spacing: 16) {
@@ -222,14 +233,14 @@ struct ButtonsTab: View {
                         .foregroundColor(riskLevelColor(riskLevel))
 
                     Text(viewModel.riskMessage)
-                        .appFont(size: 11, weight: .medium)
+                        .appFont(size: 10, weight: .medium)
                         .foregroundColor(AppColors.textPrimary.opacity(0.6))
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
             }
         }
         .padding(20)
-        .frame(height: 155)
+        .frame(height: 140)
         .background(
             RoundedRectangle(cornerRadius: 32)
                 .fill(AppColors.cardBackground)
@@ -262,7 +273,7 @@ struct ButtonsTab: View {
                 Spacer()
 
                 Button {
-                    Task { await viewModel.refresh() }
+                    selectedTab = 3
                 } label: {
                     HStack(spacing: 4) {
                         Text("View Map")
@@ -275,38 +286,50 @@ struct ButtonsTab: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
+            Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
+                .appFont(size: 8)
+                .foregroundColor(AppColors.textMuted)
 
             if let feed = viewModel.feed, let sighting = feed.sightings.first {
 
-                VStack(spacing: 0) {
-                    // Front card (most recent)
-                    HStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppColors.danger)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(AppColors.dangerLight)
-                            )
+                Button {
+                    selectedTab = 1
+                } label: {
+                    VStack(spacing: 0) {
+                        // Front card (most recent)
+                        HStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppColors.danger)
+                                .frame(width: 40, height: 40)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(AppColors.dangerLight)
+                                )
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(sighting.notes ?? "Taps spotted: \(sighting.parkingLotCode)")
-                                .appFont(size: 14, weight: .semibold)
-                                .foregroundColor(AppColors.textPrimary)
-                                .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("TAPS spotted: \(sighting.parkingLotCode)")
+                                    .appFont(size: 14, weight: .semibold)
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .lineLimit(1)
 
-                            Text(sighting.minutesAgo.formattedTimeAgo)
-                                .appFont(size: 12)
+                                Text(sighting.minutesAgo.formattedTimeAgo)
+                                    .appFont(size: 12)
+                                    .foregroundColor(AppColors.textMuted)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppColors.textMuted)
                         }
-
-                        Spacer()
+                        .cardStyle(cornerRadius: 16)
+                        StackedCardEdge(inset: 8)
+                        StackedCardEdge(inset: 16)
                     }
-                    .cardStyle(cornerRadius: 16)
-                    StackedCardEdge(inset: 8)
-                    StackedCardEdge(inset: 16)
                 }
+                .buttonStyle(PlainButtonStyle())
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle")
@@ -462,5 +485,5 @@ struct StatusInfoItem: View {
 }
 
 #Preview {
-    ButtonsTab(viewModel: AppViewModel())
+    ButtonsTab(viewModel: AppViewModel(), selectedTab: .constant(0))
 }

@@ -551,12 +551,12 @@ class AppViewModel: ObservableObject {
     // MARK: - Helpers
 
     var probabilityColor: Color {
-        guard let prediction = prediction else { return .gray }
+        guard let prediction = prediction else { return AppColors.textMuted }
         switch prediction.riskLevel {
-        case "HIGH": return .red
-        case "MEDIUM": return .yellow
-        case "LOW": return .green
-        default: return .gray
+        case "HIGH": return AppColors.dangerBright
+        case "MEDIUM": return AppColors.warning
+        case "LOW": return AppColors.success
+        default: return AppColors.textMuted
         }
     }
 

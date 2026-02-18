@@ -262,7 +262,7 @@ struct RiskBadge: View {
     private var textColor: Color {
         switch level.uppercased() {
         case "HIGH": return AppColors.dangerBright
-        case "MEDIUM": return Color(hex: "F59E0B")
+        case "MEDIUM": return AppColors.warning
         case "LOW": return AppColors.success
         default: return AppColors.textMuted
         }
@@ -335,9 +335,9 @@ struct RiskBarChart: View {
     private let barHeights: [CGFloat] = [12, 24, 36]
 
     private let activeColors: [Color] = [
-        Color(hex: "81C784"),  // green (LOW bar)
-        Color(hex: "FFD54F"),  // yellow (MEDIUM bar)
-        Color(hex: "EF4444"),  // red (HIGH bar)
+        AppColors.success,      // green (LOW bar)
+        AppColors.warning,      // yellow (MEDIUM bar)
+        AppColors.dangerBright,  // red (HIGH bar)
     ]
     private let inactiveColor = Color(hex: "F2F2EB")
 
