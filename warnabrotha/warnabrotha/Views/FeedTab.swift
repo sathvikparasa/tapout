@@ -174,13 +174,6 @@ struct FeedCardView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left accent bar
-            if isNewest {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(AppColors.accent)
-                    .frame(width: 4)
-                    .padding(.vertical, 12)
-            }
 
             HStack(alignment: .center, spacing: 16) {
                 // Text content

@@ -308,7 +308,7 @@ struct DashboardActionButton: View {
                     .foregroundColor(textColor)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 196)
+            .frame(height: UIScreen.main.bounds.height * 0.22)
             .background(
                 RoundedRectangle(cornerRadius: 40)
                     .fill(color)
