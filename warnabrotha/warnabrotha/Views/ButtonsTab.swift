@@ -25,6 +25,7 @@ struct ButtonsTab: View {
                     lotSelector
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
+                        .zIndex(10)
 
                     // Action buttons row
                     HStack(spacing: 20) {
@@ -186,20 +187,33 @@ struct ButtonsTab: View {
                 }
                 .padding(16)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(AppColors.cardBackground)
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        bottomLeadingRadius: showLotDropdown ? 0 : 16,
+                        bottomTrailingRadius: showLotDropdown ? 0 : 16,
+                        topTrailingRadius: 16
+                    )
+                    .fill(AppColors.cardBackground)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(AppColors.border, lineWidth: 1)
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        bottomLeadingRadius: showLotDropdown ? 0 : 16,
+                        bottomTrailingRadius: showLotDropdown ? 0 : 16,
+                        topTrailingRadius: 16
+                    )
+                    .stroke(AppColors.border, lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())
             .overlay(alignment: .top) {
-                if showLotDropdown {
-                    lotDropdownMenu
-                        .offset(y: 60)
+                GeometryReader { geo in
+                    if showLotDropdown {
+                        lotDropdownMenu
+                            .offset(y: geo.size.height)
+                    }
                 }
+                .allowsHitTesting(showLotDropdown)
             }
             .zIndex(1)
         }
@@ -422,12 +436,22 @@ struct ButtonsTab: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(AppColors.cardBackground)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 16,
+                bottomTrailingRadius: 16,
+                topTrailingRadius: 0
+            )
+            .fill(AppColors.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(AppColors.border, lineWidth: 1)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 16,
+                bottomTrailingRadius: 16,
+                topTrailingRadius: 0
+            )
+            .stroke(AppColors.border, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
     }
