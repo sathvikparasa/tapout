@@ -20,12 +20,14 @@ private let ucDavisCenter = CLLocationCoordinate2D(latitude: 38.5422, longitude:
 
 struct MapTab: View {
     @ObservedObject var viewModel: AppViewModel
+    @Binding var hideTabBar: Bool
     @State private var selectedLot: ParkingLot? = nil
     @State private var searchQuery = ""
+    @FocusState private var searchFieldFocused: Bool
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: ucDavisCenter,
-            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            span: MKCoordinateSpan(latitudeDelta: 0.025, longitudeDelta: 0.025)
         )
     )
 
@@ -85,6 +87,9 @@ struct MapTab: View {
             }
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
             .ignoresSafeArea(edges: .top)
+            .onTapGesture {
+                searchFieldFocused = false
+            }
 
             // Search bar overlay
             HStack(spacing: 8) {
@@ -96,6 +101,7 @@ struct MapTab: View {
                     .appFont(size: 14, weight: .medium)
                     .foregroundColor(AppColors.textPrimary)
                     .autocorrectionDisabled()
+                    .focused($searchFieldFocused)
 
                 if !searchQuery.isEmpty {
                     Button {
@@ -129,7 +135,7 @@ struct MapTab: View {
                         cameraPosition = .region(
                             MKCoordinateRegion(
                                 center: ucDavisCenter,
-                                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                                span: MKCoordinateSpan(latitudeDelta: 0.025, longitudeDelta: 0.025)
                             )
                         )
                     }
@@ -182,6 +188,11 @@ struct MapTab: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.confirmationMessage)
+        }
+        .onChange(of: searchFieldFocused) { _, focused in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                hideTabBar = focused
+            }
         }
     }
 
@@ -363,5 +374,5 @@ private struct StatCard: View {
 }
 
 #Preview {
-    MapTab(viewModel: AppViewModel())
+    MapTab(viewModel: AppViewModel(), hideTabBar: .constant(false))
 }

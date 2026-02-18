@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
     @State private var selectedTab = 0
+    @State private var hideTabBar = false
 
     var body: some View {
         ZStack {
@@ -32,17 +33,19 @@ struct ContentView: View {
                             case 2:
                                 ScanTab(viewModel: viewModel)
                             case 3:
-                                MapTab(viewModel: viewModel)
+                                MapTab(viewModel: viewModel, hideTabBar: $hideTabBar)
                             default:
                                 ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        AppTabBar(
-                            selectedTab: $selectedTab,
-                            feedBadgeCount: viewModel.unreadNotificationCount
-                        )
+                        if !hideTabBar {
+                            AppTabBar(
+                                selectedTab: $selectedTab,
+                                feedBadgeCount: viewModel.unreadNotificationCount
+                            )
+                        }
                     }
                 }
             }
