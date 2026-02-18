@@ -46,7 +46,6 @@ limiter = Limiter(key_func=get_remote_address)
     summary="Register a device",
     description="Register a new device and receive an access token."
 )
-@limiter.limit("10/hour")
 async def register_device(
     request: Request,
     device_data: DeviceCreate,
