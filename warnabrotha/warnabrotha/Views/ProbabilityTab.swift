@@ -7,9 +7,37 @@
 
 import SwiftUI
 
+// MARK: - Time Formatting Helper
+
+extension Int {
+    /// Formats a `minutesAgo` value into a human-readable string.
+    var formattedTimeAgo: String {
+        if self <= 1 { return "just now" }
+        if self < 60 { return "\(self) minutes ago" }
+        let hours = self / 60
+        let remaining = self % 60
+        if remaining > 0 {
+            return "\(hours)h \(remaining)m ago"
+        }
+        return "\(hours) hour\(hours != 1 ? "s" : "") ago"
+    }
+}
+
 struct ProbabilityTab: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var selectedFilter: Int? = nil // nil = ALL LOTS
+
+    /// Returns the sightings to display based on the active filter.
+    private var activeSightings: [FeedSighting]? {
+        if selectedFilter == nil {
+            // ALL LOTS — show aggregated feed
+            return viewModel.allFeedSightings.isEmpty && viewModel.feed == nil
+                ? nil
+                : viewModel.allFeedSightings
+        } else {
+            return viewModel.feed?.sightings
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,7 +66,7 @@ struct ProbabilityTab: View {
                         isSelected: selectedFilter == nil
                     ) {
                         selectedFilter = nil
-                        Task { await viewModel.refresh() }
+                        Task { await viewModel.loadAllFeeds() }
                     }
 
                     ForEach(viewModel.parkingLots) { lot in
@@ -79,13 +107,13 @@ struct ProbabilityTab: View {
                     .padding(.vertical, 12)
 
                     // Feed items
-                    if let feed = viewModel.feed {
-                        if feed.sightings.isEmpty {
+                    if let sightings = activeSightings {
+                        if sightings.isEmpty {
                             EmptyFeedView()
                                 .padding(16)
                         } else {
                             VStack(spacing: 12) {
-                                ForEach(Array(feed.sightings.enumerated()), id: \.element.id) { index, sighting in
+                                ForEach(Array(sightings.enumerated()), id: \.element.id) { index, sighting in
                                     FeedCardView(
                                         sighting: sighting,
                                         isNewest: index == 0
@@ -169,27 +197,33 @@ struct FeedCardView: View {
 
                 Spacer()
 
-                // Vote buttons (no container)
-                HStack(spacing: 10) {
+                // Vote buttons with separate counts
+                HStack(spacing: 14) {
+                    // Upvote
                     Button {
                         onVote(.upvote)
                     } label: {
-                        Image(systemName: "hand.thumbsup.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(userVote == .upvote ? AppColors.accent : AppColors.textMuted)
+                        HStack(spacing: 4) {
+                            Image(systemName: "hand.thumbsup.fill")
+                                .font(.system(size: 16))
+                            Text("\(sighting.upvotes)")
+                                .appFont(size: 14, weight: .bold)
+                        }
+                        .foregroundColor(userVote == .upvote ? AppColors.accent : AppColors.pillBorder)
                     }
                     .buttonStyle(PlainButtonStyle())
 
-                    Text("\(sighting.netScore)")
-                        .appFont(size: 16, weight: .heavy)
-                        .foregroundColor(isOld ? AppColors.textMuted : Color(hex: "334155"))
-
+                    // Downvote
                     Button {
                         onVote(.downvote)
                     } label: {
-                        Image(systemName: "hand.thumbsdown.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(userVote == .downvote ? Color(hex: "FCA5A5") : AppColors.pillBorder)
+                        HStack(spacing: 4) {
+                            Text("\(sighting.downvotes)")
+                                .appFont(size: 14, weight: .bold)
+                            Image(systemName: "hand.thumbsdown.fill")
+                                .font(.system(size: 16))
+                        }
+                        .foregroundColor(userVote == .downvote ? AppColors.danger : AppColors.pillBorder)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
@@ -198,19 +232,14 @@ struct FeedCardView: View {
             .padding(.vertical, 20)
         }
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(AppColors.cardBackground)
         )
         .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
     }
 
     private var timeText: String {
-        if sighting.minutesAgo < 60 {
-            return "\(sighting.minutesAgo) mins ago"
-        } else {
-            let hours = sighting.minutesAgo / 60
-            return "\(hours) hour\(hours > 1 ? "s" : "") ago"
-        }
+        sighting.minutesAgo.formattedTimeAgo
     }
 
     private var userVote: VoteType? {

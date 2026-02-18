@@ -116,11 +116,11 @@ struct EmailVerificationView: View {
                 }
                 .padding(16)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(AppColors.cardBackground)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .stroke(
                             email.isEmpty
                                 ? AppColors.border
@@ -212,11 +212,11 @@ struct EmailVerificationView: View {
                     .autocorrectionDisabled()
                     .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16)
                             .fill(AppColors.cardBackground)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16)
                             .stroke(
                                 otpCode.count == 6 ? AppColors.accent : AppColors.border,
                                 lineWidth: 1

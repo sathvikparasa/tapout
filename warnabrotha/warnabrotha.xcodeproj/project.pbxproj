@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B62F3E74030050CF10 /* PushNotificationService.swift */; };
 		570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B82F3E9CB40050CF10 /* MapTab.swift */; };
+		57BBC6DD2F45316F00A10E3D /* ScanTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57BBC6DC2F45316F00A10E3D /* ScanTab.swift */; };
 		AA000001 /* warnabrothaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* warnabrothaApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* ContentView.swift */; };
 		AA000003 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003 /* APIModels.swift */; };
@@ -51,6 +52,7 @@
 		5733877D2F2010FB0053D6A8 /* warnabrotha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = warnabrotha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5733878D2F2010FE0053D6A8 /* warnabrothaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		57BBC6DC2F45316F00A10E3D /* ScanTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanTab.swift; sourceTree = "<group>"; };
 		AA100001 /* warnabrothaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaApp.swift; sourceTree = "<group>"; };
 		AA100002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA100003 /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModels.swift; sourceTree = "<group>"; };
@@ -188,6 +190,7 @@
 		AA200008 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				57BBC6DC2F45316F00A10E3D /* ScanTab.swift */,
 				570EB4B82F3E9CB40050CF10 /* MapTab.swift */,
 				AA100008 /* ButtonsTab.swift */,
 				AA100009 /* EmailVerificationView.swift */,
@@ -349,6 +352,7 @@
 				AA000004 /* APIClient.swift in Sources */,
 				AA000005 /* KeychainService.swift in Sources */,
 				AA000006 /* Win95Theme.swift in Sources */,
+				57BBC6DD2F45316F00A10E3D /* ScanTab.swift in Sources */,
 				AA000007 /* AppViewModel.swift in Sources */,
 				AA000008 /* ButtonsTab.swift in Sources */,
 				AA000009 /* EmailVerificationView.swift in Sources */,
