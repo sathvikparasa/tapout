@@ -37,11 +37,7 @@ class APIClient {
     static let shared = APIClient()
 
     // Change this to your backend URL
-    #if DEBUG
     private let baseURL = "https://tapout-485821.wl.r.appspot.com/api/v1"
-    #else
-    private let baseURL = "https://api.warnabrotha.com/api/v1"
-    #endif
 
     private let session: URLSession
     private let keychain = KeychainService.shared
