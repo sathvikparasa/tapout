@@ -428,6 +428,48 @@ struct NotificationList: Codable {
     }
 }
 
+// MARK: - Ticket Scanning
+
+struct TicketScanResponse: Codable {
+    let success: Bool
+    let ticketDate: String?
+    let ticketTime: String?
+    let ticketLocation: String?
+    let mappedLotId: Int?
+    let mappedLotName: String?
+    let mappedLotCode: String?
+    let isRecent: Bool
+    let sightingId: Int?
+    let usersNotified: Int
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case ticketDate = "ticket_date"
+        case ticketTime = "ticket_time"
+        case ticketLocation = "ticket_location"
+        case mappedLotId = "mapped_lot_id"
+        case mappedLotName = "mapped_lot_name"
+        case mappedLotCode = "mapped_lot_code"
+        case isRecent = "is_recent"
+        case sightingId = "sighting_id"
+        case usersNotified = "users_notified"
+    }
+}
+
+// MARK: - Global Statistics
+
+struct GlobalStatsResponse: Codable {
+    let totalRegisteredDevices: Int
+    let totalParked: Int
+    let totalSightingsToday: Int
+
+    enum CodingKeys: String, CodingKey {
+        case totalRegisteredDevices = "total_registered_devices"
+        case totalParked = "total_parked"
+        case totalSightingsToday = "total_sightings_today"
+    }
+}
+
 // MARK: - Error Response
 
 struct APIError: Codable {

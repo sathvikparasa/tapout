@@ -8,19 +8,20 @@
 
 /* Begin PBXBuildFile section */
 		570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B62F3E74030050CF10 /* PushNotificationService.swift */; };
+		570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B82F3E9CB40050CF10 /* MapTab.swift */; };
+		57BBC6DD2F45316F00A10E3D /* ScanTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57BBC6DC2F45316F00A10E3D /* ScanTab.swift */; };
 		AA000001 /* warnabrothaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* warnabrothaApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* ContentView.swift */; };
 		AA000003 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003 /* APIModels.swift */; };
 		AA000004 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100004 /* APIClient.swift */; };
 		AA000005 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100005 /* KeychainService.swift */; };
-		AA000006 /* Win95Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100006 /* Win95Theme.swift */; };
+		AA000006 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100006 /* AppTheme.swift */; };
 		AA000007 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100007 /* AppViewModel.swift */; };
 		AA000008 /* ButtonsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100008 /* ButtonsTab.swift */; };
 		AA000009 /* EmailVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100009 /* EmailVerificationView.swift */; };
-		AA00000A /* ProbabilityTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000A /* ProbabilityTab.swift */; };
+		AA00000A /* FeedTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000A /* FeedTab.swift */; };
 		AA00000B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA10000B /* Assets.xcassets */; };
 		AA00000C /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA10000C /* Preview Assets.xcassets */; };
-		AA00000D /* W95FA.otf in Resources */ = {isa = PBXBuildFile; fileRef = AA10000D /* W95FA.otf */; };
 		AA00000E /* warnabrothaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000E /* warnabrothaTests.swift */; };
 		AA00000F /* warnabrothaUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000F /* warnabrothaUITests.swift */; };
 		AA000010 /* warnabrothaUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100010 /* warnabrothaUITestsLaunchTests.swift */; };
@@ -46,22 +47,23 @@
 /* Begin PBXFileReference section */
 		570EB4B52F3E737F0050CF10 /* warnabrotha.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = warnabrotha.entitlements; sourceTree = "<group>"; };
 		570EB4B62F3E74030050CF10 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
+		570EB4B82F3E9CB40050CF10 /* MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTab.swift; sourceTree = "<group>"; };
 		5733877D2F2010FB0053D6A8 /* warnabrotha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = warnabrotha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5733878D2F2010FE0053D6A8 /* warnabrothaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		57BBC6DC2F45316F00A10E3D /* ScanTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanTab.swift; sourceTree = "<group>"; };
 		AA100001 /* warnabrothaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaApp.swift; sourceTree = "<group>"; };
 		AA100002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA100003 /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModels.swift; sourceTree = "<group>"; };
 		AA100004 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		AA100005 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
-		AA100006 /* Win95Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Win95Theme.swift; sourceTree = "<group>"; };
+		AA100006 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		AA100007 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		AA100008 /* ButtonsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonsTab.swift; sourceTree = "<group>"; };
 		AA100009 /* EmailVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailVerificationView.swift; sourceTree = "<group>"; };
-		AA10000A /* ProbabilityTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProbabilityTab.swift; sourceTree = "<group>"; };
+		AA10000A /* FeedTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedTab.swift; sourceTree = "<group>"; };
 		AA10000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA10000C /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		AA10000D /* W95FA.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = W95FA.otf; sourceTree = "<group>"; };
 		AA10000E /* warnabrothaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaTests.swift; sourceTree = "<group>"; };
 		AA10000F /* warnabrothaUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaUITests.swift; sourceTree = "<group>"; };
 		AA100010 /* warnabrothaUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -120,7 +122,6 @@
 				AA100001 /* warnabrothaApp.swift */,
 				AA100002 /* ContentView.swift */,
 				AA100011 /* Info.plist */,
-				AA10000D /* W95FA.otf */,
 				AA10000B /* Assets.xcassets */,
 				AA200002 /* Models */,
 				AA200003 /* Services */,
@@ -178,7 +179,7 @@
 		AA200007 /* Theme */ = {
 			isa = PBXGroup;
 			children = (
-				AA100006 /* Win95Theme.swift */,
+				AA100006 /* AppTheme.swift */,
 			);
 			path = Theme;
 			sourceTree = "<group>";
@@ -186,9 +187,11 @@
 		AA200008 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				57BBC6DC2F45316F00A10E3D /* ScanTab.swift */,
+				570EB4B82F3E9CB40050CF10 /* MapTab.swift */,
 				AA100008 /* ButtonsTab.swift */,
 				AA100009 /* EmailVerificationView.swift */,
-				AA10000A /* ProbabilityTab.swift */,
+				AA10000A /* FeedTab.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -313,7 +316,6 @@
 			files = (
 				AA00000C /* Preview Assets.xcassets in Resources */,
 				AA00000B /* Assets.xcassets in Resources */,
-				AA00000D /* W95FA.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,13 +344,15 @@
 				570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
 				AA000003 /* APIModels.swift in Sources */,
+				570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */,
 				AA000004 /* APIClient.swift in Sources */,
 				AA000005 /* KeychainService.swift in Sources */,
-				AA000006 /* Win95Theme.swift in Sources */,
+				AA000006 /* AppTheme.swift in Sources */,
+				57BBC6DD2F45316F00A10E3D /* ScanTab.swift in Sources */,
 				AA000007 /* AppViewModel.swift in Sources */,
 				AA000008 /* ButtonsTab.swift in Sources */,
 				AA000009 /* EmailVerificationView.swift in Sources */,
-				AA00000A /* ProbabilityTab.swift in Sources */,
+				AA00000A /* FeedTab.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

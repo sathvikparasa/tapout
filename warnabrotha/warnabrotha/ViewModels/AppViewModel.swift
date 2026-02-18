@@ -13,6 +13,14 @@ enum OTPStep {
     case codeInput
 }
 
+enum ScanState {
+    case idle
+    case preview
+    case processing
+    case success
+    case error
+}
+
 @MainActor
 class AppViewModel: ObservableObject {
     // MARK: - Published State
@@ -37,6 +45,17 @@ class AppViewModel: ObservableObject {
     // Feed state
     @Published var feed: FeedResponse?
     @Published var allFeeds: AllFeedsResponse?
+    @Published var allFeedSightings: [FeedSighting] = []
+
+    // Scan state
+    @Published var scanState: ScanState = .idle
+    @Published var scanImageData: Data? = nil
+    @Published var scanResult: TicketScanResponse? = nil
+    @Published var scanError: String? = nil
+
+    // Map state
+    @Published var lotStats: [Int: ParkingLotWithStats] = [:]
+    @Published var globalStats: GlobalStatsResponse? = nil
 
     // Prediction state
     @Published var prediction: PredictionResponse?
@@ -235,6 +254,11 @@ class AppViewModel: ObservableObject {
             // Fetch unread notification count
             await fetchUnreadNotificationCount()
 
+            // Load all feeds and global stats
+            await loadAllFeeds()
+            await loadGlobalStats()
+            await refreshAllLotStats()
+
         } catch let apiError as APIClientError {
             if case .noToken = apiError {
                 isAuthenticated = false
@@ -359,13 +383,148 @@ class AppViewModel: ObservableObject {
 
     func vote(sightingId: Int, type: VoteType) async {
         do {
-            _ = try await api.vote(sightingId: sightingId, voteType: type)
+            // Check current vote to determine toggle behavior
+            let currentVote = allFeedSightings.first(where: { $0.id == sightingId })?.userVote
+                ?? feed?.sightings.first(where: { $0.id == sightingId })?.userVote
+
+            if currentVote == type {
+                // Same vote type tapped — remove vote
+                try await api.removeVote(sightingId: sightingId)
+            } else {
+                // Different or no vote — add/change vote
+                _ = try await api.vote(sightingId: sightingId, voteType: type)
+            }
+
             // Reload feed to show updated votes
             feed = try await api.getFeed(lotId: selectedLotId)
+            await loadAllFeeds()
         } catch {
             self.error = error.localizedDescription
             showError = true
         }
+    }
+
+    // MARK: - Scan Actions
+
+    func selectScanImage(_ data: Data) {
+        scanImageData = data
+        scanResult = nil
+        scanError = nil
+        scanState = .preview
+    }
+
+    func submitTicketScan() async {
+        guard let imageData = scanImageData else { return }
+        scanState = .processing
+
+        do {
+            let result = try await api.scanTicket(imageData: imageData)
+            if result.success {
+                scanResult = result
+                scanState = .success
+                if result.sightingId != nil {
+                    await loadAllFeeds()
+                    await refreshAllLotStats()
+                }
+            } else {
+                scanError = "Could not extract ticket details."
+                scanState = .error
+            }
+        } catch {
+            scanError = error.localizedDescription
+            scanState = .error
+        }
+    }
+
+    func resetScan() {
+        scanState = .idle
+        scanImageData = nil
+        scanResult = nil
+        scanError = nil
+    }
+
+    // MARK: - Map Actions
+
+    func checkInAtLot(_ lotId: Int) async {
+        guard !isParked else {
+            self.error = "You're already parked!"
+            showError = true
+            return
+        }
+
+        isLoading = true
+
+        do {
+            currentSession = try await api.checkIn(lotId: lotId)
+            confirmationMessage = "Checked in at \(currentSession?.parkingLotName ?? "parking lot")!"
+            showConfirmation = true
+            await loadLotData()
+            await refreshAllLotStats()
+        } catch {
+            self.error = error.localizedDescription
+            showError = true
+        }
+
+        isLoading = false
+    }
+
+    func reportSightingAtLot(_ lotId: Int, notes: String? = nil) async {
+        isLoading = true
+
+        do {
+            let response = try await api.reportSighting(lotId: lotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            showConfirmation = true
+            await loadLotData()
+            await loadAllFeeds()
+            await refreshAllLotStats()
+        } catch {
+            self.error = error.localizedDescription
+            showError = true
+        }
+
+        isLoading = false
+    }
+
+    // MARK: - All Feeds
+
+    func loadAllFeeds() async {
+        do {
+            let response = try await api.getAllFeeds()
+            allFeeds = response
+            allFeedSightings = response.feeds
+                .flatMap { $0.sightings }
+                .sorted { $0.minutesAgo < $1.minutesAgo }
+        } catch {
+            // Non-critical
+            print("Failed to load all feeds: \(error)")
+        }
+    }
+
+    // MARK: - Global Stats
+
+    func loadGlobalStats() async {
+        do {
+            globalStats = try await api.getGlobalStats()
+        } catch {
+            // Non-critical
+            print("Failed to load global stats: \(error)")
+        }
+    }
+
+    // MARK: - Lot Stats
+
+    func refreshAllLotStats() async {
+        var statsMap: [Int: ParkingLotWithStats] = [:]
+        for lot in parkingLots {
+            do {
+                let lotWithStats = try await api.getParkingLot(id: lot.id)
+                statsMap[lot.id] = lotWithStats
+            } catch {
+                // Skip this lot
+            }
+        }
+        lotStats = statsMap
     }
 
     // MARK: - Probability Animation
@@ -392,12 +551,12 @@ class AppViewModel: ObservableObject {
     // MARK: - Helpers
 
     var probabilityColor: Color {
-        guard let prediction = prediction else { return .gray }
+        guard let prediction = prediction else { return AppColors.textMuted }
         switch prediction.riskLevel {
-        case "HIGH": return .red
-        case "MEDIUM": return .yellow
-        case "LOW": return .green
-        default: return .gray
+        case "HIGH": return AppColors.dangerBright
+        case "MEDIUM": return AppColors.warning
+        case "LOW": return AppColors.success
+        default: return AppColors.textMuted
         }
     }
 
