@@ -36,7 +36,6 @@ enum APIClientError: Error, LocalizedError {
 class APIClient {
     static let shared = APIClient()
 
-    // Change this to your backend URL
     private let baseURL = "https://tapout-485821.wl.r.appspot.com/api/v1"
 
     private let session: URLSession

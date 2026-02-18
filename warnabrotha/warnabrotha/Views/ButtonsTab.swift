@@ -13,10 +13,14 @@ struct ButtonsTab: View {
     @State private var showReportConfirmation = false
     @State private var showLotDropdown = false
 
+    private var screenHeight: CGFloat {
+        UIScreen.main.bounds.height
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
-            ScrollView {
-                VStack(spacing: 28) {
+            VStack(spacing: 0) {
+                VStack(spacing: screenHeight * 0.025) {
                     // Lot selector
                     lotSelector
                         .padding(.horizontal, 20)
@@ -82,11 +86,6 @@ struct ButtonsTab: View {
 
             // Top bar
             topBar
-
-            // Dropdown overlay
-            if showLotDropdown {
-                lotDropdownOverlay
-            }
         }
         .alert("Report TAPS Sighting", isPresented: $showReportConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -124,10 +123,10 @@ struct ButtonsTab: View {
             Spacer()
 
             Button {
-                // Notifications action placeholder
+                // Profile placeholder
             } label: {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bell")
+                    Image(systemName: "person.crop.circle")
                         .font(.system(size: 22))
                         .foregroundColor(AppColors.textPrimary)
 
@@ -196,6 +195,13 @@ struct ButtonsTab: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
+            .overlay(alignment: .top) {
+                if showLotDropdown {
+                    lotDropdownMenu
+                        .offset(y: 60)
+                }
+            }
+            .zIndex(1)
         }
         .padding(.top, 56) // space for top bar
     }
@@ -240,7 +246,7 @@ struct ButtonsTab: View {
             }
         }
         .padding(20)
-        .frame(height: 140)
+        .frame(height: screenHeight * 0.16)
         .background(
             RoundedRectangle(cornerRadius: 32)
                 .fill(AppColors.cardBackground)
@@ -295,8 +301,30 @@ struct ButtonsTab: View {
                 Button {
                     selectedTab = 1
                 } label: {
-                    VStack(spacing: 0) {
-                        // Front card (most recent)
+                    ZStack(alignment: .top) {
+                        // Bottom-most layer (most inset)
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppColors.cardBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppColors.border.opacity(0.3), lineWidth: 1)
+                            )
+                            .padding(.horizontal, 16)
+                            .frame(height: 73)
+                            .offset(y: 8)
+
+                        // Middle layer
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppColors.cardBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppColors.border.opacity(0.5), lineWidth: 1)
+                            )
+                            .padding(.horizontal, 8)
+                            .frame(height: 73)
+                            .offset(y: 4)
+
+                        // Front card (top layer)
                         HStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.system(size: 20))
@@ -325,9 +353,8 @@ struct ButtonsTab: View {
                                 .foregroundColor(AppColors.textMuted)
                         }
                         .cardStyle(cornerRadius: 16)
-                        StackedCardEdge(inset: 8)
-                        StackedCardEdge(inset: 16)
                     }
+                    .padding(.bottom, 8)
                 }
                 .buttonStyle(PlainButtonStyle())
             } else {
@@ -346,77 +373,63 @@ struct ButtonsTab: View {
         }
     }
 
-    // MARK: - Lot Dropdown Overlay
+    // MARK: - Lot Dropdown Menu
 
-    private var lotDropdownOverlay: some View {
+    private var lotDropdownMenu: some View {
         VStack(spacing: 0) {
-            Color.clear
-                .frame(height: 152) // offset below lot selector
-
-            VStack(spacing: 0) {
-                ForEach(viewModel.parkingLots) { lot in
-                    Button {
-                        viewModel.selectLot(lot.id)
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showLotDropdown = false
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(
-                                    lot.id == viewModel.selectedLotId
-                                        ? AppColors.accent
-                                        : AppColors.textMuted
-                                )
-
-                            Text("\(lot.name) (\(lot.code))")
-                                .appFont(size: 14, weight: lot.id == viewModel.selectedLotId ? .bold : .regular)
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-
-                            if lot.id == viewModel.selectedLotId {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(AppColors.accent)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .background(
-                            lot.id == viewModel.selectedLotId
-                                ? AppColors.accentVeryLight
-                                : Color.clear
-                        )
+            ForEach(viewModel.parkingLots) { lot in
+                Button {
+                    viewModel.selectLot(lot.id)
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showLotDropdown = false
                     }
-                    .buttonStyle(PlainButtonStyle())
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(
+                                lot.id == viewModel.selectedLotId
+                                    ? AppColors.accent
+                                    : AppColors.textMuted
+                            )
 
-                    if lot.id != viewModel.parkingLots.last?.id {
-                        Divider()
-                            .padding(.leading, 44)
+                        Text("\(lot.name) (\(lot.code))")
+                            .appFont(size: 14, weight: lot.id == viewModel.selectedLotId ? .bold : .regular)
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        if lot.id == viewModel.selectedLotId {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(AppColors.accent)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(
+                        lot.id == viewModel.selectedLotId
+                            ? AppColors.accentVeryLight
+                            : Color.clear
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                if lot.id != viewModel.parkingLots.last?.id {
+                    Divider()
+                        .padding(.leading, 44)
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(AppColors.cardBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(AppColors.border, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
-            .padding(.horizontal, 20)
-
-            Spacer()
         }
         .background(
-            Color.black.opacity(0.001) // tap-to-dismiss area
-                .onTapGesture {
-                    withAnimation { showLotDropdown = false }
-                }
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.cardBackground)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppColors.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
     }
 }
 
