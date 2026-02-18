@@ -26,7 +26,7 @@ struct ContentView: View {
                         Group {
                             switch selectedTab {
                             case 0:
-                                ButtonsTab(viewModel: viewModel)
+                                ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
                             case 1:
                                 ProbabilityTab(viewModel: viewModel)
                             case 2:
@@ -34,7 +34,7 @@ struct ContentView: View {
                             case 3:
                                 MapTab(viewModel: viewModel)
                             default:
-                                ButtonsTab(viewModel: viewModel)
+                                ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
