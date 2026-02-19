@@ -262,7 +262,7 @@ struct RiskBadge: View {
     private var textColor: Color {
         switch level.uppercased() {
         case "HIGH": return AppColors.dangerBright
-        case "MEDIUM": return Color(hex: "F59E0B")
+        case "MEDIUM": return AppColors.warning
         case "LOW": return AppColors.success
         default: return AppColors.textMuted
         }
@@ -308,7 +308,7 @@ struct DashboardActionButton: View {
                     .foregroundColor(textColor)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 196)
+            .frame(height: UIScreen.main.bounds.height * 0.22)
             .background(
                 RoundedRectangle(cornerRadius: 40)
                     .fill(color)
@@ -335,9 +335,9 @@ struct RiskBarChart: View {
     private let barHeights: [CGFloat] = [12, 24, 36]
 
     private let activeColors: [Color] = [
-        Color(hex: "81C784"),  // green (LOW bar)
-        Color(hex: "FFD54F"),  // yellow (MEDIUM bar)
-        Color(hex: "EF4444"),  // red (HIGH bar)
+        AppColors.success,      // green (LOW bar)
+        AppColors.warning,      // yellow (MEDIUM bar)
+        AppColors.dangerBright,  // red (HIGH bar)
     ]
     private let inactiveColor = Color(hex: "F2F2EB")
 
@@ -359,10 +359,10 @@ struct StackedCardEdge: View {
     var inset: CGFloat = 8
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 16)
             .fill(AppColors.cardBackground)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16)
                     .stroke(AppColors.border, lineWidth: 1)
             )
             .frame(height: 8)

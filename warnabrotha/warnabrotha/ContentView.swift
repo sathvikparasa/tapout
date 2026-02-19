@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
     @State private var selectedTab = 0
+    @State private var hideTabBar = false
 
     var body: some View {
         ZStack {
@@ -26,21 +27,25 @@ struct ContentView: View {
                         Group {
                             switch selectedTab {
                             case 0:
-                                ButtonsTab(viewModel: viewModel)
+                                ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
                             case 1:
                                 ProbabilityTab(viewModel: viewModel)
                             case 2:
-                                MapTab()
+                                ScanTab(viewModel: viewModel)
+                            case 3:
+                                MapTab(viewModel: viewModel, hideTabBar: $hideTabBar)
                             default:
-                                ButtonsTab(viewModel: viewModel)
+                                ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        AppTabBar(
-                            selectedTab: $selectedTab,
-                            feedBadgeCount: viewModel.unreadNotificationCount
-                        )
+                        if !hideTabBar {
+                            AppTabBar(
+                                selectedTab: $selectedTab,
+                                feedBadgeCount: viewModel.unreadNotificationCount
+                            )
+                        }
                     }
                 }
             }
@@ -62,7 +67,7 @@ struct AppTabBar: View {
     var body: some View {
         HStack(spacing: 0) {
             TabBarItem(
-                icon: "square.grid.2x2",
+                icon: "house",
                 label: "Home",
                 isSelected: selectedTab == 0
             ) {
@@ -79,11 +84,19 @@ struct AppTabBar: View {
             }
 
             TabBarItem(
-                icon: "map",
-                label: "Map",
+                icon: "doc.viewfinder",
+                label: "Scan",
                 isSelected: selectedTab == 2
             ) {
                 selectedTab = 2
+            }
+
+            TabBarItem(
+                icon: "map",
+                label: "Map",
+                isSelected: selectedTab == 3
+            ) {
+                selectedTab = 3
             }
         }
         .padding(.top, 12)
@@ -234,9 +247,9 @@ struct WelcomeView: View {
                     .opacity(isRegistering ? 0.7 : 1)
                     .padding(.horizontal, 24)
 
-                    Text("Already have an account? **Log In**")
-                        .appFont(size: 14)
-                        .foregroundColor(AppColors.textSecondary)
+//                    Text("Already have an account? **Log In**")
+//                        .appFont(size: 14)
+//                        .foregroundColor(AppColors.textSecondary)
                 }
                 .padding(.bottom, 48)
             }
@@ -256,7 +269,7 @@ struct FeatureRow: View {
                 .foregroundColor(AppColors.accent)
                 .frame(width: 40, height: 40)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(AppColors.accentLight)
                 )
 

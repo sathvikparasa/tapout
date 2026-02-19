@@ -36,12 +36,7 @@ enum APIClientError: Error, LocalizedError {
 class APIClient {
     static let shared = APIClient()
 
-    // Change this to your backend URL
-    #if DEBUG
     private let baseURL = "https://tapout-485821.wl.r.appspot.com/api/v1"
-    #else
-    private let baseURL = "https://api.warnabrotha.com/api/v1"
-    #endif
 
     private let session: URLSession
     private let keychain = KeychainService.shared
@@ -173,6 +168,31 @@ class APIClient {
 
     func removeVote(sightingId: Int) async throws {
         try await delete(endpoint: "/feed/sightings/\(sightingId)/vote")
+    }
+
+    // MARK: - Ticket Scanning
+
+    func scanTicket(imageData: Data) async throws -> TicketScanResponse {
+        var request = try buildRequest(endpoint: "/ticket-scan", method: "POST")
+
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"ticket.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        request.httpBody = body
+        return try await execute(request)
+    }
+
+    // MARK: - Global Stats
+
+    func getGlobalStats() async throws -> GlobalStatsResponse {
+        return try await get(endpoint: "/stats")
     }
 
     // MARK: - Predictions

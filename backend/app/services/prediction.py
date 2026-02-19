@@ -112,7 +112,7 @@ class PredictionService:
 
     @classmethod
     def _build_no_sighting_response(cls, now: datetime, lot_name: Optional[str] = None) -> PredictionResponse:
-        message = f"TAPS has not been sighted at {lot_name} today" if lot_name else "TAPS has not been sighted today"
+        message = f"TAPS has not been sighted at {lot_name} in the last hour." if lot_name else "TAPS has not been sighted in the last hour."
         return PredictionResponse(
             risk_level="MEDIUM",
             risk_message=message,

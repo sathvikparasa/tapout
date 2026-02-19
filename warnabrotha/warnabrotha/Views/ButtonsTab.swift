@@ -9,32 +9,49 @@ import SwiftUI
 
 struct ButtonsTab: View {
     @ObservedObject var viewModel: AppViewModel
+    @Binding var selectedTab: Int
     @State private var showReportConfirmation = false
-    @State private var reportNotes = ""
     @State private var showLotDropdown = false
+
+    private var screenHeight: CGFloat {
+        UIScreen.main.bounds.height
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
-            ScrollView {
-                VStack(spacing: 28) {
+            VStack(spacing: 0) {
+                VStack(spacing: screenHeight * 0.025) {
                     // Lot selector
                     lotSelector
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
+                        .zIndex(10)
 
                     // Action buttons row
                     HStack(spacing: 20) {
                         // Check-in / Check-out button
-                        if viewModel.isParked {
+                        if viewModel.isParked && viewModel.currentSession?.parkingLotId == viewModel.selectedLotId {
+                            // Viewing the lot we're parked at → CHECK OUT
                             DashboardActionButton(
                                 title: "CHECK OUT",
                                 systemIcon: "arrow.right.circle",
-                                color: AppColors.warning,
-                                textColor: AppColors.textPrimary
+                                color: AppColors.textSecondary
                             ) {
                                 Task { await viewModel.checkOut() }
                             }
+                        } else if viewModel.isParked {
+                            // Parked elsewhere → tap to switch back
+                            DashboardActionButton(
+                                title: "AT \(viewModel.currentSession?.parkingLotCode ?? "LOT")",
+                                systemIcon: "checkmark.circle.fill",
+                                color: AppColors.textSecondary.opacity(0.5)
+                            ) {
+                                if let lotId = viewModel.currentSession?.parkingLotId {
+                                    viewModel.selectLot(lotId)
+                                }
+                            }
                         } else {
+                            // Not parked → CHECK IN
                             DashboardActionButton(
                                 title: "CHECK IN",
                                 systemIcon: "p.circle.fill",
@@ -70,21 +87,12 @@ struct ButtonsTab: View {
 
             // Top bar
             topBar
-
-            // Dropdown overlay
-            if showLotDropdown {
-                lotDropdownOverlay
-            }
         }
         .alert("Report TAPS Sighting", isPresented: $showReportConfirmation) {
-            TextField("Optional: Add details", text: $reportNotes)
-            Button("Cancel", role: .cancel) {
-                reportNotes = ""
-            }
+            Button("Cancel", role: .cancel) {}
             Button("Report", role: .destructive) {
                 Task {
-                    await viewModel.reportSighting(notes: reportNotes.isEmpty ? nil : reportNotes)
-                    reportNotes = ""
+                    await viewModel.reportSighting()
                 }
             }
         } message: {
@@ -116,10 +124,10 @@ struct ButtonsTab: View {
             Spacer()
 
             Button {
-                // Notifications action placeholder
+                // Profile placeholder
             } label: {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: "bell")
+                    Image(systemName: "person.crop.circle")
                         .font(.system(size: 22))
                         .foregroundColor(AppColors.textPrimary)
 
@@ -179,15 +187,35 @@ struct ButtonsTab: View {
                 }
                 .padding(16)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(AppColors.cardBackground)
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        bottomLeadingRadius: showLotDropdown ? 0 : 16,
+                        bottomTrailingRadius: showLotDropdown ? 0 : 16,
+                        topTrailingRadius: 16
+                    )
+                    .fill(AppColors.cardBackground)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(AppColors.border, lineWidth: 1)
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        bottomLeadingRadius: showLotDropdown ? 0 : 16,
+                        bottomTrailingRadius: showLotDropdown ? 0 : 16,
+                        topTrailingRadius: 16
+                    )
+                    .stroke(AppColors.border, lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())
+            .overlay(alignment: .top) {
+                GeometryReader { geo in
+                    if showLotDropdown {
+                        lotDropdownMenu
+                            .offset(y: geo.size.height)
+                    }
+                }
+                .allowsHitTesting(showLotDropdown)
+            }
+            .zIndex(1)
         }
         .padding(.top, 56) // space for top bar
     }
@@ -198,8 +226,8 @@ struct ButtonsTab: View {
         let riskLevel = viewModel.prediction?.riskLevel ?? "UNKNOWN"
         let activeBars = viewModel.riskBars // 1=LOW, 2=MEDIUM, 3=HIGH
 
-        return VStack(alignment: .leading, spacing: 16) {
-            // Header row: label + LIVE badge
+        return VStack(alignment: .leading, spacing: 0) {
+            // Header row: label + LIVE badge — pinned to top
             HStack {
                 Text("Current Risk Meter")
                     .appFont(size: 10, weight: .bold)
@@ -210,6 +238,8 @@ struct ButtonsTab: View {
 
                 LiveBadge()
             }
+
+            Spacer()
 
             // Risk bars + level text + message
             HStack(spacing: 16) {
@@ -223,13 +253,14 @@ struct ButtonsTab: View {
                         .foregroundColor(riskLevelColor(riskLevel))
 
                     Text(viewModel.riskMessage)
-                        .appFont(size: 11, weight: .medium)
+                        .appFont(size: 10, weight: .medium)
                         .foregroundColor(AppColors.textPrimary.opacity(0.6))
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
             }
         }
-        .padding(24)
+        .padding(20)
+        .frame(height: screenHeight * 0.16)
         .background(
             RoundedRectangle(cornerRadius: 32)
                 .fill(AppColors.cardBackground)
@@ -262,7 +293,7 @@ struct ButtonsTab: View {
                 Spacer()
 
                 Button {
-                    Task { await viewModel.refresh() }
+                    selectedTab = 3
                 } label: {
                     HStack(spacing: 4) {
                         Text("View Map")
@@ -275,45 +306,71 @@ struct ButtonsTab: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
+            Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
+                .appFont(size: 8)
+                .foregroundColor(AppColors.textMuted)
 
             if let feed = viewModel.feed, let sighting = feed.sightings.first {
-                let stackCount = min(feed.sightings.count, 3)
 
-                VStack(spacing: 0) {
-                    // Front card (most recent)
-                    HStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppColors.danger)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(AppColors.dangerLight)
+                Button {
+                    selectedTab = 1
+                } label: {
+                    ZStack(alignment: .top) {
+                        // Bottom-most layer (most inset)
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppColors.cardBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppColors.border.opacity(0.3), lineWidth: 1)
                             )
+                            .padding(.horizontal, 16)
+                            .frame(height: 73)
+                            .offset(y: 8)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(sighting.notes ?? "Taps spotted: \(sighting.parkingLotCode)")
-                                .appFont(size: 14, weight: .semibold)
-                                .foregroundColor(AppColors.textPrimary)
-                                .lineLimit(1)
+                        // Middle layer
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(AppColors.cardBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(AppColors.border.opacity(0.5), lineWidth: 1)
+                            )
+                            .padding(.horizontal, 8)
+                            .frame(height: 73)
+                            .offset(y: 4)
 
-                            Text("\(sighting.minutesAgo)m ago")
-                                .appFont(size: 12)
+                        // Front card (top layer)
+                        HStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppColors.danger)
+                                .frame(width: 40, height: 40)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(AppColors.dangerLight)
+                                )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("TAPS spotted: \(sighting.parkingLotCode)")
+                                    .appFont(size: 14, weight: .semibold)
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .lineLimit(1)
+
+                                Text(sighting.minutesAgo.formattedTimeAgo)
+                                    .appFont(size: 12)
+                                    .foregroundColor(AppColors.textMuted)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(AppColors.textMuted)
                         }
-
-                        Spacer()
+                        .cardStyle(cornerRadius: 16)
                     }
-                    .cardStyle(cornerRadius: 12)
-
-                    // Stacked card edges below
-                    if stackCount >= 2 {
-                        StackedCardEdge(inset: 8)
-                    }
-                    if stackCount >= 3 {
-                        StackedCardEdge(inset: 16)
-                    }
+                    .padding(.bottom, 8)
                 }
+                .buttonStyle(PlainButtonStyle())
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle")
@@ -325,82 +382,78 @@ struct ButtonsTab: View {
                         .foregroundColor(AppColors.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .cardStyle(cornerRadius: 12)
+                .cardStyle(cornerRadius: 16)
             }
         }
     }
 
-    // MARK: - Lot Dropdown Overlay
+    // MARK: - Lot Dropdown Menu
 
-    private var lotDropdownOverlay: some View {
+    private var lotDropdownMenu: some View {
         VStack(spacing: 0) {
-            Color.clear
-                .frame(height: 152) // offset below lot selector
-
-            VStack(spacing: 0) {
-                ForEach(viewModel.parkingLots) { lot in
-                    Button {
-                        viewModel.selectLot(lot.id)
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            showLotDropdown = false
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(
-                                    lot.id == viewModel.selectedLotId
-                                        ? AppColors.accent
-                                        : AppColors.textMuted
-                                )
-
-                            Text("\(lot.name) (\(lot.code))")
-                                .appFont(size: 14, weight: lot.id == viewModel.selectedLotId ? .bold : .regular)
-                                .foregroundColor(AppColors.textPrimary)
-
-                            Spacer()
-
-                            if lot.id == viewModel.selectedLotId {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(AppColors.accent)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .background(
-                            lot.id == viewModel.selectedLotId
-                                ? AppColors.accentVeryLight
-                                : Color.clear
-                        )
+            ForEach(viewModel.parkingLots) { lot in
+                Button {
+                    viewModel.selectLot(lot.id)
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showLotDropdown = false
                     }
-                    .buttonStyle(PlainButtonStyle())
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(
+                                lot.id == viewModel.selectedLotId
+                                    ? AppColors.accent
+                                    : AppColors.textMuted
+                            )
 
-                    if lot.id != viewModel.parkingLots.last?.id {
-                        Divider()
-                            .padding(.leading, 44)
+                        Text("\(lot.name) (\(lot.code))")
+                            .appFont(size: 14, weight: lot.id == viewModel.selectedLotId ? .bold : .regular)
+                            .foregroundColor(AppColors.textPrimary)
+
+                        Spacer()
+
+                        if lot.id == viewModel.selectedLotId {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(AppColors.accent)
+                        }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(
+                        lot.id == viewModel.selectedLotId
+                            ? AppColors.accentVeryLight
+                            : Color.clear
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                if lot.id != viewModel.parkingLots.last?.id {
+                    Divider()
+                        .padding(.leading, 44)
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(AppColors.cardBackground)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(AppColors.border, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
-            .padding(.horizontal, 20)
-
-            Spacer()
         }
         .background(
-            Color.black.opacity(0.001) // tap-to-dismiss area
-                .onTapGesture {
-                    withAnimation { showLotDropdown = false }
-                }
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 16,
+                bottomTrailingRadius: 16,
+                topTrailingRadius: 0
+            )
+            .fill(AppColors.cardBackground)
         )
+        .overlay(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 16,
+                bottomTrailingRadius: 16,
+                topTrailingRadius: 0
+            )
+            .stroke(AppColors.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 20, y: 10)
     }
 }
 
@@ -469,5 +522,5 @@ struct StatusInfoItem: View {
 }
 
 #Preview {
-    ButtonsTab(viewModel: AppViewModel())
+    ButtonsTab(viewModel: AppViewModel(), selectedTab: .constant(0))
 }
