@@ -23,9 +23,12 @@ def _load_secrets_from_gcp():
     client = secretmanager.SecretManagerServiceClient()
     for name in SECRET_NAMES:
         if name not in os.environ:
-            secret_path = f"projects/{GCP_PROJECT}/secrets/{name}/versions/latest"
-            response = client.access_secret_version(request={"name": secret_path})
-            os.environ[name] = response.payload.data.decode("UTF-8")
+            try:
+                secret_path = f"projects/{GCP_PROJECT}/secrets/{name}/versions/latest"
+                response = client.access_secret_version(request={"name": secret_path})
+                os.environ[name] = response.payload.data.decode("UTF-8")
+            except Exception:
+                pass  # Secret not found — will use default from Settings
 
 
 _load_secrets_from_gcp()
