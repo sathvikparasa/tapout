@@ -57,6 +57,7 @@ struct ButtonsTab: View {
                                 systemIcon: "p.circle.fill",
                                 color: AppColors.accent
                             ) {
+                                UINotificationFeedbackGenerator().notificationOccurred(.success)
                                 Task { await viewModel.checkIn() }
                             }
                         }
@@ -67,6 +68,9 @@ struct ButtonsTab: View {
                             systemIcon: "exclamationmark.triangle.fill",
                             color: AppColors.danger
                         ) {
+                            let gen = UIImpactFeedbackGenerator(style: .medium)
+                            gen.impactOccurred()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { gen.impactOccurred() }
                             showReportConfirmation = true
                         }
                     }
@@ -80,7 +84,16 @@ struct ButtonsTab: View {
                     recentActivitySection
                         .padding(.horizontal, 20)
 
-                    Spacer(minLength: 20)
+                    Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
+                        .appFont(size: 10)
+                        .foregroundColor(AppColors.textMuted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 8)
+
+                    Spacer(minLength: 0)
                 }
             }
             .background(AppColors.background)
@@ -118,7 +131,7 @@ struct ButtonsTab: View {
                 .foregroundColor(AppColors.textPrimary)
             + Text("Out")
                 .foregroundColor(AppColors.accent))
-                .displayFont(size: 24)
+                .displayFont(size: 30)
                 .tracking(-0.5)
 
             Spacer()
@@ -155,7 +168,7 @@ struct ButtonsTab: View {
     private var lotSelector: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("SELECT PARKING ZONE")
-                .appFont(size: 10, weight: .bold)
+                .appFont(size: 14, weight: .bold)
                 .tracking(1)
                 .foregroundColor(AppColors.accent)
 
@@ -204,6 +217,7 @@ struct ButtonsTab: View {
                     )
                     .stroke(AppColors.border, lineWidth: 1)
                 )
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
             .overlay(alignment: .top) {
@@ -230,7 +244,7 @@ struct ButtonsTab: View {
             // Header row: label + LIVE badge — pinned to top
             HStack {
                 Text("Current Risk Meter")
-                    .appFont(size: 10, weight: .bold)
+                    .appFont(size: 14, weight: .bold)
                     .textCase(.uppercase)
                     .foregroundColor(AppColors.textPrimary.opacity(0.4))
 
@@ -239,7 +253,7 @@ struct ButtonsTab: View {
                 LiveBadge()
             }
 
-            Spacer()
+            Spacer(minLength: 0).frame(maxHeight: 8)
 
             // Risk bars + level text + message
             HStack(spacing: 16) {
@@ -287,7 +301,7 @@ struct ButtonsTab: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Recent Activity")
-                    .appFont(size: 14, weight: .bold)
+                    .appFont(size: 18, weight: .bold)
                     .foregroundColor(AppColors.textPrimary)
 
                 Spacer()
@@ -306,10 +320,6 @@ struct ButtonsTab: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-            Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
-                .appFont(size: 8)
-                .foregroundColor(AppColors.textMuted)
-
             if let feed = viewModel.feed, let sighting = feed.sightings.first {
 
                 Button {
@@ -426,6 +436,7 @@ struct ButtonsTab: View {
                             ? AppColors.accentVeryLight
                             : Color.clear
                     )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
 
