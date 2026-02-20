@@ -62,13 +62,38 @@ class NotificationService:
             return cls._apns_client
 
         # Check if APNs is configured
+        import os
+        logger.warning(
+            "APNs env vars at request time: APNS_KEY_ID=%r APNS_TEAM_ID=%r "
+            "APNS_BUNDLE_ID=%r APNS_KEY_CONTENT_set=%s",
+            os.environ.get("APNS_KEY_ID"),
+            os.environ.get("APNS_TEAM_ID"),
+            os.environ.get("APNS_BUNDLE_ID"),
+            "APNS_KEY_CONTENT" in os.environ,
+        )
+        logger.warning(
+            "APNs settings at request time: key_id=%r team_id=%r "
+            "key_path=%r bundle_id=%r key_content_set=%s",
+            settings.apns_key_id,
+            settings.apns_team_id,
+            settings.apns_key_path,
+            settings.apns_bundle_id,
+            bool(settings.apns_key_content),
+        )
         if not all([
             settings.apns_key_id,
             settings.apns_team_id,
             settings.apns_key_path,
             settings.apns_bundle_id,
         ]):
-            logger.warning("APNs not fully configured, push notifications disabled")
+            logger.warning(
+                "APNs not fully configured, push notifications disabled. "
+                "key_id=%s team_id=%s key_path=%s bundle_id=%s",
+                bool(settings.apns_key_id),
+                bool(settings.apns_team_id),
+                bool(settings.apns_key_path),
+                bool(settings.apns_bundle_id),
+            )
             return None
 
         try:
