@@ -11,12 +11,18 @@ import MapKit
 // MARK: - Hardcoded fallback coordinates
 
 private let defaultCoordinates: [String: CLLocationCoordinate2D] = [
-    "MU": CLLocationCoordinate2D(latitude: 38.544416, longitude: -121.749561),
-    "HUTCH": CLLocationCoordinate2D(latitude: 38.53969, longitude: -121.758182),
-    "ARC": CLLocationCoordinate2D(latitude: 38.54304, longitude: -121.757572),
+    "MU": CLLocationCoordinate2D(latitude: 38.54450, longitude: -121.74947),
+    "HUTCH": CLLocationCoordinate2D(latitude: 38.53974, longitude: -121.75809),
+    "ARC": CLLocationCoordinate2D(latitude: 38.54313, longitude: -121.75756),
 ]
 
 private let ucDavisCenter = CLLocationCoordinate2D(latitude: 38.5422, longitude: -121.7551)
+
+private let lotDisplayNames: [String: String] = [
+    "HUTCH": "Hutchinson Parking Structure",
+    "MU": "Memorial Union",
+    "ARC": "Gym",
+]
 
 struct MapTab: View {
     @ObservedObject var viewModel: AppViewModel
@@ -31,14 +37,37 @@ struct MapTab: View {
         )
     )
 
+    private func displayName(for lot: ParkingLot) -> String {
+        lotDisplayNames[lot.code] ?? lot.name
+    }
+
+    private func fuzzyScore(_ query: String, _ target: String) -> Int? {
+        let q = query.lowercased()
+        let t = target.lowercased()
+        if t == q { return 200 }
+        if t.hasPrefix(q) { return 150 }
+        if t.contains(q) { return 100 }
+        // Fuzzy: all query chars appear in order within target
+        var qi = q.startIndex
+        for ch in t {
+            if qi == q.endIndex { break }
+            if ch == q[qi] { qi = q.index(after: qi) }
+        }
+        return qi == q.endIndex ? 50 : nil
+    }
+
     private var filteredLots: [ParkingLot] {
-        if searchQuery.isEmpty {
-            return viewModel.parkingLots
+        if searchQuery.isEmpty { return viewModel.parkingLots }
+        return viewModel.parkingLots.compactMap { lot -> (ParkingLot, Int)? in
+            let best = [
+                fuzzyScore(searchQuery, lot.name),
+                fuzzyScore(searchQuery, lot.code),
+                fuzzyScore(searchQuery, displayName(for: lot))
+            ].compactMap { $0 }.max()
+            return best.map { (lot, $0) }
         }
-        let query = searchQuery.lowercased()
-        return viewModel.parkingLots.filter {
-            $0.name.lowercased().contains(query) || $0.code.lowercased().contains(query)
-        }
+        .sorted { $0.1 > $1.1 }
+        .map { $0.0 }
     }
 
     var body: some View {
@@ -49,13 +78,13 @@ struct MapTab: View {
                     let coord = coordinateFor(lot)
                     let isSelected = selectedLot?.id == lot.id
 
-                    Annotation(lot.code, coordinate: coord) {
+                    Annotation("", coordinate: coord) {
                         VStack(spacing: 4) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(isSelected ? AppColors.accent : AppColors.accent.opacity(0.6))
+                                    .fill(isSelected ? AppColors.darkBackground : Color(hex: "475569"))
                                     .frame(width: 32, height: 32)
-                                    .shadow(color: .black.opacity(isSelected ? 0.2 : 0.1), radius: isSelected ? 8 : 4, y: 2)
+                                    .shadow(color: .black.opacity(isSelected ? 0.3 : 0.15), radius: isSelected ? 8 : 4, y: 2)
 
                                 Image(systemName: "car.fill")
                                     .font(.system(size: 14, weight: .bold))
@@ -74,7 +103,7 @@ struct MapTab: View {
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(isSelected ? AppColors.accent.opacity(0.2) : Color.clear, lineWidth: 1)
+                                        .stroke(isSelected ? AppColors.darkBackground.opacity(0.2) : Color.clear, lineWidth: 1)
                                 )
                         }
                         .onTapGesture {
@@ -91,41 +120,121 @@ struct MapTab: View {
                 searchFieldFocused = false
             }
 
-            // Search bar overlay
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
-                    .foregroundColor(AppColors.textMuted)
+            // Search bar + dropdown
+            VStack(spacing: 0) {
+                let hasResults = !searchQuery.isEmpty && !filteredLots.isEmpty
 
-                TextField("Search campus lots...", text: $searchQuery)
-                    .appFont(size: 14, weight: .medium)
-                    .foregroundColor(AppColors.textPrimary)
-                    .autocorrectionDisabled()
-                    .focused($searchFieldFocused)
+                // Search bar
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16))
+                        .foregroundColor(AppColors.textMuted)
 
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(AppColors.textMuted)
+                    TextField("Search campus lots...", text: $searchQuery)
+                        .appFont(size: 14, weight: .medium)
+                        .foregroundColor(AppColors.textPrimary)
+                        .autocorrectionDisabled()
+                        .focused($searchFieldFocused)
+
+                    if !searchQuery.isEmpty {
+                        Button {
+                            searchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(AppColors.textMuted)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(12)
+                .background(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        bottomLeadingRadius: hasResults ? 0 : 16,
+                        bottomTrailingRadius: hasResults ? 0 : 16,
+                        topTrailingRadius: 16
+                    )
+                    .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 16,
+                        bottomLeadingRadius: hasResults ? 0 : 16,
+                        bottomTrailingRadius: hasResults ? 0 : 16,
+                        topTrailingRadius: 16
+                    )
+                    .stroke(AppColors.border.opacity(0.5), lineWidth: 1)
+                )
+
+                // Dropdown results
+                if hasResults {
+                    let results = Array(filteredLots.prefix(5))
+                    VStack(spacing: 0) {
+                        ForEach(Array(results.enumerated()), id: \.element.id) { index, lot in
+                            Button {
+                                let coord = coordinateFor(lot)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedLot = lot
+                                    cameraPosition = .region(MKCoordinateRegion(
+                                        center: coord,
+                                        span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+                                    ))
+                                }
+                                searchQuery = ""
+                                searchFieldFocused = false
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "mappin.circle.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(AppColors.textMuted)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(lot.name)
+                                            .appFont(size: 14, weight: .semibold)
+                                            .foregroundColor(AppColors.textPrimary)
+                                        Text(lot.code)
+                                            .appFont(size: 11, weight: .medium)
+                                            .foregroundColor(AppColors.textMuted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "arrow.up.left")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppColors.textMuted)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            if index < results.count - 1 {
+                                Divider().padding(.leading, 40)
+                            }
+                        }
+                    }
+                    .background(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 0,
+                            bottomLeadingRadius: 16,
+                            bottomTrailingRadius: 16,
+                            topTrailingRadius: 0
+                        )
+                        .fill(.ultraThinMaterial)
+                    )
+                    .overlay(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 0,
+                            bottomLeadingRadius: 16,
+                            bottomTrailingRadius: 16,
+                            topTrailingRadius: 0
+                        )
+                        .stroke(AppColors.border.opacity(0.5), lineWidth: 1)
+                    )
                 }
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(AppColors.border.opacity(0.5), lineWidth: 1)
-            )
             .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
             .padding(.horizontal, 17)
-            .padding(.top, 56)
+            .padding(.top, 8)
 
             // Map controls (right side)
             VStack(spacing: 8) {
@@ -157,7 +266,7 @@ struct MapTab: View {
                 .buttonStyle(PlainButtonStyle())
             }
             .padding(.trailing, 17)
-            .padding(.top, 120)
+            .padding(.top, 72)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .overlay(alignment: .bottom) {
@@ -169,12 +278,16 @@ struct MapTab: View {
                     isParked: viewModel.isParked,
                     currentSessionLotId: viewModel.currentSession?.parkingLotId,
                     onCheckIn: {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
                         Task { await viewModel.checkInAtLot(lot.id) }
                     },
                     onCheckOut: {
                         Task { await viewModel.checkOut() }
                     },
                     onReportTaps: {
+                        let gen = UIImpactFeedbackGenerator(style: .medium)
+                        gen.impactOccurred()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { gen.impactOccurred() }
                         Task { await viewModel.reportSightingAtLot(lot.id) }
                     },
                     onDismiss: {
@@ -317,13 +430,23 @@ private struct LotBottomSheet: View {
             .padding(.bottom, 32)
         }
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.1), radius: 20, y: -10)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 24,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 24
+            )
+            .fill(Color.white)
+            .shadow(color: .black.opacity(0.1), radius: 20, y: -10)
         )
         .overlay(alignment: .top) {
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(AppColors.borderLight, lineWidth: 1)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 24,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 24
+            )
+            .stroke(AppColors.borderLight, lineWidth: 1)
         }
         .gesture(
             DragGesture()

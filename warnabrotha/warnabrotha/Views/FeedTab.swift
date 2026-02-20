@@ -29,14 +29,11 @@ struct ProbabilityTab: View {
 
     /// Returns the sightings to display based on the active filter.
     private var activeSightings: [FeedSighting]? {
-        if selectedFilter == nil {
-            // ALL LOTS — show aggregated feed
-            return viewModel.allFeedSightings.isEmpty && viewModel.feed == nil
-                ? nil
-                : viewModel.allFeedSightings
-        } else {
-            return viewModel.feed?.sightings
+        guard viewModel.allFeedsLoaded else { return nil }
+        if let filter = selectedFilter {
+            return viewModel.allFeedSightings.filter { $0.parkingLotId == filter }
         }
+        return viewModel.allFeedSightings
     }
 
     var body: some View {
@@ -66,7 +63,6 @@ struct ProbabilityTab: View {
                         isSelected: selectedFilter == nil
                     ) {
                         selectedFilter = nil
-                        Task { await viewModel.loadAllFeeds() }
                     }
 
                     ForEach(viewModel.parkingLots) { lot in
@@ -75,7 +71,6 @@ struct ProbabilityTab: View {
                             isSelected: selectedFilter == lot.id
                         ) {
                             selectedFilter = lot.id
-                            viewModel.selectLot(lot.id)
                         }
                     }
                 }
@@ -154,10 +149,15 @@ struct ProbabilityTab: View {
                 }
             }
             .refreshable {
-                await viewModel.refresh()
+                await viewModel.loadAllFeeds()
             }
         }
         .background(AppColors.background)
+        .onAppear {
+            if !viewModel.allFeedsLoaded {
+                Task { await viewModel.loadAllFeeds() }
+            }
+        }
     }
 }
 
@@ -194,6 +194,7 @@ struct FeedCardView: View {
                 HStack(spacing: 14) {
                     // Upvote
                     Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         onVote(.upvote)
                     } label: {
                         HStack(spacing: 4) {
@@ -208,6 +209,7 @@ struct FeedCardView: View {
 
                     // Downvote
                     Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         onVote(.downvote)
                     } label: {
                         HStack(spacing: 4) {
