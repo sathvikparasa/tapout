@@ -107,7 +107,8 @@ class NotificationService:
         push_token: str,
         title: str,
         body: str,
-        data: Optional[dict] = None
+        data: Optional[dict] = None,
+        badge: int = 1,
     ) -> bool:
         """
         Send a push notification via FCM (Android) or APNs (iOS),
@@ -125,7 +126,7 @@ class NotificationService:
         if cls._is_fcm_token(push_token):
             return await cls._send_fcm(push_token, title, body, data)
         else:
-            return await cls._send_apns(push_token, title, body, data)
+            return await cls._send_apns(push_token, title, body, data, badge)
 
     @classmethod
     async def _send_apns(
@@ -133,7 +134,8 @@ class NotificationService:
         push_token: str,
         title: str,
         body: str,
-        data: Optional[dict] = None
+        data: Optional[dict] = None,
+        badge: int = 1,
     ) -> bool:
         """Send a push notification via APNs (iOS)."""
         apns_client = cls._get_apns_client()
@@ -151,7 +153,7 @@ class NotificationService:
                             "body": body,
                         },
                         "sound": "default",
-                        "badge": 1,
+                        "badge": badge,
                     },
                     "data": data or {},
                 },
@@ -262,63 +264,61 @@ class NotificationService:
         parking_lot_name: str,
         parking_lot_code: str = ""
     ) -> int:
-        """
-        Notify all users currently parked at a lot that TAPS was spotted.
+        import asyncio
 
-        Args:
-            db: Database session
-            parking_lot_id: ID of the parking lot
-            parking_lot_name: Name of the parking lot for notification
-            parking_lot_code: Code of the parking lot
-
-        Returns:
-            Number of users notified
-        """
-        # Get all active parking sessions at this lot with their devices
         result = await db.execute(
             select(ParkingSession)
             .where(
                 ParkingSession.parking_lot_id == parking_lot_id,
-                ParkingSession.checked_out_at.is_(None)  # Active sessions
+                ParkingSession.checked_out_at.is_(None)
             )
             .options(selectinload(ParkingSession.device))
         )
         active_sessions = result.scalars().all()
 
-        notified_count = 0
+        if not active_sessions:
+            return 0
+
         title = "⚠️ TAPS Alert!"
         message = f"TAPS spotted at {parking_lot_name}! Tap to pay for parking."
+        checked_in_count = len(active_sessions)
 
-        for session in active_sessions:
-            device = session.device
-
-            # Create in-app notification (always)
-            await cls.create_notification(
-                db=db,
-                device=device,
+        # Batch insert all in-app notifications in a single commit
+        db.add_all([
+            Notification(
+                device_id=session.device.id,
                 notification_type=NotificationType.TAPS_SPOTTED,
                 title=title,
                 message=message,
                 parking_lot_id=parking_lot_id,
             )
+            for session in active_sessions
+        ])
+        await db.commit()
 
-            # Try to send push notification if enabled
-            if device.is_push_enabled and device.push_token:
-                await cls.send_push_notification(
-                    push_token=device.push_token,
-                    title=title,
-                    body=message,
-                    data={
-                        "type": "TAPS_SPOTTED",
-                        "parking_lot_id": parking_lot_id,
-                        "parking_lot_name": parking_lot_name,
-                        "parking_lot_code": parking_lot_code,
-                    }
-                )
+        # Fire all push notifications concurrently
+        push_tasks = [
+            cls.send_push_notification(
+                push_token=session.device.push_token,
+                title=title,
+                body=message,
+                badge=checked_in_count,
+                data={
+                    "type": "TAPS_SPOTTED",
+                    "parking_lot_id": parking_lot_id,
+                    "parking_lot_name": parking_lot_name,
+                    "parking_lot_code": parking_lot_code,
+                    "checked_in_count": checked_in_count,
+                }
+            )
+            for session in active_sessions
+            if session.device.is_push_enabled and session.device.push_token
+        ]
 
-            notified_count += 1
+        if push_tasks:
+            await asyncio.gather(*push_tasks, return_exceptions=True)
 
-        return notified_count
+        return checked_in_count
 
     @staticmethod
     async def get_unread_notifications(

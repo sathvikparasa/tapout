@@ -368,8 +368,9 @@ class AppViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response = try await api.reportSighting(lotId: selectedLotId, notes: notes)
-            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            let parkersAtLot = selectedLot?.activeParkers ?? 0
+            _ = try await api.reportSighting(lotId: selectedLotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(parkersAtLot) users notified."
             showConfirmation = true
             await loadLotData()
         } catch {
@@ -494,8 +495,9 @@ class AppViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response = try await api.reportSighting(lotId: lotId, notes: notes)
-            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            let parkersAtLot = lotStats[lotId]?.activeParkers ?? selectedLot?.activeParkers ?? 0
+            _ = try await api.reportSighting(lotId: lotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(parkersAtLot) users notified."
             showConfirmation = true
             await loadLotData()
             await loadAllFeeds()

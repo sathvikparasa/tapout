@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.schemas.feed import FeedSighting, FeedResponse, AllFeedsResponse
-from app.schemas.vote import VoteType, VoteCreate, VoteCreate, VoteResponse, VoteResult
+from app.schemas.vote import VoteType, VoteCreate, VoteResponse, VoteResult
 from app.models.taps_sighting import TapsSighting
 from app.models.parking_lot import ParkingLot
 from app.models.vote import Vote, VoteType as VoteTypeModel
