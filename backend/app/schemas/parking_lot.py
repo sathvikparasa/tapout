@@ -45,7 +45,7 @@ class ParkingLotWithStats(ParkingLotResponse):
     Used for displaying lot information with real-time data.
     """
     active_parkers: int = Field(0, description="Number of users currently parked")
-    recent_sightings: int = Field(0, description="TAPS sightings in last 24 hours")
+    recent_sightings: int = Field(0, description="TAPS sightings in last hour")
     taps_probability: float = Field(0.0, ge=0.0, le=1.0, description="Predicted probability of TAPS presence")
 
     class Config:
