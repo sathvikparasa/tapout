@@ -25,7 +25,8 @@ from app.api import (
     feed_router,
     ticket_scan_router,
 )
-from app.services.reminder import run_reminder_job
+from app.services.reminder import run_reminder_job, ReminderService
+from apscheduler.triggers.cron import CronTrigger
 from app.models.parking_lot import ParkingLot
 from app.database import Base
 from app.api.auth import limiter
@@ -74,6 +75,12 @@ async def run_scheduled_reminder_job():
         await run_reminder_job(db)
 
 
+async def run_auto_checkout_job():
+    """Wrapper to run the nightly auto-checkout job with a database session."""
+    async with AsyncSessionLocal() as db:
+        await ReminderService.auto_checkout_expired_sessions(db)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -117,6 +124,12 @@ async def lifespan(app: FastAPI):
         'interval',
         minutes=5,
         id='checkout_reminder',
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_auto_checkout_job,
+        CronTrigger(hour=22, minute=0, timezone='America/Los_Angeles'),
+        id='auto_checkout',
         replace_existing=True,
     )
     scheduler.start()

@@ -65,7 +65,7 @@ async def get_parking_lot(
     Includes:
     - Basic lot information
     - Number of currently parked users
-    - Recent sightings count (last 24 hours)
+    - Recent sightings count (last hour)
     - Current TAPS probability prediction
     """
     # Get the parking lot
@@ -90,13 +90,13 @@ async def get_parking_lot(
     )
     active_parkers = parkers_result.scalar() or 0
 
-    # Count recent sightings (last 24 hours)
-    one_day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+    # Count recent sightings (last hour)
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
     sightings_result = await db.execute(
         select(func.count(TapsSighting.id))
         .where(
             TapsSighting.parking_lot_id == lot_id,
-            TapsSighting.reported_at >= one_day_ago
+            TapsSighting.reported_at >= one_hour_ago
         )
     )
     recent_sightings = sightings_result.scalar() or 0
