@@ -47,5 +47,8 @@ python-dotenv==1.0.0
 # Rate limiting
 slowapi==0.1.9
 
+# Redis cache
+redis[asyncio]>=5.0
+
 # Anthropic VLM for ticket OCR
 anthropic>=0.40.0

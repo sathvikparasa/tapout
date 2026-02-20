@@ -19,6 +19,7 @@ from app.models.taps_sighting import TapsSighting
 from app.services.prediction import PredictionService
 from app.services.auth import get_current_device
 from app.models.device import Device
+from app.services.cache import cache_get, cache_set, TTL_LOTS_LIST, TTL_LOT_STATS
 
 router = APIRouter(prefix="/lots", tags=["Parking Lots"])
 
@@ -31,21 +32,19 @@ router = APIRouter(prefix="/lots", tags=["Parking Lots"])
 )
 async def list_parking_lots(
     db: AsyncSession = Depends(get_db),
-    _device: Device = Depends(get_current_device)  # Require auth
+    _device: Device = Depends(get_current_device)
 ):
-    """
-    Get all active parking lots.
+    cached = await cache_get("lots:all")
+    if cached is not None:
+        return cached
 
-    Returns basic information about each lot without real-time stats.
-    """
     result = await db.execute(
-        select(ParkingLot)
-        .where(ParkingLot.is_active == True)
-        .order_by(ParkingLot.name)
+        select(ParkingLot).where(ParkingLot.is_active == True).order_by(ParkingLot.name)
     )
     lots = result.scalars().all()
-
-    return [ParkingLotResponse.model_validate(lot) for lot in lots]
+    data = [ParkingLotResponse.model_validate(lot).model_dump(mode="json") for lot in lots]
+    await cache_set("lots:all", data, TTL_LOTS_LIST)
+    return data
 
 
 @router.get(
@@ -59,56 +58,35 @@ async def get_parking_lot(
     db: AsyncSession = Depends(get_db),
     _device: Device = Depends(get_current_device)
 ):
-    """
-    Get detailed information about a parking lot.
+    cached = await cache_get(f"lot_stats:{lot_id}")
+    if cached is not None:
+        return cached
 
-    Includes:
-    - Basic lot information
-    - Number of currently parked users
-    - Recent sightings count (last 24 hours)
-    - Current TAPS probability prediction
-    """
-    # Get the parking lot
-    result = await db.execute(
-        select(ParkingLot).where(ParkingLot.id == lot_id)
-    )
+    result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
     lot = result.scalar_one_or_none()
-
     if lot is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Parking lot {lot_id} not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Parking lot {lot_id} not found")
 
-    # Count active parkers
     parkers_result = await db.execute(
         select(func.count(ParkingSession.id))
-        .where(
-            ParkingSession.parking_lot_id == lot_id,
-            ParkingSession.checked_out_at.is_(None)
-        )
+        .where(ParkingSession.parking_lot_id == lot_id, ParkingSession.checked_out_at.is_(None))
     )
     active_parkers = parkers_result.scalar() or 0
 
-    # Count recent sightings (last 24 hours)
     one_day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
     sightings_result = await db.execute(
         select(func.count(TapsSighting.id))
-        .where(
-            TapsSighting.parking_lot_id == lot_id,
-            TapsSighting.reported_at >= one_day_ago
-        )
+        .where(TapsSighting.parking_lot_id == lot_id, TapsSighting.reported_at >= one_day_ago)
     )
     recent_sightings = sightings_result.scalar() or 0
 
-    # Get probability prediction
     try:
         prediction = await PredictionService.predict(db, lot_id=lot_id)
         taps_probability = prediction.probability
     except Exception:
         taps_probability = 0.0
 
-    return ParkingLotWithStats(
+    data = ParkingLotWithStats(
         id=lot.id,
         name=lot.name,
         code=lot.code,
@@ -118,7 +96,10 @@ async def get_parking_lot(
         active_parkers=active_parkers,
         recent_sightings=recent_sightings,
         taps_probability=taps_probability,
-    )
+    ).model_dump(mode="json")
+
+    await cache_set(f"lot_stats:{lot_id}", data, TTL_LOT_STATS)
+    return data
 
 
 @router.get(

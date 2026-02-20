@@ -29,6 +29,7 @@ from app.services.reminder import run_reminder_job
 from app.models.parking_lot import ParkingLot
 from app.database import Base
 from app.api.auth import limiter
+from app.services.cache import init_cache, close_cache
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -103,6 +104,12 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Firebase credentials not configured, FCM push notifications disabled")
 
+    # Initialize Redis cache (GCP MemoryStore)
+    if settings.redis_host:
+        init_cache(settings.redis_host, settings.redis_port)
+    else:
+        logger.warning("REDIS_HOST not set — caching disabled")
+
     # Initialize database
     await init_db()
     logger.info("Database initialized")
@@ -127,6 +134,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down WarnABrotha API...")
     scheduler.shutdown()
+    await close_cache()
     await close_db()
     logger.info("Shutdown complete")
 

@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # Anthropic API key for ticket OCR
     anthropic_api_key: str = ""
 
+    # Redis cache (GCP MemoryStore)
+    redis_host: Optional[str] = None
+    redis_port: int = 6379
+
     # Reminder settings
     parking_reminder_hours: int = 3  # Hours before sending checkout reminder
 
