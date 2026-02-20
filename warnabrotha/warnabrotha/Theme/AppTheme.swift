@@ -334,18 +334,22 @@ struct RiskBarChart: View {
     private let gap: CGFloat = 3
     private let barHeights: [CGFloat] = [12, 24, 36]
 
-    private let activeColors: [Color] = [
-        AppColors.success,      // green (LOW bar)
-        AppColors.warning,      // yellow (MEDIUM bar)
-        AppColors.dangerBright,  // red (HIGH bar)
-    ]
     private let inactiveColor = Color(hex: "F2F2EB")
+
+    private var barColor: Color {
+        switch activeBars {
+        case 1: return AppColors.success
+        case 2: return AppColors.warning
+        case 3: return AppColors.dangerBright
+        default: return AppColors.textMuted
+        }
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: gap) {
             ForEach(0..<3) { index in
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(index < activeBars ? activeColors[index] : inactiveColor)
+                    .fill(index < activeBars ? barColor : inactiveColor)
                     .frame(width: barWidth, height: barHeights[index])
             }
         }

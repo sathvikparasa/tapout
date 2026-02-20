@@ -46,6 +46,7 @@ class AppViewModel: ObservableObject {
     @Published var feed: FeedResponse?
     @Published var allFeeds: AllFeedsResponse?
     @Published var allFeedSightings: [FeedSighting] = []
+    @Published var allFeedsLoaded = false
 
     // Scan state
     @Published var scanState: ScanState = .idle
@@ -367,8 +368,9 @@ class AppViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response = try await api.reportSighting(lotId: selectedLotId, notes: notes)
-            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            let parkersAtLot = selectedLot?.activeParkers ?? 0
+            _ = try await api.reportSighting(lotId: selectedLotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(parkersAtLot) users notified."
             showConfirmation = true
             await loadLotData()
         } catch {
@@ -382,23 +384,44 @@ class AppViewModel: ObservableObject {
     // MARK: - Voting
 
     func vote(sightingId: Int, type: VoteType) async {
-        do {
-            // Check current vote to determine toggle behavior
-            let currentVote = allFeedSightings.first(where: { $0.id == sightingId })?.userVote
-                ?? feed?.sightings.first(where: { $0.id == sightingId })?.userVote
+        // Save originals for revert on error
+        let originalSightings = allFeedSightings
+        let currentVote = allFeedSightings.first(where: { $0.id == sightingId })?.userVote
 
+        // Optimistic update — apply immediately before API call
+        allFeedSightings = allFeedSightings.map { sighting in
+            guard sighting.id == sightingId else { return sighting }
+            let newVote: VoteType? = sighting.userVote == type ? nil : type
+            var upvotes = sighting.upvotes
+            var downvotes = sighting.downvotes
+            if sighting.userVote == .upvote { upvotes -= 1 }
+            if sighting.userVote == .downvote { downvotes -= 1 }
+            if newVote == .upvote { upvotes += 1 }
+            if newVote == .downvote { downvotes += 1 }
+            return FeedSighting(
+                id: sighting.id,
+                parkingLotId: sighting.parkingLotId,
+                parkingLotName: sighting.parkingLotName,
+                parkingLotCode: sighting.parkingLotCode,
+                reportedAt: sighting.reportedAt,
+                notes: sighting.notes,
+                upvotes: upvotes,
+                downvotes: downvotes,
+                netScore: upvotes - downvotes,
+                userVote: newVote,
+                minutesAgo: sighting.minutesAgo
+            )
+        }
+
+        do {
             if currentVote == type {
-                // Same vote type tapped — remove vote
                 try await api.removeVote(sightingId: sightingId)
             } else {
-                // Different or no vote — add/change vote
                 _ = try await api.vote(sightingId: sightingId, voteType: type)
             }
-
-            // Reload feed to show updated votes
-            feed = try await api.getFeed(lotId: selectedLotId)
-            await loadAllFeeds()
         } catch {
+            // Revert on failure
+            allFeedSightings = originalSightings
             self.error = error.localizedDescription
             showError = true
         }
@@ -472,8 +495,9 @@ class AppViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response = try await api.reportSighting(lotId: lotId, notes: notes)
-            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            let parkersAtLot = lotStats[lotId]?.activeParkers ?? selectedLot?.activeParkers ?? 0
+            _ = try await api.reportSighting(lotId: lotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(parkersAtLot) users notified."
             showConfirmation = true
             await loadLotData()
             await loadAllFeeds()
@@ -495,6 +519,7 @@ class AppViewModel: ObservableObject {
             allFeedSightings = response.feeds
                 .flatMap { $0.sightings }
                 .sorted { $0.minutesAgo < $1.minutesAgo }
+            allFeedsLoaded = true
         } catch {
             // Non-critical
             print("Failed to load all feeds: \(error)")
