@@ -6,5 +6,11 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>amppark</string>
+		<string>aimsmobilepay</string>
+		<string>honkmobile</string>
+	</array>
 </dict>
 </plist>

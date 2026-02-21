@@ -12,6 +12,7 @@ from app.schemas.prediction import PredictionRequest, PredictionResponse
 from app.models.device import Device
 from app.services.auth import get_current_device
 from app.services.prediction import PredictionService
+from app.services.cache import cache_get, cache_set, TTL_PREDICTION
 
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
 
@@ -26,16 +27,14 @@ async def get_prediction_global(
     device: Device = Depends(get_current_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get TAPS risk prediction based on the most recent sighting globally.
+    cached = await cache_get("prediction:global")
+    if cached is not None:
+        return cached
 
-    Returns:
-    - Risk level (LOW, MEDIUM, HIGH)
-    - Risk bars count (1-3) for UI display
-    - Human-readable risk message
-    """
     prediction = await PredictionService.predict(db=db)
-    return prediction
+    data = prediction.model_dump(mode="json")
+    await cache_set("prediction:global", data, TTL_PREDICTION)
+    return data
 
 
 @router.get(
@@ -49,13 +48,14 @@ async def get_prediction(
     device: Device = Depends(get_current_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get TAPS risk prediction for a specific parking lot.
+    cached = await cache_get(f"prediction:{lot_id}")
+    if cached is not None:
+        return cached
 
-    Returns risk based on the most recent sighting at this lot today.
-    """
     prediction = await PredictionService.predict(db=db, lot_id=lot_id)
-    return prediction
+    data = prediction.model_dump(mode="json")
+    await cache_set(f"prediction:{lot_id}", data, TTL_PREDICTION)
+    return data
 
 
 @router.post(
@@ -69,12 +69,7 @@ async def predict_for_time(
     device: Device = Depends(get_current_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get TAPS risk prediction for a specific time.
-
-    - **parking_lot_id**: Optional lot to filter by
-    - **timestamp**: Time to predict for (defaults to now)
-    """
+    # Custom time predictions are not cached — they're one-off requests
     prediction = await PredictionService.predict(
         db=db,
         timestamp=request.timestamp or datetime.now(timezone.utc),

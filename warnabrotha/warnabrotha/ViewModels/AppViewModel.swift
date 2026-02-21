@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UserNotifications
 
 enum OTPStep {
     case emailInput
@@ -314,6 +315,18 @@ class AppViewModel: ObservableObject {
         }
     }
 
+    func markAllNotificationsRead() async {
+        guard unreadNotificationCount > 0 else { return }
+        do {
+            try await api.markAllNotificationsRead()
+            unreadNotificationCount = 0
+            // Clear the iOS app badge
+            try await UNUserNotificationCenter.current().setBadgeCount(0)
+        } catch {
+            print("Failed to mark all notifications read: \(error)")
+        }
+    }
+
     // MARK: - Parking Actions
 
     func checkIn() async {
@@ -368,8 +381,9 @@ class AppViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response = try await api.reportSighting(lotId: selectedLotId, notes: notes)
-            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            let parkersAtLot = selectedLot?.activeParkers ?? 0
+            _ = try await api.reportSighting(lotId: selectedLotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(parkersAtLot) users notified."
             showConfirmation = true
             await loadLotData()
         } catch {
@@ -494,8 +508,9 @@ class AppViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response = try await api.reportSighting(lotId: lotId, notes: notes)
-            confirmationMessage = "TAPS reported! \(response.usersNotified ?? 0) users notified."
+            let parkersAtLot = lotStats[lotId]?.activeParkers ?? selectedLot?.activeParkers ?? 0
+            _ = try await api.reportSighting(lotId: lotId, notes: notes)
+            confirmationMessage = "TAPS reported! \(parkersAtLot) users notified."
             showConfirmation = true
             await loadLotData()
             await loadAllFeeds()

@@ -31,7 +31,7 @@ class PushNotificationService {
     func sendTokenToBackend(_ token: String) async {
         KeychainService.shared.savePushToken(token)
         do {
-            try await APIClient.shared.updateDevice(pushToken: token, isPushEnabled: true)
+            _ = try await APIClient.shared.updateDevice(pushToken: token, isPushEnabled: true)
         } catch {
             print("Failed to send push token to backend: \(error)")
         }

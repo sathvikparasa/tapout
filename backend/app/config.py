@@ -22,13 +22,18 @@ def _load_secrets_from_gcp():
 
     client = secretmanager.SecretManagerServiceClient()
     for name in SECRET_NAMES:
-        if name not in os.environ:
-            try:
-                secret_path = f"projects/{GCP_PROJECT}/secrets/{name}/versions/latest"
-                response = client.access_secret_version(request={"name": secret_path})
-                os.environ[name] = response.payload.data.decode("UTF-8")
-            except Exception:
-                pass  # Secret not found — will use default from Settings
+        if name in os.environ:
+            val = os.environ[name]
+            print(f"[SECRET MANAGER] '{name}' already in env, skipping Secret Manager (len={len(val)}, empty={val == ''})")
+            continue
+        try:
+            secret_path = f"projects/{GCP_PROJECT}/secrets/{name}/versions/latest"
+            response = client.access_secret_version(request={"name": secret_path})
+            value = response.payload.data.decode("UTF-8")
+            os.environ[name] = value
+            print(f"[SECRET MANAGER] Loaded '{name}' from Secret Manager (len={len(value)}, empty={value == ''})")
+        except Exception as e:
+            print(f"[SECRET MANAGER] Failed to load secret '{name}': {e}")
 
 
 _load_secrets_from_gcp()
@@ -75,6 +80,10 @@ class Settings(BaseSettings):
 
     # Anthropic API key for ticket OCR
     anthropic_api_key: str = ""
+
+    # Redis cache (GCP MemoryStore)
+    redis_host: Optional[str] = None
+    redis_port: int = 6379
 
     # Reminder settings
     parking_reminder_hours: int = 3  # Hours before sending checkout reminder

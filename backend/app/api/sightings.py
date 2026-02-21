@@ -7,7 +7,7 @@ Handles reporting TAPS sightings and listing recent sightings.
 from typing import List
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -22,6 +22,7 @@ from app.models.parking_lot import ParkingLot
 from app.models.device import Device
 from app.services.auth import require_verified_device
 from app.services.notification import NotificationService
+from app.services.cache import cache_delete
 
 router = APIRouter(prefix="/sightings", tags=["TAPS Sightings"])
 
@@ -35,6 +36,7 @@ router = APIRouter(prefix="/sightings", tags=["TAPS Sightings"])
 )
 async def report_sighting(
     sighting_data: TapsSightingCreate,
+    background_tasks: BackgroundTasks,
     device: Device = Depends(require_verified_device),
     db: AsyncSession = Depends(get_db)
 ):
@@ -85,8 +87,12 @@ async def report_sighting(
     await db.commit()
     await db.refresh(sighting)
 
-    # Notify all parked users
-    users_notified = await NotificationService.notify_parked_users(
+    # Bust caches — lot stats and prediction are now stale
+    await cache_delete(f"lot_stats:{lot.id}", f"prediction:{lot.id}", "prediction:global")
+
+    # Fire notifications in the background — don't block the response
+    background_tasks.add_task(
+        NotificationService.notify_parked_users,
         db=db,
         parking_lot_id=lot.id,
         parking_lot_name=lot.name,
@@ -100,7 +106,7 @@ async def report_sighting(
         parking_lot_code=lot.code,
         reported_at=sighting.reported_at,
         notes=sighting.notes,
-        users_notified=users_notified,
+        users_notified=0,
     )
 
 

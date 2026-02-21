@@ -47,6 +47,11 @@ struct ContentView: View {
                             )
                         }
                     }
+                    .onChange(of: selectedTab) { _, tab in
+                        if tab == 1 {
+                            Task { await viewModel.markAllNotificationsRead() }
+                        }
+                    }
                 }
             }
             .overlay {

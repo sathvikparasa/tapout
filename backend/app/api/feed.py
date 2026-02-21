@@ -21,6 +21,7 @@ from app.models.parking_lot import ParkingLot
 from app.models.vote import Vote, VoteType as VoteTypeModel
 from app.models.device import Device
 from app.services.auth import get_current_device, require_verified_device
+from app.services.cache import cache_get, cache_set, cache_delete, TTL_VOTE_COUNTS
 
 router = APIRouter(prefix="/feed", tags=["Feed"])
 
@@ -28,73 +29,88 @@ router = APIRouter(prefix="/feed", tags=["Feed"])
 FEED_WINDOW_HOURS = 3
 
 
-async def get_sighting_with_votes(
+async def _batch_build_feed_sightings(
     db: AsyncSession,
-    sighting: TapsSighting,
+    sightings: list,
     device: Device,
-    lot_name: str,
-    lot_code: str
-) -> FeedSighting:
+    lot_by_id: dict,
+) -> list:
     """
-    Build a FeedSighting with vote counts and user's vote.
+    Build FeedSighting objects for a list of sightings using at most 2 DB
+    queries (batch vote counts + batch user votes) regardless of list length.
 
-    Args:
-        db: Database session
-        sighting: The sighting to build response for
-        device: Current user's device
-        lot_name: Parking lot name
-        lot_code: Parking lot code
-
-    Returns:
-        FeedSighting with vote information
+    Vote counts are cached per sighting with a 30-second TTL and invalidated
+    whenever a vote is cast or removed.
     """
-    # Count upvotes and downvotes using ORM queries
-    upvote_result = await db.execute(
-        select(func.count()).select_from(Vote).where(
-            Vote.sighting_id == sighting.id,
-            Vote.vote_type == VoteTypeModel.UPVOTE
-        )
-    )
-    downvote_result = await db.execute(
-        select(func.count()).select_from(Vote).where(
-            Vote.sighting_id == sighting.id,
-            Vote.vote_type == VoteTypeModel.DOWNVOTE
-        )
-    )
-    upvotes = upvote_result.scalar() or 0
-    downvotes = downvote_result.scalar() or 0
+    if not sightings:
+        return []
 
-    # Get user's vote on this sighting
-    user_vote_result = await db.execute(
-        select(Vote.vote_type)
-        .where(
-            Vote.sighting_id == sighting.id,
-            Vote.device_id == device.id
-        )
-    )
-    user_vote_row = user_vote_result.scalar_one_or_none()
-    user_vote = VoteType(user_vote_row.value) if user_vote_row else None
-
-    # Calculate minutes ago
+    sighting_ids = [s.id for s in sightings]
     now = datetime.now(timezone.utc)
-    reported_at = sighting.reported_at
-    if reported_at.tzinfo is None:
-        reported_at = reported_at.replace(tzinfo=timezone.utc)
-    minutes_ago = int((now - reported_at).total_seconds() / 60)
 
-    return FeedSighting(
-        id=sighting.id,
-        parking_lot_id=sighting.parking_lot_id,
-        parking_lot_name=lot_name,
-        parking_lot_code=lot_code,
-        reported_at=sighting.reported_at,
-        notes=sighting.notes,
-        upvotes=upvotes,
-        downvotes=downvotes,
-        net_score=upvotes - downvotes,
-        user_vote=user_vote,
-        minutes_ago=minutes_ago,
+    # ── 1. Vote counts — try cache first, batch-fetch misses ────────────────
+    vote_data: dict[int, dict] = {}
+    cache_misses: list[int] = []
+
+    for sid in sighting_ids:
+        cached = await cache_get(f"vote_counts:{sid}")
+        if cached is not None:
+            vote_data[sid] = cached
+        else:
+            cache_misses.append(sid)
+            vote_data[sid] = {"up": 0, "down": 0}
+
+    if cache_misses:
+        rows = await db.execute(
+            select(Vote.sighting_id, Vote.vote_type, func.count().label("n"))
+            .where(Vote.sighting_id.in_(cache_misses))
+            .group_by(Vote.sighting_id, Vote.vote_type)
+        )
+        for row in rows:
+            if row.vote_type == VoteTypeModel.UPVOTE:
+                vote_data[row.sighting_id]["up"] = row.n
+            else:
+                vote_data[row.sighting_id]["down"] = row.n
+
+        # Store freshly loaded counts in cache
+        for sid in cache_misses:
+            await cache_set(f"vote_counts:{sid}", vote_data[sid], TTL_VOTE_COUNTS)
+
+    # ── 2. User's own votes — always live (personal, low cost) ─────────────
+    user_vote_rows = await db.execute(
+        select(Vote.sighting_id, Vote.vote_type)
+        .where(Vote.sighting_id.in_(sighting_ids), Vote.device_id == device.id)
     )
+    user_votes: dict[int, VoteTypeModel] = {r.sighting_id: r.vote_type for r in user_vote_rows}
+
+    # ── 3. Assemble ─────────────────────────────────────────────────────────
+    result = []
+    for sighting in sightings:
+        lot = lot_by_id[sighting.parking_lot_id]
+        counts = vote_data[sighting.id]
+        user_vote_raw = user_votes.get(sighting.id)
+        user_vote = VoteType(user_vote_raw.value) if user_vote_raw else None
+
+        reported_at = sighting.reported_at
+        if reported_at.tzinfo is None:
+            reported_at = reported_at.replace(tzinfo=timezone.utc)
+        minutes_ago = int((now - reported_at).total_seconds() / 60)
+
+        result.append(FeedSighting(
+            id=sighting.id,
+            parking_lot_id=sighting.parking_lot_id,
+            parking_lot_name=lot.name,
+            parking_lot_code=lot.code,
+            reported_at=sighting.reported_at,
+            notes=sighting.notes,
+            upvotes=counts["up"],
+            downvotes=counts["down"],
+            net_score=counts["up"] - counts["down"],
+            user_vote=user_vote,
+            minutes_ago=minutes_ago,
+        ))
+
+    return result
 
 
 @router.get(
@@ -107,58 +123,55 @@ async def get_all_feeds(
     device: Device = Depends(get_current_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get feeds for all parking lots with recent sightings.
-
-    Returns sightings from the last 3 hours, grouped by lot,
-    with vote counts and the current user's vote on each.
-    """
-    # Calculate cutoff time
     cutoff = datetime.now(timezone.utc) - timedelta(hours=FEED_WINDOW_HOURS)
 
-    # Get all active parking lots
+    # 1 query: all active lots
     lots_result = await db.execute(
-        select(ParkingLot)
-        .where(ParkingLot.is_active == True)
-        .order_by(ParkingLot.name)
+        select(ParkingLot).where(ParkingLot.is_active == True).order_by(ParkingLot.name)
     )
     lots = lots_result.scalars().all()
+    lot_by_id = {lot.id: lot for lot in lots}
 
-    feeds = []
-    total_sightings = 0
-
-    for lot in lots:
-        # Get recent sightings for this lot
-        sightings_result = await db.execute(
-            select(TapsSighting)
-            .where(
-                TapsSighting.parking_lot_id == lot.id,
-                TapsSighting.reported_at >= cutoff
-            )
-            .order_by(TapsSighting.reported_at.desc())
+    # 1 query: all recent sightings across every lot
+    sightings_result = await db.execute(
+        select(TapsSighting)
+        .where(
+            TapsSighting.parking_lot_id.in_(lot_by_id.keys()),
+            TapsSighting.reported_at >= cutoff,
         )
-        sightings = sightings_result.scalars().all()
+        .order_by(TapsSighting.reported_at.desc())
+    )
+    all_sightings = sightings_result.scalars().all()
 
-        # Build feed sightings with vote info
-        feed_sightings = []
-        for sighting in sightings:
-            feed_sighting = await get_sighting_with_votes(
-                db, sighting, device, lot.name, lot.code
-            )
-            feed_sightings.append(feed_sighting)
+    # Group sightings by lot
+    sightings_by_lot: dict[int, list] = {lot.id: [] for lot in lots}
+    for s in all_sightings:
+        sightings_by_lot[s.parking_lot_id].append(s)
 
-        feeds.append(FeedResponse(
+    # Batch build with at most 2 more DB queries total
+    feed_sightings_all = await _batch_build_feed_sightings(
+        db, all_sightings, device, lot_by_id
+    )
+
+    # Re-group built sightings by lot for response
+    built_by_lot: dict[int, list] = {lot.id: [] for lot in lots}
+    for fs in feed_sightings_all:
+        built_by_lot[fs.parking_lot_id].append(fs)
+
+    feeds = [
+        FeedResponse(
             parking_lot_id=lot.id,
             parking_lot_name=lot.name,
             parking_lot_code=lot.code,
-            sightings=feed_sightings,
-            total_sightings=len(feed_sightings),
-        ))
-        total_sightings += len(feed_sightings)
+            sightings=built_by_lot[lot.id],
+            total_sightings=len(built_by_lot[lot.id]),
+        )
+        for lot in lots
+    ]
 
     return AllFeedsResponse(
         feeds=feeds,
-        total_sightings=total_sightings,
+        total_sightings=len(all_sightings),
     )
 
 
@@ -173,45 +186,20 @@ async def get_lot_feed(
     device: Device = Depends(get_current_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get feed for a specific parking lot.
-
-    Returns sightings from the last 3 hours with vote counts
-    and the current user's vote on each.
-    """
-    # Get parking lot
-    lot_result = await db.execute(
-        select(ParkingLot).where(ParkingLot.id == lot_id)
-    )
+    lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
     lot = lot_result.scalar_one_or_none()
-
     if lot is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Parking lot {lot_id} not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Parking lot {lot_id} not found")
 
-    # Calculate cutoff time
     cutoff = datetime.now(timezone.utc) - timedelta(hours=FEED_WINDOW_HOURS)
-
-    # Get recent sightings
     sightings_result = await db.execute(
         select(TapsSighting)
-        .where(
-            TapsSighting.parking_lot_id == lot_id,
-            TapsSighting.reported_at >= cutoff
-        )
+        .where(TapsSighting.parking_lot_id == lot_id, TapsSighting.reported_at >= cutoff)
         .order_by(TapsSighting.reported_at.desc())
     )
     sightings = sightings_result.scalars().all()
 
-    # Build feed sightings with vote info
-    feed_sightings = []
-    for sighting in sightings:
-        feed_sighting = await get_sighting_with_votes(
-            db, sighting, device, lot.name, lot.code
-        )
-        feed_sightings.append(feed_sighting)
+    feed_sightings = await _batch_build_feed_sightings(db, sightings, device, {lot.id: lot})
 
     return FeedResponse(
         parking_lot_id=lot.id,
@@ -234,72 +222,37 @@ async def vote_on_sighting(
     device: Device = Depends(require_verified_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Vote on a TAPS sighting.
-
-    - If you haven't voted, creates a new vote
-    - If you vote the same way, removes your vote
-    - If you vote differently, updates your vote
-
-    Requires email verification.
-    """
-    # Verify sighting exists
-    sighting_result = await db.execute(
-        select(TapsSighting).where(TapsSighting.id == sighting_id)
-    )
+    sighting_result = await db.execute(select(TapsSighting).where(TapsSighting.id == sighting_id))
     sighting = sighting_result.scalar_one_or_none()
-
     if sighting is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sighting {sighting_id} not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Sighting {sighting_id} not found")
 
-    # Check if user already voted
     existing_vote_result = await db.execute(
-        select(Vote)
-        .where(
-            Vote.sighting_id == sighting_id,
-            Vote.device_id == device.id
-        )
+        select(Vote).where(Vote.sighting_id == sighting_id, Vote.device_id == device.id)
     )
     existing_vote = existing_vote_result.scalar_one_or_none()
-
-    # Map schema VoteType to model VoteType
     vote_type_model = VoteTypeModel(vote_data.vote_type.value)
 
     if existing_vote is None:
-        # Create new vote
-        vote = Vote(
-            device_id=device.id,
-            sighting_id=sighting_id,
-            vote_type=vote_type_model,
-        )
-        db.add(vote)
+        db.add(Vote(device_id=device.id, sighting_id=sighting_id, vote_type=vote_type_model))
         await db.commit()
-        return VoteResult(
-            success=True,
-            action="created",
-            vote_type=vote_data.vote_type,
-        )
+        action = "created"
+        result_vote = vote_data.vote_type
     elif existing_vote.vote_type == vote_type_model:
-        # Same vote - remove it (toggle behavior)
         await db.delete(existing_vote)
         await db.commit()
-        return VoteResult(
-            success=True,
-            action="removed",
-            vote_type=None,
-        )
+        action = "removed"
+        result_vote = None
     else:
-        # Different vote - update it
         existing_vote.vote_type = vote_type_model
         await db.commit()
-        return VoteResult(
-            success=True,
-            action="updated",
-            vote_type=vote_data.vote_type,
-        )
+        action = "updated"
+        result_vote = vote_data.vote_type
+
+    # Invalidate cached vote count for this sighting
+    await cache_delete(f"vote_counts:{sighting_id}")
+
+    return VoteResult(success=True, action=action, vote_type=result_vote)
 
 
 @router.delete(
@@ -312,27 +265,16 @@ async def remove_vote(
     device: Device = Depends(require_verified_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Remove your vote from a sighting.
-    """
-    # Find existing vote
     existing_vote_result = await db.execute(
-        select(Vote)
-        .where(
-            Vote.sighting_id == sighting_id,
-            Vote.device_id == device.id
-        )
+        select(Vote).where(Vote.sighting_id == sighting_id, Vote.device_id == device.id)
     )
     existing_vote = existing_vote_result.scalar_one_or_none()
-
     if existing_vote is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You haven't voted on this sighting"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You haven't voted on this sighting")
 
     await db.delete(existing_vote)
     await db.commit()
+    await cache_delete(f"vote_counts:{sighting_id}")
 
     return {"success": True, "message": "Vote removed"}
 
@@ -347,52 +289,38 @@ async def get_sighting_votes(
     device: Device = Depends(get_current_device),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get vote counts for a specific sighting.
-    """
-    # Verify sighting exists
-    sighting_result = await db.execute(
-        select(TapsSighting).where(TapsSighting.id == sighting_id)
-    )
+    sighting_result = await db.execute(select(TapsSighting).where(TapsSighting.id == sighting_id))
     sighting = sighting_result.scalar_one_or_none()
-
     if sighting is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sighting {sighting_id} not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Sighting {sighting_id} not found")
 
-    # Count votes using ORM queries
-    upvote_result = await db.execute(
-        select(func.count()).select_from(Vote).where(
-            Vote.sighting_id == sighting_id,
-            Vote.vote_type == VoteTypeModel.UPVOTE
+    cached = await cache_get(f"vote_counts:{sighting_id}")
+    if cached:
+        upvotes, downvotes = cached["up"], cached["down"]
+    else:
+        upvote_result = await db.execute(
+            select(func.count()).select_from(Vote).where(
+                Vote.sighting_id == sighting_id, Vote.vote_type == VoteTypeModel.UPVOTE
+            )
         )
-    )
-    downvote_result = await db.execute(
-        select(func.count()).select_from(Vote).where(
-            Vote.sighting_id == sighting_id,
-            Vote.vote_type == VoteTypeModel.DOWNVOTE
+        downvote_result = await db.execute(
+            select(func.count()).select_from(Vote).where(
+                Vote.sighting_id == sighting_id, Vote.vote_type == VoteTypeModel.DOWNVOTE
+            )
         )
-    )
-    upvotes = upvote_result.scalar() or 0
-    downvotes = downvote_result.scalar() or 0
+        upvotes = upvote_result.scalar() or 0
+        downvotes = downvote_result.scalar() or 0
+        await cache_set(f"vote_counts:{sighting_id}", {"up": upvotes, "down": downvotes}, TTL_VOTE_COUNTS)
 
-    # Get user's vote
     user_vote_result = await db.execute(
-        select(Vote.vote_type)
-        .where(
-            Vote.sighting_id == sighting_id,
-            Vote.device_id == device.id
-        )
+        select(Vote.vote_type).where(Vote.sighting_id == sighting_id, Vote.device_id == device.id)
     )
     user_vote_row = user_vote_result.scalar_one_or_none()
-    user_vote = user_vote_row.value if user_vote_row else None
 
     return {
         "sighting_id": sighting_id,
         "upvotes": upvotes,
         "downvotes": downvotes,
         "net_score": upvotes - downvotes,
-        "user_vote": user_vote,
+        "user_vote": user_vote_row.value if user_vote_row else None,
     }

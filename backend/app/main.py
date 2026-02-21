@@ -25,10 +25,12 @@ from app.api import (
     feed_router,
     ticket_scan_router,
 )
-from app.services.reminder import run_reminder_job
+from app.services.reminder import run_reminder_job, ReminderService
+from apscheduler.triggers.cron import CronTrigger
 from app.models.parking_lot import ParkingLot
 from app.database import Base
 from app.api.auth import limiter
+from app.services.cache import init_cache, close_cache
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -74,6 +76,12 @@ async def run_scheduled_reminder_job():
         await run_reminder_job(db)
 
 
+async def run_auto_checkout_job():
+    """Wrapper to run the nightly auto-checkout job with a database session."""
+    async with AsyncSessionLocal() as db:
+        await ReminderService.auto_checkout_expired_sessions(db)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -103,6 +111,12 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Firebase credentials not configured, FCM push notifications disabled")
 
+    # Initialize Redis cache (GCP MemoryStore)
+    if settings.redis_host:
+        init_cache(settings.redis_host, settings.redis_port)
+    else:
+        logger.warning("REDIS_HOST not set — caching disabled")
+
     # Initialize database
     await init_db()
     logger.info("Database initialized")
@@ -119,6 +133,12 @@ async def lifespan(app: FastAPI):
         id='checkout_reminder',
         replace_existing=True,
     )
+    scheduler.add_job(
+        run_auto_checkout_job,
+        CronTrigger(hour=22, minute=0, timezone='America/Los_Angeles'),
+        id='auto_checkout',
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info("Background scheduler started")
 
@@ -127,6 +147,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down WarnABrotha API...")
     scheduler.shutdown()
+    await close_cache()
     await close_db()
     logger.info("Shutdown complete")
 
