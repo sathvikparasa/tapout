@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UserNotifications
 
 enum OTPStep {
     case emailInput
@@ -311,6 +312,18 @@ class AppViewModel: ObservableObject {
         } catch {
             // Non-critical — don't surface to UI
             print("Failed to fetch unread notifications: \(error)")
+        }
+    }
+
+    func markAllNotificationsRead() async {
+        guard unreadNotificationCount > 0 else { return }
+        do {
+            try await api.markAllNotificationsRead()
+            unreadNotificationCount = 0
+            // Clear the iOS app badge
+            try await UNUserNotificationCenter.current().setBadgeCount(0)
+        } catch {
+            print("Failed to mark all notifications read: \(error)")
         }
     }
 

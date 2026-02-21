@@ -212,6 +212,10 @@ class APIClient {
         let _: EmptyResponse = try await post(endpoint: "/notifications/read", body: body)
     }
 
+    func markAllNotificationsRead() async throws {
+        let _: EmptyResponse = try await post(endpoint: "/notifications/read/all", body: EmptyBody())
+    }
+
     // MARK: - HTTP Methods
 
     private func get<T: Decodable>(endpoint: String) async throws -> T {
