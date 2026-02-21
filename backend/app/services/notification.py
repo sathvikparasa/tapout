@@ -180,7 +180,7 @@ class NotificationService:
                         "sound": "default",
                         "badge": badge,
                     },
-                    "data": data or {},
+                    **(data or {}),
                 },
                 push_type=PushType.ALERT,
             )
