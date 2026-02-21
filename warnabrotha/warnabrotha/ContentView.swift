@@ -40,16 +40,19 @@ struct ContentView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        if !hideTabBar {
-                            AppTabBar(
-                                selectedTab: $selectedTab,
-                                feedBadgeCount: viewModel.unreadNotificationCount
-                            )
-                        }
+                        AppTabBar(
+                            selectedTab: $selectedTab,
+                            feedBadgeCount: viewModel.unreadNotificationCount
+                        )
+                        .opacity(hideTabBar ? 0 : 1)
+                        .allowsHitTesting(!hideTabBar)
                     }
                     .onChange(of: selectedTab) { _, tab in
                         if tab == 1 {
                             Task { await viewModel.markAllNotificationsRead() }
+                        }
+                        if tab != 3 {
+                            hideTabBar = false
                         }
                     }
                 }

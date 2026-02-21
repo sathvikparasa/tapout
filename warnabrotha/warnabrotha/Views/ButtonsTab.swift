@@ -143,18 +143,9 @@ struct ButtonsTab: View {
             Button {
                 showPreferences = true
             } label: {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(AppColors.textPrimary)
-
-                    if viewModel.unreadNotificationCount > 0 {
-                        Circle()
-                            .fill(AppColors.dangerBright)
-                            .frame(width: 10, height: 10)
-                            .offset(x: 2, y: -2)
-                    }
-                }
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(AppColors.textPrimary)
             }
             .buttonStyle(PlainButtonStyle())
         }
