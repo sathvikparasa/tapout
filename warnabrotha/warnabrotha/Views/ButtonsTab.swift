@@ -12,6 +12,7 @@ struct ButtonsTab: View {
     @Binding var selectedTab: Int
     @State private var showReportConfirmation = false
     @State private var showLotDropdown = false
+    @State private var showPreferences = false
 
     private var screenHeight: CGFloat {
         UIScreen.main.bounds.height
@@ -121,6 +122,9 @@ struct ButtonsTab: View {
         } message: {
             Text(viewModel.error ?? "An error occurred")
         }
+        .sheet(isPresented: $showPreferences) {
+            PreferencesView()
+        }
     }
 
     // MARK: - Top Bar
@@ -137,10 +141,10 @@ struct ButtonsTab: View {
             Spacer()
 
             Button {
-                // Profile placeholder
+                showPreferences = true
             } label: {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: "person.crop.circle")
+                    Image(systemName: "gearshape.fill")
                         .font(.system(size: 22))
                         .foregroundColor(AppColors.textPrimary)
 
