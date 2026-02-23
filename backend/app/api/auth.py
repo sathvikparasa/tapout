@@ -106,6 +106,15 @@ async def send_otp(
             detail="Device not registered. Call /auth/register first.",
         )
 
+    # Admin bypass: skip OTP entirely
+    if settings.admin_bypass_email and body.email.lower() == settings.admin_bypass_email.lower():
+        device.email_verified = True
+        await db.commit()
+        return SendOTPResponse(
+            success=True,
+            message="Verification code sent to your email.",
+        )
+
     # Check per-device rate limit (max 3 active OTPs)
     active_count = await OTPService.count_active_otps_for_device(db, device.id)
     if active_count >= 3:
@@ -163,6 +172,20 @@ async def verify_otp(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Device not registered.",
+        )
+
+    # Admin bypass: skip OTP verification
+    if settings.admin_bypass_email and body.email.lower() == settings.admin_bypass_email.lower():
+        device.email_verified = True
+        await db.commit()
+        access_token = AuthService.create_access_token(device.device_id)
+        return VerifyOTPResponse(
+            success=True,
+            message="Email verified successfully.",
+            email_verified=True,
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=settings.access_token_expire_hours * 3600,
         )
 
     # Get pending OTP

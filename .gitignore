@@ -14,6 +14,7 @@ __pycache__/
 .claude/
 .mcp.json
 backend/app.yaml
+backend/app-dev.yaml
 
 # Secrets & API Keys
 *.secret
