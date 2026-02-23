@@ -31,7 +31,7 @@ enum ParkingPaymentApp: String {
             return "itms-apps://itunes.apple.com/app/id1475971159"
         case .honkMobile:
             // Universal link — opens Honk Mobile app if installed, Safari otherwise
-            return "https://honkmobile.com/parking"
+            return "https://honkmobile.com/home"
         }
     }
 }
@@ -79,8 +79,21 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
 
     private func openParkingPaymentApp() {
-        guard let url = URL(string: ParkingPaymentApp.preferred.redirectURL) else { return }
-        UIApplication.shared.open(url)
+        let app = ParkingPaymentApp.preferred
+        guard let url = URL(string: app.redirectURL) else { return }
+
+        switch app {
+        case .ampPark:
+            UIApplication.shared.open(url)
+        case .honkMobile:
+            // universalLinksOnly ensures the app opens directly regardless of default browser.
+            // If Honk Mobile isn't installed, success == false → fall back to App Store.
+            UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { success in
+                if !success, let appStoreURL = URL(string: "itms-apps://itunes.apple.com/app/id915957520") {
+                    UIApplication.shared.open(appStoreURL)
+                }
+            }
+        }
     }
 }
 
