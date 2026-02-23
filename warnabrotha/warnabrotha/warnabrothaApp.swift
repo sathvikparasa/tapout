@@ -23,27 +23,15 @@ enum ParkingPaymentApp: String {
         UserDefaults.standard.set(app.rawValue, forKey: "preferredParkingApp")
     }
 
-    /// URL schemes to try first (opens the app if installed)
-    var candidateSchemes: [String] {
+    /// URL to open when a TAPS notification is tapped
+    var redirectURL: String {
         switch self {
-        case .ampPark:    return ["amppark://", "aimsmobilepay://"]
-        case .honkMobile: return ["honkmobile://"]
-        }
-    }
-
-    /// App Store deep link (opens App Store app directly)
-    var appStoreURL: String {
-        switch self {
-        case .ampPark:    return "itms-apps://itunes.apple.com/app/id1475971159"
-        case .honkMobile: return "itms-apps://itunes.apple.com/app/id915957520"
-        }
-    }
-
-    /// Web fallback
-    var webURL: String {
-        switch self {
-        case .ampPark:    return "https://apps.apple.com/us/app/amp-park/id1475971159"
-        case .honkMobile: return "https://parking.honkmobile.com/signup"
+        case .ampPark:
+            // No URL scheme or universal links — go straight to App Store
+            return "itms-apps://itunes.apple.com/app/id1475971159"
+        case .honkMobile:
+            // Universal link — opens Honk Mobile app if installed, Safari otherwise
+            return "https://honkmobile.com/parking"
         }
     }
 }
@@ -91,29 +79,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
 
     private func openParkingPaymentApp() {
-        let app = ParkingPaymentApp.preferred
-        let schemes = app.candidateSchemes.compactMap { URL(string: $0) }
-        tryOpenURLs(schemes, fallbackAppStore: app.appStoreURL, fallbackWeb: app.webURL)
-    }
-
-    private func tryOpenURLs(_ urls: [URL], fallbackAppStore: String, fallbackWeb: String) {
-        guard let url = urls.first else {
-            // All schemes failed — try App Store
-            if let appStoreURL = URL(string: fallbackAppStore) {
-                UIApplication.shared.open(appStoreURL) { success in
-                    if !success, let webURL = URL(string: fallbackWeb) {
-                        UIApplication.shared.open(webURL)
-                    }
-                }
-            }
-            return
-        }
-
-        UIApplication.shared.open(url) { success in
-            if success { return }
-            // This scheme failed — try the next one
-            self.tryOpenURLs(Array(urls.dropFirst()), fallbackAppStore: fallbackAppStore, fallbackWeb: fallbackWeb)
-        }
+        guard let url = URL(string: ParkingPaymentApp.preferred.redirectURL) else { return }
+        UIApplication.shared.open(url)
     }
 }
 
