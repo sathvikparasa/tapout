@@ -95,6 +95,13 @@ class AppViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        // Keychain persists across app deletions — clear it on a fresh install
+        // UserDefaults is wiped on deletion, so this reliably detects reinstalls
+        if !UserDefaults.standard.bool(forKey: "hasLaunchedBefore") {
+            keychain.clearAll()
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+        }
+
         if keychain.getToken() != nil && hasCompletedOnboarding {
             isAuthenticated = true
             isEmailVerified = true

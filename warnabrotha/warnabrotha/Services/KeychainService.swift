@@ -111,6 +111,7 @@ class KeychainService {
 
     func clearAll() {
         _ = delete(key: tokenKey)
-        // Keep device ID for consistency
+        _ = delete(key: deviceIdKey)
+        _ = delete(key: pushTokenKey)
     }
 }
