@@ -82,7 +82,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
 
         if let type = userInfo["type"] as? String, type == "TAPS_SPOTTED" {
-            openParkingPaymentApp()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.openParkingPaymentApp()
+            }
         }
 
         completionHandler()
@@ -90,24 +92,27 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
     private func openParkingPaymentApp() {
         let app = ParkingPaymentApp.preferred
+        let schemes = app.candidateSchemes.compactMap { URL(string: $0) }
+        tryOpenURLs(schemes, fallbackAppStore: app.appStoreURL, fallbackWeb: app.webURL)
+    }
 
-        // Tier 1: Open the app directly if installed
-        for scheme in app.candidateSchemes {
-            if let url = URL(string: scheme), UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url)
-                return
+    private func tryOpenURLs(_ urls: [URL], fallbackAppStore: String, fallbackWeb: String) {
+        guard let url = urls.first else {
+            // All schemes failed — try App Store
+            if let appStoreURL = URL(string: fallbackAppStore) {
+                UIApplication.shared.open(appStoreURL) { success in
+                    if !success, let webURL = URL(string: fallbackWeb) {
+                        UIApplication.shared.open(webURL)
+                    }
+                }
             }
-        }
-
-        // Tier 2: Open App Store page
-        if let url = URL(string: app.appStoreURL) {
-            UIApplication.shared.open(url)
             return
         }
 
-        // Tier 3: Web fallback
-        if let url = URL(string: app.webURL) {
-            UIApplication.shared.open(url)
+        UIApplication.shared.open(url) { success in
+            if success { return }
+            // This scheme failed — try the next one
+            self.tryOpenURLs(Array(urls.dropFirst()), fallbackAppStore: fallbackAppStore, fallbackWeb: fallbackWeb)
         }
     }
 }
