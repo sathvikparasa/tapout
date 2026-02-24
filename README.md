@@ -4,8 +4,6 @@ A parking enforcement tracking app for UC Davis students. Get real-time alerts w
 
 **Website**: [tapoutparking.info](https://tapoutparking.info)
 
-![TapOut App](screen.png)
-
 ## Overview
 
 TapOut helps UC Davis students avoid parking tickets by:
