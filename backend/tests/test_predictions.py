@@ -103,7 +103,7 @@ class TestBuildResponses:
         resp = PredictionService._build_no_sighting_response(now)
 
         assert resp.risk_level == "MEDIUM"
-        assert "not been sighted today" in resp.risk_message
+        assert resp.risk_message == "No TAPS in the last hour."
         assert resp.last_sighting_at is None
         assert resp.hours_since_last_sighting is None
         assert resp.predicted_for == now

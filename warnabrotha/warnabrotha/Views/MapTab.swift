@@ -11,9 +11,10 @@ import MapKit
 // MARK: - Hardcoded fallback coordinates
 
 private let defaultCoordinates: [String: CLLocationCoordinate2D] = [
-    "MU": CLLocationCoordinate2D(latitude: 38.54450, longitude: -121.74947),
-    "HUTCH": CLLocationCoordinate2D(latitude: 38.53974, longitude: -121.75809),
+    "MU": CLLocationCoordinate2D(latitude: 38.544552, longitude: -121.749712),
+    "HUTCH": CLLocationCoordinate2D(latitude: 38.539711, longitude: -121.758379),
     "ARC": CLLocationCoordinate2D(latitude: 38.54313, longitude: -121.75756),
+    "TERCERO": CLLocationCoordinate2D(latitude: 38.534834, longitude: -121.756463),
 ]
 
 private let ucDavisCenter = CLLocationCoordinate2D(latitude: 38.5422, longitude: -121.7551)
@@ -22,6 +23,7 @@ private let lotDisplayNames: [String: String] = [
     "HUTCH": "Hutchinson Parking Structure",
     "MU": "Memorial Union",
     "ARC": "Gym",
+    "TERCERO": "Tercero Parking Lot",
 ]
 
 struct MapTab: View {
