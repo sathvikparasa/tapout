@@ -9,7 +9,7 @@ import SwiftUI
 
 struct PreferencesView: View {
     @State private var selected: ParkingPaymentApp = ParkingPaymentApp.preferred
-    @Environment(\.dismiss) private var dismiss
+    let onDismiss: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -20,22 +20,19 @@ struct PreferencesView: View {
                     .displayFont(size: 30)
                     .foregroundColor(AppColors.textPrimary)
                 Spacer()
-                Button {
-                    dismiss()
-                } label: {
+                Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 26))
                         .foregroundColor(AppColors.textMuted)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-            .padding(.top, 8)
 
             // Section
             VStack(alignment: .leading, spacing: 12) {
                 Text("What Parking app do you use?")
-                    .appFont(size: 16, weight: .semibold)
-                    .foregroundColor(AppColors.textMuted)
+                    .appFont(size: 16, weight: .bold)
+                    .foregroundColor(AppColors.accent)
                     .padding(.horizontal, 4)
 
                 appCard(name: "AMP Parking",  imageName: "amp_parking_logo",  app: .ampPark)
@@ -43,12 +40,16 @@ struct PreferencesView: View {
             }
 
             tipCard
-
-            Spacer()
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 28)
-        .background(AppColors.background.ignoresSafeArea())
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 32)
+                .fill(AppColors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 32)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
     }
 
     // MARK: - App Selection Card
@@ -84,7 +85,7 @@ struct PreferencesView: View {
                     Spacer().frame(width: 23)
 
                     Text(name)
-                        .appFont(size: 24, weight: .bold)
+                        .appFont(size: 18, weight: .bold)
                         .foregroundColor(AppColors.textPrimary)
                         .lineLimit(1)
 
@@ -137,5 +138,5 @@ struct PreferencesView: View {
 }
 
 #Preview {
-    PreferencesView()
+    PreferencesView(onDismiss: {})
 }

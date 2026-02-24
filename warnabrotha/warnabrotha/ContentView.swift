@@ -151,9 +151,11 @@ struct TabBarItem: View {
                             .offset(x: 8, y: -4)
                     }
                 }
+                .frame(width: 28, height: 28)
 
                 Text(label)
                     .appFont(size: 10, weight: isSelected ? .bold : .medium)
+                    .frame(height: 13)
             }
             .foregroundColor(isSelected ? AppColors.accent : AppColors.textMuted)
             .frame(maxWidth: .infinity)

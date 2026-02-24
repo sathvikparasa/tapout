@@ -60,21 +60,34 @@ async def report_sighting(
             detail=f"Parking lot {sighting_data.parking_lot_id} not found"
         )
 
-    # Check for spam: prevent same device from reporting multiple times within cooldown period
-    # TODO: change back to minutes=5 after testing
-    five_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=0)
-    spam_check = await db.execute(
+    # Rate limiting: same lot = 15 min cooldown, any lot = 10 min cooldown
+    now = datetime.now(timezone.utc)
+
+    same_lot_check = await db.execute(
         select(TapsSighting)
         .where(
             TapsSighting.reported_by_device_id == device.id,
             TapsSighting.parking_lot_id == lot.id,
-            TapsSighting.reported_at >= five_minutes_ago
+            TapsSighting.reported_at >= now - timedelta(minutes=15)
         )
     )
-    if spam_check.scalar_one_or_none() is not None:
+    if same_lot_check.scalar_one_or_none() is not None:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="You already reported TAPS at this lot within the last 5 minutes"
+            detail="You already reported TAPS at this lot within the last 15 minutes"
+        )
+
+    any_lot_check = await db.execute(
+        select(TapsSighting)
+        .where(
+            TapsSighting.reported_by_device_id == device.id,
+            TapsSighting.reported_at >= now - timedelta(minutes=10)
+        )
+    )
+    if any_lot_check.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You can only report once every 10 minutes across all lots"
         )
 
     # Create sighting record

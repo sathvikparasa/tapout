@@ -13,6 +13,7 @@ struct ButtonsTab: View {
     @State private var showReportConfirmation = false
     @State private var showLotDropdown = false
     @State private var showPreferences = false
+    @State private var showRiskInfo = false
 
     private var screenHeight: CGFloat {
         UIScreen.main.bounds.height
@@ -21,7 +22,7 @@ struct ButtonsTab: View {
     var body: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                VStack(spacing: screenHeight * 0.025) {
+                VStack(spacing: 16) {
                     // Lot selector
                     lotSelector
                         .padding(.horizontal, 20)
@@ -54,8 +55,8 @@ struct ButtonsTab: View {
                         } else {
                             // Not parked → CHECK IN
                             DashboardActionButton(
-                                title: "CHECK IN",
-                                systemIcon: "p.circle.fill",
+                                title: "GET \(viewModel.selectedLot?.code ?? "LOT") ALERTS",
+                                systemIcon: "bell.fill",
                                 color: AppColors.accent
                             ) {
                                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -76,13 +77,9 @@ struct ButtonsTab: View {
                         }
                     }
                     .padding(.horizontal, 24)
-
-                    // Risk meter card
-                    riskMeterCard
-                        .padding(.horizontal, 20)
-
-                    // Recent activity
-                    recentActivitySection
+                    .padding(12)
+                    // Risk Indicators
+                    riskIndicatorsSection
                         .padding(.horizontal, 20)
 
                     Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
@@ -92,7 +89,6 @@ struct ButtonsTab: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 32)
-                        .padding(.bottom, 8)
 
                     Spacer(minLength: 0)
                 }
@@ -101,6 +97,32 @@ struct ButtonsTab: View {
 
             // Top bar
             topBar
+        }
+        .overlay {
+            if showPreferences {
+                ZStack {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+                        .onTapGesture { showPreferences = false }
+
+                    PreferencesView(onDismiss: { showPreferences = false })
+                        .padding(.horizontal, 24)
+                }
+            } else if showRiskInfo {
+                ZStack {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+                        .onTapGesture { showRiskInfo = false }
+
+                    RiskInfoSheet(
+                        currentBars: viewModel.riskBars,
+                        currentLevel: viewModel.prediction?.riskLevel ?? "UNKNOWN",
+                        currentMessage: viewModel.riskMessage,
+                        onDismiss: { showRiskInfo = false }
+                    )
+                    .padding(.horizontal, 24)
+                }
+            }
         }
         .alert("Report TAPS Sighting", isPresented: $showReportConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -121,9 +143,6 @@ struct ButtonsTab: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.error ?? "An error occurred")
-        }
-        .sheet(isPresented: $showPreferences) {
-            PreferencesView()
         }
     }
 
@@ -238,10 +257,14 @@ struct ButtonsTab: View {
         return VStack(alignment: .leading, spacing: 0) {
             // Header row: label + LIVE badge — pinned to top
             HStack {
-                Text("Current Risk Meter")
+                Text("Risk Meter")
                     .appFont(size: 14, weight: .bold)
                     .textCase(.uppercase)
                     .foregroundColor(AppColors.textPrimary.opacity(0.4))
+
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundColor(AppColors.textPrimary.opacity(0.3))
 
                 Spacer()
 
@@ -290,14 +313,16 @@ struct ButtonsTab: View {
         }
     }
 
-    // MARK: - Recent Activity
+    // MARK: - Risk Indicators
 
-    private var recentActivitySection: some View {
+    private var riskIndicatorsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Recent Activity")
-                    .appFont(size: 18, weight: .bold)
-                    .foregroundColor(AppColors.textPrimary)
+                Text("Risk Indicators")
+                    .appFont(size: 14, weight: .bold)
+                    .tracking(1)
+                    .textCase(.uppercase)
+                    .foregroundColor(AppColors.accent)
 
                 Spacer()
 
@@ -315,6 +340,16 @@ struct ButtonsTab: View {
                 }
                 .buttonStyle(PlainButtonStyle())
             }
+
+            riskMeterCard
+                .onTapGesture { showRiskInfo = true }
+
+            recentActivitySection
+        }
+    }
+
+    private var recentActivitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             if let feed = viewModel.feed, let sighting = feed.sightings.first {
 
                 Button {
@@ -524,6 +559,96 @@ struct StatusInfoItem: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Risk Info Sheet
+
+struct RiskInfoSheet: View {
+    let currentBars: Int
+    let currentLevel: String
+    let currentMessage: String
+    let onDismiss: () -> Void
+
+    private struct ExplainRow {
+        let bars: Int
+        let label: String
+        let color: Color
+        let description: String
+    }
+
+    private let rows: [ExplainRow] = [
+        ExplainRow(bars: 1, label: "LOW",    color: AppColors.success,     description: "Taps was spotted at this lot over an hour ago. Unlikely to return for another hour"),
+        ExplainRow(bars: 2, label: "MEDIUM", color: AppColors.warning,     description: "Taps hasn't been spotted in 2 hours. They are likely to return soon"),
+        ExplainRow(bars: 3, label: "HIGH",   color: AppColors.dangerBright, description: "Taps has been reported within the hour. They are likely still in the area ticketing cars."),
+    ]
+
+    private func levelColor(_ bars: Int) -> Color {
+        switch bars {
+        case 1: return AppColors.success
+        case 2: return AppColors.warning
+        case 3: return AppColors.dangerBright
+        default: return AppColors.textMuted
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+
+            // Header
+            HStack(alignment: .center) {
+                Text("Risk Meter")
+                    .displayFont(size: 30)
+                    .foregroundColor(AppColors.textPrimary)
+
+                Spacer()
+
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundColor(AppColors.textMuted)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            // Subheader
+            Text("What does this mean?")
+                .appFont(size: 15, weight: .bold)
+                .foregroundColor(AppColors.accent)
+
+            // Explanation rows
+            ForEach(rows, id: \.label) { row in
+                HStack(alignment: .center, spacing: 16) {
+                    RiskBarChart(activeBars: row.bars)
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(row.label)
+                            .displayFont(size: 30)
+                            .foregroundColor(row.color)
+
+                        Text(row.description)
+                            .appFont(size: 11, weight: .medium)
+                            .foregroundColor(AppColors.textPrimary.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            // Disclaimer
+            Text("Disclaimer: These estimates are based on patterns we've detected from our research. There is no guarantee of accuracy.")
+                .appFont(size: 11, weight: .medium)
+                .foregroundColor(AppColors.textPrimary.opacity(0.6))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 32)
+                .fill(AppColors.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 32)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
     }
 }
 
