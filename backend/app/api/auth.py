@@ -176,6 +176,12 @@ async def verify_otp(
 
     # Admin bypass: skip OTP verification
     if settings.admin_bypass_email and body.email.lower() == settings.admin_bypass_email.lower():
+        if body.otp_code != settings.admin_bypass_otp:
+            return VerifyOTPResponse(
+                success=False,
+                message="Invalid code.",
+                email_verified=False,
+            )
         device.email_verified = True
         await db.commit()
         access_token = AuthService.create_access_token(device.device_id)
