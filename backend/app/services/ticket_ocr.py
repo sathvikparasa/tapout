@@ -36,6 +36,7 @@ USER_PROMPT = "Extract the date, time, and location from this UC Davis parking t
 TICKET_LOCATION_TO_LOT_CODE = {
     "LOT 25": "ARC",
     "LOT 15": "MU",
+    "LOT 47": "TERCERO",
     # HUTCH mapping TBD
 }
 

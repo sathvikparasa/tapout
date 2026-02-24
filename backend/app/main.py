@@ -52,9 +52,10 @@ async def seed_initial_data():
     """
     async with AsyncSessionLocal() as db:
         lots_to_seed = [
-            {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.5382, "longitude": -121.7617},
-            {"name": "Quad Structure", "code": "MU", "latitude": 38.5425, "longitude": -121.7490},
+            {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.539711, "longitude": -121.758379},
+            {"name": "Quad Structure", "code": "MU", "latitude": 38.544552, "longitude": -121.749712},
             {"name": "Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
+            {"name": "Tercero Parking Lot", "code": "TERCERO", "latitude": 38.534834, "longitude": -121.756463},
         ]
 
         for lot_data in lots_to_seed:
