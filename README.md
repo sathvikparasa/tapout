@@ -1,10 +1,14 @@
-# WarnABrotha (WIP)
+# TapOut
 
 A parking enforcement tracking app for UC Davis students. Get real-time alerts when TAPS is spotted at your parking structure, check probability predictions, and help the community by reporting sightings.
 
+**Website**: [tapoutparking.info](https://tapoutparking.info)
+
+![TapOut App](screen.png)
+
 ## Overview
 
-WarnABrotha helps UC Davis students avoid parking tickets by:
+TapOut helps UC Davis students avoid parking tickets by:
 
 - **Real-time Alerts**: Get notified instantly when TAPS is spotted at your parking lot
 - **Check In/Out**: Register when you park to receive location-specific notifications
