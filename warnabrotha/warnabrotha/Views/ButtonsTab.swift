@@ -617,6 +617,7 @@ struct RiskInfoSheet: View {
                 .foregroundColor(AppColors.accent)
 
             // Explanation rows
+            VStack(alignment: .leading, spacing: 24) {
             ForEach(rows, id: \.label) { row in
                 HStack(alignment: .center, spacing: 16) {
                     RiskBarChart(activeBars: row.bars)
@@ -632,6 +633,7 @@ struct RiskInfoSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+            }
             }
 
             // Disclaimer

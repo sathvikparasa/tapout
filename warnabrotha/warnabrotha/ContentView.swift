@@ -264,6 +264,11 @@ struct WelcomeView: View {
                 .padding(.bottom, 48)
             }
         }
+        .alert("Registration Failed", isPresented: $viewModel.showError) {
+            Button("OK", role: .cancel) { viewModel.showError = false }
+        } message: {
+            Text(viewModel.error ?? "Could not connect. Please check your connection and try again.")
+        }
     }
 }
 
