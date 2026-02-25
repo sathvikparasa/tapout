@@ -134,6 +134,9 @@ class AppViewModel: ObservableObject {
                 isEmailVerified = true
                 showEmailVerification = false
                 await loadInitialData()
+            } else {
+                // Token exists but email never verified — send back to verification
+                showEmailVerification = true
             }
         }
     }
