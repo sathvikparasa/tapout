@@ -170,9 +170,8 @@ We'd love to hear from you! Whether you have bug reports, feature requests, or j
 
 ### Contact Us
 
-- **Email**: warnabrotha@ucdavis.edu
-- **Discord**: discord.gg/warnabrotha
-- **GitHub Issues**: [github.com/warnabrotha/app/issues](https://github.com/warnabrotha/app/issues)
+- **Email**: ucd.tapout@gmail.com
+- **GitHub Issues**: [github.com/tapout/app/issues](https://github.com/tapout/app/issues)
 
 ### Team
 
