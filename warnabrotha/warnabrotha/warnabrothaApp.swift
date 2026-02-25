@@ -89,7 +89,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             // universalLinksOnly ensures the app opens directly regardless of default browser.
             // If Honk Mobile isn't installed, success == false → fall back to App Store.
             UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { success in
-                if !success, let appStoreURL = URL(string: "itms-apps://itunes.apple.com/app/id915957520") {
+                if !success, let appStoreURL = URL(string: "itms-apps://itunes.apple.com/app/id816255029") {
                     UIApplication.shared.open(appStoreURL)
                 }
             }
