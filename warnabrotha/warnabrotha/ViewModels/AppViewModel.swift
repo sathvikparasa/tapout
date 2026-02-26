@@ -67,6 +67,7 @@ class AppViewModel: ObservableObject {
     // Notification state
     @Published var notificationPermissionGranted = false
     @Published var unreadNotificationCount = 0
+    @Published var showTimeSensitivePrompt = false
 
     // UI state
     @Published var isLoading = false
@@ -313,6 +314,12 @@ class AppViewModel: ObservableObject {
     func requestNotificationPermission() async {
         let granted = await PushNotificationService.shared.requestPermissionAndRegister()
         notificationPermissionGranted = granted
+        if granted {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            if settings.timeSensitiveSetting == .disabled {
+                showTimeSensitivePrompt = true
+            }
+        }
     }
 
     func fetchUnreadNotificationCount() async {
