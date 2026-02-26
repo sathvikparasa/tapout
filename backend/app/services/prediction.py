@@ -5,11 +5,12 @@ Determines risk level based on time since the most recent TAPS sighting.
 Only considers sightings from today (Pacific time), since TAPS operates 7am-10pm.
 
 Risk rules:
-- 0-1 hours ago:  HIGH  (TAPS actively patrolling)
-- 1-2 hours ago:  LOW   (TAPS likely moved on)
-- 2-4 hours ago:  MEDIUM (Uncertain, could return)
-- >4 hours ago:   HIGH  (Overdue, likely coming)
-- Not spotted today: MEDIUM (No data, default)
+- Weekend:             LOW    (Parking free except during events)
+- Weekday 10 PM–6 AM: LOW    (TAPS likely not ticketing)
+- 0–1 hours ago:      HIGH   (TAPS actively patrolling)
+- 1–2 hours ago:      LOW    (TAPS likely moved on)
+- > 2 hours ago:      MEDIUM (Uncertain, could return)
+- Not spotted today:  MEDIUM (No data, default)
 """
 
 import logging
@@ -50,6 +51,19 @@ class PredictionService:
         now_pacific = now.astimezone(_PACIFIC)
         today_start_pacific = now_pacific.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_pacific.astimezone(timezone.utc)
+
+        # Weekend: parking is free, TAPS not enforcing
+        if now_pacific.weekday() >= 5:  # 5=Saturday, 6=Sunday
+            return cls._build_off_hours_response(
+                now, "Parking is free on weekends except during special events."
+            )
+
+        # Weekday late night / early morning: TAPS not operating
+        hour = now_pacific.hour
+        if hour >= 22 or hour < 6:
+            return cls._build_off_hours_response(
+                now, "TAPS likely not ticketing right now."
+            )
 
         # Find the most recent sighting from today, filtered by lot if provided
         query = (
@@ -92,10 +106,8 @@ class PredictionService:
             return "HIGH"
         elif hours_ago <= 2.0:
             return "LOW"
-        elif hours_ago <= 4.0:
-            return "MEDIUM"
         else:
-            return "HIGH"
+            return "MEDIUM"
 
     @classmethod
     def _format_time_ago(cls, hours_ago: float) -> str:
@@ -111,8 +123,25 @@ class PredictionService:
         return f"{hours_int} hour{'s' if hours_int != 1 else ''} ago"
 
     @classmethod
+    def _build_off_hours_response(cls, now: datetime, message: str) -> PredictionResponse:
+        return PredictionResponse(
+            risk_level="LOW",
+            risk_message=message,
+            last_sighting_lot_name=None,
+            last_sighting_lot_code=None,
+            last_sighting_at=None,
+            hours_since_last_sighting=None,
+            parking_lot_id=None,
+            parking_lot_name=None,
+            parking_lot_code=None,
+            probability=_RISK_TO_PROBABILITY["LOW"],
+            predicted_for=now,
+            confidence=0.0,
+        )
+
+    @classmethod
     def _build_no_sighting_response(cls, now: datetime, lot_name: Optional[str] = None) -> PredictionResponse:
-        message = f"No TAPS at {lot_name} in the last hour." if lot_name else "No TAPS in the last hour."
+        message = "TAPS might return in the next few hours."
         return PredictionResponse(
             risk_level="MEDIUM",
             risk_message=message,
@@ -138,7 +167,7 @@ class PredictionService:
     ) -> PredictionResponse:
         risk_level = cls._classify_risk(hours_ago)
         time_str = cls._format_time_ago(hours_ago)
-        risk_message = f"TAPS spotted {time_str} at {lot.name}"
+        risk_message = f"TAPS spotted {time_str}."
 
         return PredictionResponse(
             risk_level=risk_level,

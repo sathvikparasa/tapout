@@ -13,8 +13,7 @@ __pycache__/
 .env.*.local
 .claude/
 .mcp.json
-backend/app.yaml
-backend/app-dev.yaml
+*app*.yaml
 
 # Secrets & API Keys
 *.secret

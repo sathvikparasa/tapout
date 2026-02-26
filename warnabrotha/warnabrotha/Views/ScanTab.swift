@@ -2,7 +2,7 @@
 //  ScanTab.swift
 //  TapOut
 //
-//  Ticket scanning — camera/gallery capture → OCR upload → result display.
+//  Ticket scanning — Records history list + camera/gallery capture → OCR upload → result display.
 //
 
 import SwiftUI
@@ -13,34 +13,43 @@ struct ScanTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            switch viewModel.scanState {
-            case .idle:
-                ScanIdleView(viewModel: viewModel)
-            case .preview:
-                ScanPreviewView(viewModel: viewModel)
-            case .processing:
-                ScanProcessingView()
-            case .success:
-                ScanSuccessView(viewModel: viewModel)
-            case .error:
-                ScanErrorView(viewModel: viewModel)
+            ScanHeader(viewModel: viewModel)
+
+            switch viewModel.scanSubTab {
+            case .records:
+                TicketHistoryView(viewModel: viewModel)
+            case .scanner:
+                scannerContent
             }
         }
         .background(AppColors.background)
     }
+
+    @ViewBuilder
+    private var scannerContent: some View {
+        switch viewModel.scanState {
+        case .idle:
+            ScanIdleView(viewModel: viewModel)
+        case .preview:
+            ScanPreviewView(viewModel: viewModel)
+        case .processing:
+            ScanProcessingView()
+        case .success:
+            ScanSuccessView(viewModel: viewModel)
+        case .error:
+            ScanErrorView(viewModel: viewModel)
+        }
+    }
 }
 
-// MARK: - Idle State
+// MARK: - Shared Header
 
-private struct ScanIdleView: View {
+private struct ScanHeader: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var showCamera = false
-    @State private var showPhotoPicker = false
-    @State private var selectedPhotoItem: PhotosPickerItem? = nil
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
+        VStack(alignment: .leading, spacing: 0) {
+            // Branding + title
             VStack(alignment: .leading, spacing: 4) {
                 (Text("Tap")
                     .foregroundColor(AppColors.textPrimary)
@@ -55,8 +64,154 @@ private struct ScanIdleView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 24)
             .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
 
+            // Underline tab bar
+            HStack(spacing: 0) {
+                ScanTabButton(label: "Scanner", isActive: viewModel.scanSubTab == .scanner) {
+                    viewModel.scanSubTab = .scanner
+                }
+                ScanTabButton(label: "Records", isActive: viewModel.scanSubTab == .records) {
+                    viewModel.scanSubTab = .records
+                }
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppColors.border)
+                    .frame(height: 1)
+            }
+        }
+    }
+}
+
+private struct ScanTabButton: View {
+    let label: String
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 0) {
+                Text(label)
+                    .appFont(size: 15, weight: .bold)
+                    .foregroundColor(isActive ? AppColors.accent : AppColors.textMuted)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 10)
+
+                Rectangle()
+                    .fill(isActive ? AppColors.accent : Color.clear)
+                    .frame(height: 2)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Ticket History (Records Tab)
+
+private struct TicketHistoryView: View {
+    @ObservedObject var viewModel: AppViewModel
+
+    var body: some View {
+        if viewModel.ticketHistory.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundColor(AppColors.textMuted)
+
+                Text("No tickets scanned yet")
+                    .appFont(size: 16, weight: .medium)
+                    .foregroundColor(AppColors.textSecondary)
+
+                Text("Scan a parking ticket to see it here.")
+                    .appFont(size: 13)
+                    .foregroundColor(AppColors.textMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, 80)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.ticketHistory) { entry in
+                        TicketHistoryRow(entry: entry)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
+            }
+        }
+    }
+}
+
+private struct TicketHistoryRow: View {
+    let entry: TicketHistoryEntry
+
+    private var displayLot: String {
+        (entry.lotCode ?? entry.lotName ?? entry.ticketLocation ?? "Unknown").uppercased()
+    }
+
+    private var displayDate: String {
+        if let d = entry.ticketDate { return d }
+        let f = DateFormatter(); f.dateStyle = .short; f.timeStyle = .none
+        return f.string(from: entry.scannedAt)
+    }
+
+    private var displayTime: String {
+        if let t = entry.ticketTime { return t }
+        let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short
+        return f.string(from: entry.scannedAt)
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            // Left: time above, lot code below — mirrors FeedCardView
+            VStack(alignment: .leading, spacing: 4) {
+                Text(displayTime)
+                    .appFont(size: 11, weight: .bold)
+                    .foregroundColor(AppColors.accent)
+
+                Text(displayLot)
+                    .appFont(size: 22, weight: .bold)
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            // Right: date, then price below
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(displayDate)
+                    .appFont(size: 14, weight: .bold)
+                    .foregroundColor(AppColors.textMuted)
+                if let amount = entry.ticketAmount {
+                    Text(amount)
+                        .appFont(size: 14, weight: .bold)
+                        .foregroundColor(AppColors.textMuted)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppColors.cardBackground)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
+    }
+}
+
+// MARK: - Idle State
+
+private struct ScanIdleView: View {
+    @ObservedObject var viewModel: AppViewModel
+    @State private var showCamera = false
+    @State private var showPhotoPicker = false
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+
+    var body: some View {
+        VStack(spacing: 0) {
             Spacer()
 
             VStack(spacing: 32) {
@@ -155,18 +310,6 @@ private struct ScanPreviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Preview")
-                    .displayFont(size: 24)
-                    .foregroundColor(AppColors.textPrimary)
-                    .tracking(-0.5)
-
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-
             Spacer()
 
             if let data = viewModel.scanImageData, let uiImage = UIImage(data: data) {
@@ -289,6 +432,16 @@ private struct ScanSuccessView: View {
                 )
                 .padding(.horizontal, 24)
 
+                Button {
+                    viewModel.resetScan()
+                    viewModel.scanSubTab = .records
+                } label: {
+                    Text("View History")
+                        .appFont(size: 14, weight: .semibold)
+                        .foregroundColor(AppColors.accent)
+                }
+                .buttonStyle(PlainButtonStyle())
+
                 Spacer(minLength: 32)
             }
         }
@@ -297,7 +450,6 @@ private struct ScanSuccessView: View {
     @ViewBuilder
     private func resultMessageView(result: TicketScanResponse) -> some View {
         if result.isRecent && result.sightingId != nil {
-            // TAPS report created
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(AppColors.accent)
@@ -312,7 +464,6 @@ private struct ScanSuccessView: View {
                     .fill(AppColors.accent.opacity(0.1))
             )
         } else if !result.isRecent {
-            // Too old
             HStack(spacing: 8) {
                 Image(systemName: "clock.fill")
                     .foregroundColor(AppColors.textMuted)
@@ -327,7 +478,6 @@ private struct ScanSuccessView: View {
                     .fill(AppColors.background)
             )
         } else if result.mappedLotId == nil {
-            // Location not recognized
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(AppColors.danger)
