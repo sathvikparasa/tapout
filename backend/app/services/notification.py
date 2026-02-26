@@ -134,6 +134,7 @@ class NotificationService:
         body: str,
         data: Optional[dict] = None,
         badge: int = 1,
+        time_sensitive: bool = False,
     ) -> bool:
         """
         Send a push notification via FCM (Android) or APNs (iOS),
@@ -151,7 +152,7 @@ class NotificationService:
         if cls._is_fcm_token(push_token):
             return await cls._send_fcm(push_token, title, body, data)
         else:
-            return await cls._send_apns(push_token, title, body, data, badge)
+            return await cls._send_apns(push_token, title, body, data, badge, time_sensitive)
 
     @classmethod
     async def _send_apns(
@@ -161,6 +162,7 @@ class NotificationService:
         body: str,
         data: Optional[dict] = None,
         badge: int = 1,
+        time_sensitive: bool = False,
     ) -> bool:
         """Send a push notification via APNs (iOS)."""
         apns_client = cls._get_apns_client()
@@ -179,6 +181,7 @@ class NotificationService:
                         },
                         "sound": "default",
                         "badge": badge,
+                        "interruption-level": "time-sensitive" if time_sensitive else "active",
                     },
                     **(data or {}),
                 },
@@ -328,6 +331,7 @@ class NotificationService:
                 title=title,
                 body=message,
                 badge=checked_in_count,
+                time_sensitive=True,
                 data={
                     "type": "TAPS_SPOTTED",
                     "parking_lot_id": parking_lot_id,
