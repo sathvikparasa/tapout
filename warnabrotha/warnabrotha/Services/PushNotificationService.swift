@@ -17,7 +17,7 @@ class PushNotificationService {
     func requestPermissionAndRegister() async -> Bool {
         let center = UNUserNotificationCenter.current()
         do {
-            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge, .timeSensitive])
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
             if granted {
                 UIApplication.shared.registerForRemoteNotifications()
             }
