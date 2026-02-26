@@ -22,6 +22,11 @@ enum ScanState {
     case error
 }
 
+enum ScanSubTab {
+    case scanner
+    case records
+}
+
 @MainActor
 class AppViewModel: ObservableObject {
     // MARK: - Published State
@@ -54,6 +59,8 @@ class AppViewModel: ObservableObject {
     @Published var scanImageData: Data? = nil
     @Published var scanResult: TicketScanResponse? = nil
     @Published var scanError: String? = nil
+    @Published var scanSubTab: ScanSubTab = .scanner
+    @Published var ticketHistory: [TicketHistoryEntry] = []
 
     // Map state
     @Published var lotStats: [Int: ParkingLotWithStats] = [:]
@@ -115,6 +122,8 @@ class AppViewModel: ObservableObject {
                 await silentRefresh()
             }
         }
+
+        loadTicketHistory()
     }
 
     private func silentRefresh() async {
@@ -459,6 +468,32 @@ class AppViewModel: ObservableObject {
 
     // MARK: - Scan Actions
 
+    func loadTicketHistory() {
+        guard let data = UserDefaults.standard.data(forKey: "ticketHistory"),
+              let entries = try? JSONDecoder().decode([TicketHistoryEntry].self, from: data) else { return }
+        ticketHistory = entries
+    }
+
+    private func saveTicketToHistory(_ result: TicketScanResponse) {
+        let entry = TicketHistoryEntry(
+            id: UUID(),
+            lotCode: result.mappedLotCode,
+            lotName: result.mappedLotName,
+            ticketDate: result.ticketDate,
+            ticketTime: result.ticketTime,
+            ticketLocation: result.ticketLocation,
+            ticketAmount: nil,
+            scannedAt: Date(),
+            sightingId: result.sightingId,
+            isRecent: result.isRecent
+        )
+        ticketHistory.insert(entry, at: 0)
+        if ticketHistory.count > 50 { ticketHistory = Array(ticketHistory.prefix(50)) }
+        if let data = try? JSONEncoder().encode(ticketHistory) {
+            UserDefaults.standard.set(data, forKey: "ticketHistory")
+        }
+    }
+
     func selectScanImage(_ data: Data) {
         scanImageData = data
         scanResult = nil
@@ -475,6 +510,7 @@ class AppViewModel: ObservableObject {
             if result.success {
                 scanResult = result
                 scanState = .success
+                saveTicketToHistory(result)
                 if result.sightingId != nil {
                     await loadAllFeeds()
                     await refreshAllLotStats()

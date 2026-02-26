@@ -430,6 +430,19 @@ struct NotificationList: Codable {
 
 // MARK: - Ticket Scanning
 
+struct TicketHistoryEntry: Codable, Identifiable {
+    let id: UUID
+    let lotCode: String?
+    let lotName: String?
+    let ticketDate: String?
+    let ticketTime: String?
+    let ticketLocation: String?
+    let ticketAmount: String?
+    let scannedAt: Date
+    let sightingId: Int?
+    let isRecent: Bool
+}
+
 struct TicketScanResponse: Codable {
     let success: Bool
     let ticketDate: String?
