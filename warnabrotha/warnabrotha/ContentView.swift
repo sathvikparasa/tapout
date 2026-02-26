@@ -63,6 +63,16 @@ struct ContentView: View {
                 }
             }
         }
+        .alert("Enable Time-Sensitive Notifications", isPresented: $viewModel.showTimeSensitivePrompt) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("Allow warnabrotha to send time-sensitive alerts so TAPS warnings reach you even when Focus mode is on.")
+        }
     }
 }
 

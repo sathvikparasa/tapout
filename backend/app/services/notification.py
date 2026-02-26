@@ -186,6 +186,7 @@ class NotificationService:
                     **(data or {}),
                 },
                 push_type=PushType.ALERT,
+                priority=10 if time_sensitive else None,
             )
             response = await apns_client.send_notification(request)
 
