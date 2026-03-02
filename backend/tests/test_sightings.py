@@ -129,30 +129,6 @@ class TestSightingEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_report_sighting_spam_prevention(
-        self,
-        client: AsyncClient,
-        auth_headers: dict,
-        test_parking_lot: ParkingLot
-    ):
-        """Test spam prevention for rapid sighting reports."""
-        # First report
-        response1 = await client.post(
-            "/api/v1/sightings",
-            headers=auth_headers,
-            json={"parking_lot_id": test_parking_lot.id}
-        )
-        assert response1.status_code == 201
-
-        # Second report within 5 minutes should fail
-        response2 = await client.post(
-            "/api/v1/sightings",
-            headers=auth_headers,
-            json={"parking_lot_id": test_parking_lot.id}
-        )
-        assert response2.status_code == 429
-
-    @pytest.mark.asyncio
     async def test_report_sighting_requires_verification(
         self,
         client: AsyncClient,
@@ -263,3 +239,25 @@ class TestSightingEndpoints:
         )
 
         assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_report_sighting_rapid_successive(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot
+    ):
+        """Rapid successive sighting reports are allowed (rate limiting removed)."""
+        response1 = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id}
+        )
+        assert response1.status_code == 201
+
+        response2 = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id}
+        )
+        assert response2.status_code == 201

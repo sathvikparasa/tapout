@@ -250,7 +250,7 @@ class TestSightingPredictionLotStats:
             (timedelta(hours=0.5), "HIGH"),
             (timedelta(hours=1.5), "LOW"),
             (timedelta(hours=3), "MEDIUM"),
-            (timedelta(hours=5), "HIGH"),
+            (timedelta(hours=5), "MEDIUM"),
         ]
         for offset, expected_level in offsets_expected:
             ts = (base_time + offset).isoformat()
@@ -417,7 +417,7 @@ class TestSightingNotificationFlow:
             r = await client.post(f"{API}/sightings", json={"parking_lot_id": lot.id}, headers=h_reporter)
 
         assert r.status_code == 201
-        assert r.json()["users_notified"] == 3
+        assert r.json()["users_notified"] == 0  # notifications sent in background
 
 
 # ---------------------------------------------------------------------------

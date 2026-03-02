@@ -1,0 +1,56 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      - name: Run tests
+        run: |
+          cd backend
+          pytest -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject infra config into app.yaml
+        env:
+          VPC_CONNECTOR: ${{ secrets.GCP_VPC_CONNECTOR }}
+          CLOUD_SQL_INSTANCES: ${{ secrets.GCP_CLOUD_SQL_INSTANCES }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+        run: |
+          sudo curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq -i '
+            .vpc_access_connector.name = strenv(VPC_CONNECTOR) |
+            .beta_settings.cloud_sql_instances = strenv(CLOUD_SQL_INSTANCES) |
+            .env_variables.REDIS_HOST = strenv(REDIS_HOST) |
+            .env_variables.REDIS_PORT = strenv(REDIS_PORT)
+          ' backend/app.yaml
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Deploy to App Engine
+        uses: google-github-actions/deploy-appengine@v2
+        with:
+          working_directory: backend
+          project_id: tapout-485821
