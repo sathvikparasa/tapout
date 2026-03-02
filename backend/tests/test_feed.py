@@ -3,6 +3,7 @@ Tests for feed and voting endpoints.
 """
 
 import pytest
+import asyncio
 from datetime import datetime, timedelta, timezone
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -574,3 +575,41 @@ class TestVotingEndpoints:
         sighting_data = data["sightings"][0]
         assert "minutes_ago" in sighting_data
         assert sighting_data["minutes_ago"] >= 0
+
+    @pytest.mark.asyncio
+    async def test_concurrent_same_device_votes_no_500(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot,
+    ):
+        """Concurrent votes from the same device must not produce 500s or IntegrityErrors."""
+        sighting = TapsSighting(parking_lot_id=test_parking_lot.id)
+        db_session.add(sighting)
+        await db_session.commit()
+        await db_session.refresh(sighting)
+
+        results = await asyncio.gather(
+            *[
+                client.post(
+                    f"/api/v1/feed/sightings/{sighting.id}/vote",
+                    headers=auth_headers,
+                    json={"vote_type": "upvote"},
+                )
+                for _ in range(5)
+            ],
+            return_exceptions=True,
+        )
+
+        statuses = [r.status_code for r in results if not isinstance(r, Exception)]
+        assert all(s == 200 for s in statuses), f"Got non-200 statuses: {statuses}"
+
+        # Final state: at most 1 upvote from this device, no downvotes
+        r = await client.get(
+            f"/api/v1/feed/sightings/{sighting.id}/votes",
+            headers=auth_headers,
+        )
+        data = r.json()
+        assert data["upvotes"] in (0, 1)
+        assert data["downvotes"] == 0

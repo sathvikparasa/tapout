@@ -10,8 +10,10 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.database import get_db
 from app.schemas.feed import FeedSighting, FeedResponse, AllFeedsResponse
@@ -27,6 +29,15 @@ router = APIRouter(prefix="/feed", tags=["Feed"])
 
 # Feed window in hours (shows sightings from last 3 hours)
 FEED_WINDOW_HOURS = 3
+
+
+def _insert_fn(db: AsyncSession):
+    """Return dialect-appropriate insert (PostgreSQL in prod, SQLite in tests)."""
+    try:
+        dialect = db.get_bind().dialect.name
+    except Exception:
+        dialect = "postgresql"
+    return sqlite_insert if dialect == "sqlite" else pg_insert
 
 
 async def _batch_build_feed_sightings(
@@ -233,20 +244,32 @@ async def vote_on_sighting(
     existing_vote = existing_vote_result.scalar_one_or_none()
     vote_type_model = VoteTypeModel(vote_data.vote_type.value)
 
-    if existing_vote is None:
-        db.add(Vote(device_id=device.id, sighting_id=sighting_id, vote_type=vote_type_model))
-        await db.commit()
-        action = "created"
-        result_vote = vote_data.vote_type
-    elif existing_vote.vote_type == vote_type_model:
-        await db.delete(existing_vote)
+    # Toggle: same vote type clicked again → remove
+    if existing_vote is not None and existing_vote.vote_type == vote_type_model:
+        # Core DELETE is concurrency-safe: 0-row result is not an error
+        await db.execute(
+            sa_delete(Vote).where(
+                Vote.device_id == device.id,
+                Vote.sighting_id == sighting_id,
+            )
+        )
         await db.commit()
         action = "removed"
         result_vote = None
     else:
-        existing_vote.vote_type = vote_type_model
+        # New vote or changing vote type — upsert prevents UniqueViolationError and
+        # StaleDataError from concurrent requests hitting the same (device, sighting) pair.
+        stmt = (
+            _insert_fn(db)(Vote)
+            .values(device_id=device.id, sighting_id=sighting_id, vote_type=vote_type_model)
+            .on_conflict_do_update(
+                index_elements=["device_id", "sighting_id"],
+                set_={"vote_type": vote_type_model},
+            )
+        )
+        await db.execute(stmt)
         await db.commit()
-        action = "updated"
+        action = "created" if existing_vote is None else "updated"
         result_vote = vote_data.vote_type
 
     # Invalidate cached vote count for this sighting
