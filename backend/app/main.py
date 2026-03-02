@@ -91,12 +91,14 @@ async def seed_initial_data():
                 if existing.name != lot_data["name"]:
                     existing.name = lot_data["name"]
                     updated = True
-                if existing.latitude != lot_data["latitude"] or existing.longitude != lot_data["longitude"]:
+                if round(existing.latitude or 0, 6) != round(lot_data["latitude"], 6) or \
+                        round(existing.longitude or 0, 6) != round(lot_data["longitude"], 6):
                     existing.latitude = lot_data["latitude"]
                     existing.longitude = lot_data["longitude"]
                     updated = True
                 if updated:
                     logger.info(f"Updated parking lot: {lot_data['code']}")
+        await db.commit()
 
 
 async def run_scheduled_reminder_job():
