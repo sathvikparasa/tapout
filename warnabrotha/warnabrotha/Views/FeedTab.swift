@@ -83,7 +83,7 @@ struct ProbabilityTab: View {
                 VStack(spacing: 0) {
                     // Sub-header
                     HStack {
-                        Text("Showing reports from last 3 hours")
+                        Text("Showing today's reports")
                             .appFont(size: 12, weight: .semibold)
                             .foregroundColor(AppColors.textMuted)
 
@@ -124,7 +124,7 @@ struct ProbabilityTab: View {
                                     Circle()
                                         .fill(AppColors.border)
                                         .frame(width: 6, height: 6)
-                                    Text("End of 3-hour window")
+                                    Text("End of today's reports")
                                         .appFont(size: 12, weight: .bold)
                                         .foregroundColor(AppColors.pillBorder)
                                     Circle()
@@ -283,7 +283,7 @@ struct EmptyFeedView: View {
                     .appFont(size: 18, weight: .bold)
                     .foregroundColor(AppColors.textPrimary)
 
-                Text("No TAPS sightings have been reported in the past 3 hours. Check back later or report a sighting if you spot one!")
+                Text("No TAPS sightings have been reported today. Check back later or report a sighting if you spot one!")
                     .appFont(size: 14)
                     .foregroundColor(AppColors.textSecondary)
                     .multilineTextAlignment(.center)
