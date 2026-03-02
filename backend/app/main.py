@@ -55,14 +55,14 @@ async def seed_initial_data():
             {
                 "name": "Pavilion Structure",
                 "code": "HUTCH",
-                "latitude": 38.544502,
-                "longitude": -121.749467,
+                "latitude": 38.539674579414715,
+                "longitude": -121.75836514704442,
             },
             {
                 "name": "Quad Structure",
                 "code": "MU",
-                "latitude": 38.544552,
-                "longitude": -121.749712,
+                "latitude": 38.54451981723509,
+                "longitude": -121.74950799295135,
             },
             {
                 "name": "Lot 25",
@@ -71,7 +71,7 @@ async def seed_initial_data():
                 "longitude": -121.7574,
             },
             {
-                "name": "Lot 47",
+                "name": "Tercero Parking Lot",
                 "code": "TERCERO",
                 "latitude": 38.534834,
                 "longitude": -121.756463,
@@ -86,13 +86,17 @@ async def seed_initial_data():
             if existing is None:
                 db.add(ParkingLot(**lot_data, is_active=True))
                 logger.info(f"Seeded parking lot: {lot_data['name']}")
-            elif existing.name != lot_data["name"]:
-                existing.name = lot_data["name"]
-                logger.info(
-                    f"Updated parking lot name: {lot_data['code']} -> {lot_data['name']}"
-                )
-
-        await db.commit()
+            else:
+                updated = False
+                if existing.name != lot_data["name"]:
+                    existing.name = lot_data["name"]
+                    updated = True
+                if existing.latitude != lot_data["latitude"] or existing.longitude != lot_data["longitude"]:
+                    existing.latitude = lot_data["latitude"]
+                    existing.longitude = lot_data["longitude"]
+                    updated = True
+                if updated:
+                    logger.info(f"Updated parking lot: {lot_data['code']}")
 
 
 async def run_scheduled_reminder_job():

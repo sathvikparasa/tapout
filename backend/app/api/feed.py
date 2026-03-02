@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.database import get_db
 from app.schemas.feed import FeedSighting, FeedResponse, AllFeedsResponse
@@ -233,20 +234,26 @@ async def vote_on_sighting(
     existing_vote = existing_vote_result.scalar_one_or_none()
     vote_type_model = VoteTypeModel(vote_data.vote_type.value)
 
-    if existing_vote is None:
-        db.add(Vote(device_id=device.id, sighting_id=sighting_id, vote_type=vote_type_model))
-        await db.commit()
-        action = "created"
-        result_vote = vote_data.vote_type
-    elif existing_vote.vote_type == vote_type_model:
+    # Toggle: same vote type clicked again → remove
+    if existing_vote is not None and existing_vote.vote_type == vote_type_model:
         await db.delete(existing_vote)
         await db.commit()
         action = "removed"
         result_vote = None
     else:
-        existing_vote.vote_type = vote_type_model
+        # New vote or changing vote type — upsert prevents UniqueViolationError and
+        # StaleDataError from concurrent requests hitting the same (device, sighting) pair.
+        stmt = (
+            pg_insert(Vote)
+            .values(device_id=device.id, sighting_id=sighting_id, vote_type=vote_type_model)
+            .on_conflict_do_update(
+                constraint='unique_device_sighting_vote',
+                set_={'vote_type': vote_type_model},
+            )
+        )
+        await db.execute(stmt)
         await db.commit()
-        action = "updated"
+        action = "created" if existing_vote is None else "updated"
         result_vote = vote_data.vote_type
 
     # Invalidate cached vote count for this sighting
