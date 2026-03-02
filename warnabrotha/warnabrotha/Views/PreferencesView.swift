@@ -30,7 +30,7 @@ struct PreferencesView: View {
 
             // Section
             VStack(alignment: .leading, spacing: 12) {
-                Text("What Parking app do you use?")
+                Text("Which Parking app do you use?")
                     .appFont(size: 16, weight: .bold)
                     .foregroundColor(AppColors.accent)
                     .padding(.horizontal, 4)

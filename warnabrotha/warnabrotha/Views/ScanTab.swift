@@ -426,21 +426,14 @@ private struct ScanSuccessView: View {
                 }
 
                 PrimaryButton(
-                    title: "Scan Another",
-                    icon: "doc.viewfinder",
-                    action: { viewModel.resetScan() }
+                    title: "Done",
+                    icon: "checkmark",
+                    action: {
+                        viewModel.resetScan()
+                        viewModel.scanSubTab = .records
+                    }
                 )
                 .padding(.horizontal, 24)
-
-                Button {
-                    viewModel.resetScan()
-                    viewModel.scanSubTab = .records
-                } label: {
-                    Text("View History")
-                        .appFont(size: 14, weight: .semibold)
-                        .foregroundColor(AppColors.accent)
-                }
-                .buttonStyle(PlainButtonStyle())
 
                 Spacer(minLength: 32)
             }

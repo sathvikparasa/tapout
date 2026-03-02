@@ -77,7 +77,7 @@ struct ButtonsTab: View {
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(12)
+                    .padding(.vertical, 12)
                     // Risk Indicators
                     riskIndicatorsSection
                         .padding(.horizontal, 20)
@@ -98,6 +98,13 @@ struct ButtonsTab: View {
             // Top bar
             topBar
         }
+        .simultaneousGesture(TapGesture().onEnded {
+            if showLotDropdown {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showLotDropdown = false
+                }
+            }
+        })
         .overlay {
             if showPreferences {
                 ZStack {
@@ -181,10 +188,29 @@ struct ButtonsTab: View {
 
     private var lotSelector: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("SELECT PARKING ZONE")
-                .appFont(size: 14, weight: .bold)
-                .tracking(1)
-                .foregroundColor(AppColors.accent)
+            HStack {
+                Text("Select Parking Zone")
+                    .appFont(size: 14, weight: .bold)
+                    .tracking(1)
+                    .textCase(.uppercase)
+                    .foregroundColor(AppColors.accent)
+
+                Spacer()
+
+                Button {
+                    selectedTab = 3
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("View Map")
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundColor(AppColors.accent)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(AppColors.accent)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
 
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -284,7 +310,7 @@ struct ButtonsTab: View {
                         .displayFont(size: 30)
                         .foregroundColor(riskLevelColor(riskLevel))
 
-                    Text(viewModel.riskMessage)
+                    Text("\(viewModel.selectedLot?.code ?? "") — \(viewModel.riskMessage)")
                         .appFont(size: 10, weight: .medium)
                         .foregroundColor(AppColors.textPrimary.opacity(0.6))
                         .lineLimit(1)
@@ -317,29 +343,11 @@ struct ButtonsTab: View {
 
     private var riskIndicatorsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Risk Indicators")
-                    .appFont(size: 14, weight: .bold)
-                    .tracking(1)
-                    .textCase(.uppercase)
-                    .foregroundColor(AppColors.accent)
-
-                Spacer()
-
-                Button {
-                    selectedTab = 3
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("View Map")
-                            .appFont(size: 12, weight: .semibold)
-                            .foregroundColor(AppColors.accent)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(AppColors.accent)
-                    }
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
+            Text("Risk Indicators")
+                .appFont(size: 14, weight: .bold)
+                .tracking(1)
+                .textCase(.uppercase)
+                .foregroundColor(AppColors.accent)
 
             riskMeterCard
                 .onTapGesture { showRiskInfo = true }

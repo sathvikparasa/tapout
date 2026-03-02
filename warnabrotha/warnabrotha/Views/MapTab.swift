@@ -411,8 +411,8 @@ private struct LotBottomSheet: View {
                         )
                     } else {
                         PrimaryButton(
-                            title: "CHECK IN",
-                            icon: "arrow.down.circle",
+                            title: "GET ALERTS",
+                            icon: "bell.fill",
                             color: isCheckedInElsewhere ? AppColors.textMuted : AppColors.accent,
                             action: onCheckIn
                         )
