@@ -37,7 +37,7 @@ from slowapi.errors import RateLimitExceeded
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -52,21 +52,45 @@ async def seed_initial_data():
     """
     async with AsyncSessionLocal() as db:
         lots_to_seed = [
-            {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.539711, "longitude": -121.758379},
-            {"name": "Quad Structure", "code": "MU", "latitude": 38.544552, "longitude": -121.749712},
-            {"name": "Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
-            {"name": "Tercero Parking Lot", "code": "TERCERO", "latitude": 38.534834, "longitude": -121.756463},
+            {
+                "name": "Pavilion Structure",
+                "code": "HUTCH",
+                "latitude": 38.544502,
+                "longitude": -121.749467,
+            },
+            {
+                "name": "Quad Structure",
+                "code": "MU",
+                "latitude": 38.544552,
+                "longitude": -121.749712,
+            },
+            {
+                "name": "Lot 25",
+                "code": "ARC",
+                "latitude": 38.5433,
+                "longitude": -121.7574,
+            },
+            {
+                "name": "Lot 47",
+                "code": "TERCERO",
+                "latitude": 38.534834,
+                "longitude": -121.756463,
+            },
         ]
 
         for lot_data in lots_to_seed:
-            result = await db.execute(select(ParkingLot).where(ParkingLot.code == lot_data["code"]))
+            result = await db.execute(
+                select(ParkingLot).where(ParkingLot.code == lot_data["code"])
+            )
             existing = result.scalar_one_or_none()
             if existing is None:
                 db.add(ParkingLot(**lot_data, is_active=True))
                 logger.info(f"Seeded parking lot: {lot_data['name']}")
             elif existing.name != lot_data["name"]:
                 existing.name = lot_data["name"]
-                logger.info(f"Updated parking lot name: {lot_data['code']} -> {lot_data['name']}")
+                logger.info(
+                    f"Updated parking lot name: {lot_data['code']} -> {lot_data['name']}"
+                )
 
         await db.commit()
 
@@ -99,7 +123,7 @@ async def lifespan(app: FastAPI):
             from firebase_admin import credentials
 
             cred_value = settings.firebase_credentials_json
-            if cred_value.strip().startswith('{'):
+            if cred_value.strip().startswith("{"):
                 # JSON string (e.g., from env var in app.yaml)
                 cred = credentials.Certificate(json.loads(cred_value))
             else:
@@ -110,7 +134,9 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
     else:
-        logger.warning("Firebase credentials not configured, FCM push notifications disabled")
+        logger.warning(
+            "Firebase credentials not configured, FCM push notifications disabled"
+        )
 
     # Initialize Redis cache (GCP MemoryStore)
     if settings.redis_host:
@@ -129,15 +155,15 @@ async def lifespan(app: FastAPI):
     # Run every 5 minutes to check for sessions needing reminders
     scheduler.add_job(
         run_scheduled_reminder_job,
-        'interval',
+        "interval",
         minutes=5,
-        id='checkout_reminder',
+        id="checkout_reminder",
         replace_existing=True,
     )
     scheduler.add_job(
         run_auto_checkout_job,
-        CronTrigger(hour=22, minute=0, timezone='America/Los_Angeles'),
-        id='auto_checkout',
+        CronTrigger(hour=22, minute=0, timezone="America/Los_Angeles"),
+        id="auto_checkout",
         replace_existing=True,
     )
     scheduler.start()

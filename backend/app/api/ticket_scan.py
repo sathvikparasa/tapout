@@ -18,7 +18,7 @@ from app.models.taps_sighting import TapsSighting
 from app.schemas.ticket_scan import TicketScanResponse
 from app.services.auth import require_verified_device
 from app.services.notification import NotificationService
-from app.services.ticket_ocr import TicketOCRService
+from app.services.ticket_ocr import TicketOCRService, ImageTooLargeError, CorruptImageError
 from app.api.auth import limiter
 
 logger = logging.getLogger(__name__)
@@ -62,31 +62,78 @@ async def scan_ticket(
     # Read and validate size
     image_bytes = await image.read()
     if len(image_bytes) > MAX_IMAGE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Image must be under 10 MB",
+        return TicketScanResponse(
+            success=False,
+            error_code="image_too_large",
+            error_message="Your photo is too large. Please use a smaller image (under 10 MB).",
+            is_recent=False,
         )
 
     # Extract ticket data via VLM
     try:
         ticket_data = TicketOCRService.extract_ticket_data(image_bytes, image.content_type)
+    except ImageTooLargeError:
+        logger.warning("Ticket image could not be compressed to fit API limits")
+        return TicketScanResponse(
+            success=False,
+            error_code="image_too_large",
+            error_message="Your photo is too large to process. Please try a lower-resolution image.",
+            is_recent=False,
+        )
+    except CorruptImageError:
+        logger.warning("Ticket image could not be opened — likely corrupt or unsupported format")
+        return TicketScanResponse(
+            success=False,
+            error_code="invalid_image",
+            error_message="We couldn't read your photo. Make sure it's a valid JPEG or PNG.",
+            is_recent=False,
+        )
     except ValueError as e:
-        logger.warning(f"Ticket OCR failed: {e}")
-        return TicketScanResponse(success=False, is_recent=False)
+        logger.warning(f"Ticket OCR validation failed: {e}")
+        return TicketScanResponse(
+            success=False,
+            error_code="ocr_failed",
+            error_message="We had trouble reading the ticket. Please make sure the photo is clear and well-lit.",
+            is_recent=False,
+        )
     except Exception as e:
         logger.error(f"Ticket OCR error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to process ticket image",
+        return TicketScanResponse(
+            success=False,
+            error_code="ocr_failed",
+            error_message="Something went wrong while processing your ticket. Please try again.",
+            is_recent=False,
         )
 
     # If VLM returned an error (e.g. not a ticket)
     if "error" in ticket_data:
-        return TicketScanResponse(success=True, is_recent=False)
+        error_type = ticket_data["error"]
+        if error_type == "not_a_ticket":
+            return TicketScanResponse(
+                success=False,
+                error_code="not_a_ticket",
+                error_message="This doesn't look like a UC Davis parking ticket. Please scan a valid TAPS parking notice.",
+                is_recent=False,
+            )
+        return TicketScanResponse(
+            success=False,
+            error_code="ocr_failed",
+            error_message="We couldn't extract ticket details. Please make sure the photo is clear and shows a UC Davis parking ticket.",
+            is_recent=False,
+        )
 
     ticket_date = ticket_data.get("date")
     ticket_time = ticket_data.get("time")
     ticket_location = ticket_data.get("location")
+
+    # If all fields are null, the ticket was unreadable
+    if not any([ticket_date, ticket_time, ticket_location]):
+        return TicketScanResponse(
+            success=False,
+            error_code="fields_unreadable",
+            error_message="We detected a ticket but couldn't read the details. Try retaking the photo in better lighting.",
+            is_recent=False,
+        )
 
     # If we don't have a location, can't map to a lot
     if not ticket_location:

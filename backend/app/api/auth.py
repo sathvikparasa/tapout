@@ -13,6 +13,15 @@ from sqlalchemy import select
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+
+def get_real_ip(request: Request) -> str:
+    """Return the real client IP, respecting X-Forwarded-For from GAE/proxies."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return get_remote_address(request)
+
+
 from app.database import get_db
 from app.schemas.device import (
     DeviceCreate,
@@ -36,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_real_ip)
 
 
 @router.post(

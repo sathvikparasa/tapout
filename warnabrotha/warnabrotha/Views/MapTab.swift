@@ -23,7 +23,7 @@ private let lotDisplayNames: [String: String] = [
     "HUTCH": "Hutchinson Parking Structure",
     "MU": "Memorial Union",
     "ARC": "Gym",
-    "TERCERO": "Tercero Parking Lot",
+    "TERCERO": "Lot 47",
 ]
 
 struct MapTab: View {
