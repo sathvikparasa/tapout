@@ -36,18 +36,14 @@ jobs:
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
         run: |
-          cat >> backend/app.yaml << EOF
-
-          vpc_access_connector:
-            name: $VPC_CONNECTOR
-
-          beta_settings:
-            cloud_sql_instances: $CLOUD_SQL_INSTANCES
-
-          EOF
-          printf '  REDIS_HOST: "%s"\n' "$REDIS_HOST" >> backend/app.yaml
-          printf '  REDIS_PORT: "%s"\n' "$REDIS_PORT" >> backend/app.yaml
-
+          sudo curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq -i '
+            .vpc_access_connector.name = strenv(VPC_CONNECTOR) |
+            .beta_settings.cloud_sql_instances = strenv(CLOUD_SQL_INSTANCES) |
+            .env_variables.REDIS_HOST = strenv(REDIS_HOST) |
+            .env_variables.REDIS_PORT = strenv(REDIS_PORT)
+          ' backend/app.yaml
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
