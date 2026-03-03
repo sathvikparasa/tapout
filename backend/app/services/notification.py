@@ -250,6 +250,60 @@ class NotificationService:
             logger.error(f"Error sending FCM notification: {e}")
             return False
 
+    @classmethod
+    async def _send_live_activity_update(
+        cls,
+        activity_push_token: str,
+        risk_level: str,
+        probability: float,
+        last_sighting_minutes_ago: Optional[int],
+        recent_sightings_count: int,
+        title: str,
+        body: str,
+    ) -> None:
+        """Send an APNs push-to-update for an iOS Live Activity."""
+        apns_client = cls._get_apns_client()
+        if apns_client is None:
+            logger.debug("APNs client not available, skipping live activity update")
+            return
+
+        message = {
+            "aps": {
+                "timestamp": int(datetime.now(timezone.utc).timestamp()),
+                "event": "update",
+                "content-state": {
+                    # Keys MUST match Swift ContentState property names exactly (camelCase).
+                    # A mismatch silently fails — the Live Activity will not update.
+                    "riskLevel": risk_level,
+                    "probability": probability,
+                    "lastSightingMinutesAgo": last_sighting_minutes_ago,  # None → null in JSON
+                    "recentSightingsCount": recent_sightings_count,
+                },
+                "alert": {
+                    "title": title,
+                    "body": body,
+                },
+                "sound": "default",
+                "interruption-level": "time-sensitive",
+                "relevance-score": 1.0,
+            }
+        }
+        request = NotificationRequest(
+            device_token=activity_push_token,
+            message=message,
+            push_type=PushType.LIVEACTIVITY,
+            priority=10,
+            # Live Activity topic MUST include the .push-type.liveactivity suffix.
+            # Using the normal bundle ID topic silently fails.
+            topic=f"{settings.apns_bundle_id}.push-type.liveactivity",
+        )
+        try:
+            response = await apns_client.send_notification(request)
+            if not response.is_successful:
+                logger.warning(f"Live activity push failed: {response.description}")
+        except Exception as e:
+            logger.error(f"Live activity push error: {e}")
+
     @staticmethod
     async def create_notification(
         db: AsyncSession,
@@ -347,6 +401,24 @@ class NotificationService:
 
         if push_tasks:
             await asyncio.gather(*push_tasks, return_exceptions=True)
+
+        # Also push-to-update any running Live Activities for parked users
+        live_activity_tasks = [
+            cls._send_live_activity_update(
+                activity_push_token=session.device.activity_push_token,
+                risk_level="HIGH",
+                probability=0.9,
+                last_sighting_minutes_ago=0,
+                recent_sightings_count=1,  # freshly reported sighting
+                title="⚠️ TAPS Alert!",
+                body=f"TAPS spotted at {parking_lot_name}!",
+            )
+            for session in active_sessions
+            if session.device.activity_push_token
+        ]
+
+        if live_activity_tasks:
+            await asyncio.gather(*live_activity_tasks, return_exceptions=True)
 
         return checked_in_count
 

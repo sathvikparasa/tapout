@@ -300,6 +300,11 @@ async def update_device(
     if updates.is_push_enabled is not None:
         device.is_push_enabled = updates.is_push_enabled
 
+    # Use model_fields_set to distinguish "absent" from "explicitly null" —
+    # both setting a new token and clearing it (null) are valid operations.
+    if "activity_push_token" in updates.model_fields_set:
+        device.activity_push_token = updates.activity_push_token
+
     await db.commit()
     await db.refresh(device)
 

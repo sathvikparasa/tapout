@@ -25,6 +25,7 @@ class DeviceUpdate(BaseModel):
     """Schema for updating device information."""
     push_token: Optional[str] = Field(None, max_length=255, description="APNs push notification token")
     is_push_enabled: Optional[bool] = Field(None, description="Enable/disable push notifications")
+    activity_push_token: Optional[str] = Field(None, max_length=255, description="iOS Live Activity push token")
 
 
 class DeviceResponse(BaseModel):

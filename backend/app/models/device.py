@@ -36,6 +36,7 @@ class Device(Base):
     email_verified = Column(Boolean, default=False, nullable=False)
     push_token = Column(String(255), nullable=True)
     is_push_enabled = Column(Boolean, default=False, nullable=False)
+    activity_push_token = Column(String(255), nullable=True)  # iOS Live Activity push token
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_seen_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
