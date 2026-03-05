@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -60,7 +60,13 @@ def _insert_fn(db: AsyncSession):
     response_model=TapsSightingWithNotifications,
     status_code=status.HTTP_201_CREATED,
     summary="Report TAPS sighting",
-    description="Report that TAPS has been spotted at a parking lot."
+    description="Report that TAPS has been spotted at a parking lot.",
+    responses={
+        200: {
+            "model": TapsSightingWithNotifications,
+            "description": "Report converted to an upvote — a sighting already exists at this lot within the last 10 minutes.",
+        }
+    },
 )
 async def report_sighting(
     sighting_data: TapsSightingCreate,
@@ -89,6 +95,14 @@ async def report_sighting(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parking lot {sighting_data.parking_lot_id} not found"
         )
+
+    # Acquire a per-lot advisory lock (PostgreSQL) so concurrent reports for the
+    # same lot are serialized through the rate-limit check.  SQLite (used in tests)
+    # doesn't support advisory locks, so we swallow the error gracefully.
+    try:
+        await db.execute(text("SELECT pg_advisory_xact_lock(:lot_id)"), {"lot_id": lot.id})
+    except Exception:
+        pass
 
     # Soft rate limit: if there's already a sighting at this lot within the last
     # RATE_LIMIT_MINUTES, upvote it instead of creating a new sighting.
