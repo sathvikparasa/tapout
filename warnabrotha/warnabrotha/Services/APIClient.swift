@@ -106,6 +106,21 @@ class APIClient {
         return try await patch(endpoint: "/auth/me", body: body)
     }
 
+    /// Sends the Live Activity push token to the backend (PATCH /auth/me).
+    /// Passing nil sends {"activity_push_token": null} to clear the stored token.
+    func updateActivityPushToken(_ token: String?) async throws {
+        let value: Any = token.map { $0 as Any } ?? NSNull()
+        let body: [String: Any] = ["activity_push_token": value]
+        let data = try JSONSerialization.data(withJSONObject: body)
+        var request = try buildRequest(endpoint: "/auth/me", method: "PATCH")
+        request.httpBody = data
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (_, response) = try await session.data(for: request)
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+            throw APIClientError.serverError(httpResponse.statusCode, "Failed to update activity push token")
+        }
+    }
+
     // MARK: - Parking Lots
 
     func getParkingLots() async throws -> [ParkingLot] {

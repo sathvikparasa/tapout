@@ -281,6 +281,16 @@ class AppViewModel: ObservableObject {
             await loadGlobalStats()
             await refreshAllLotStats()
 
+            // Recover Live Activity on app relaunch if user is still parked
+            if isParked, let session = currentSession, let prediction = prediction {
+                await LiveActivityService.shared.recoverIfNeeded(
+                    session: session,
+                    prediction: prediction,
+                    lastSightingMinutesAgo: currentLotLastSightingMinutesAgo,
+                    recentSightingsCount: currentLotRecentSightingsCount
+                )
+            }
+
         } catch let apiError as APIClientError {
             if case .noToken = apiError {
                 isAuthenticated = false
@@ -308,6 +318,14 @@ class AppViewModel: ObservableObject {
             // Load feed
             feed = try await api.getFeed(lotId: selectedLotId)
 
+            // Update Live Activity if currently parked (local update while app is open)
+            if isParked, let prediction = prediction {
+                await LiveActivityService.shared.update(
+                    prediction: prediction,
+                    lastSightingMinutesAgo: currentLotLastSightingMinutesAgo,
+                    recentSightingsCount: currentLotRecentSightingsCount
+                )
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -369,6 +387,15 @@ class AppViewModel: ObservableObject {
             confirmationMessage = "Checked in at \(currentSession?.parkingLotName ?? "parking lot")!"
             showConfirmation = true
             await loadLotData()
+            // Start Live Activity with fresh prediction data
+            if let session = currentSession, let prediction = prediction {
+                await LiveActivityService.shared.start(
+                    session: session,
+                    prediction: prediction,
+                    lastSightingMinutesAgo: currentLotLastSightingMinutesAgo,
+                    recentSightingsCount: currentLotRecentSightingsCount
+                )
+            }
         } catch {
             self.error = error.localizedDescription
             showError = true
@@ -390,6 +417,7 @@ class AppViewModel: ObservableObject {
             _ = try await api.checkOut()
             let lotName = currentSession?.parkingLotName ?? "parking lot"
             currentSession = nil
+            await LiveActivityService.shared.end()
             confirmationMessage = "Checked out from \(lotName)!"
             showConfirmation = true
             await loadLotData()
@@ -549,6 +577,15 @@ class AppViewModel: ObservableObject {
             showConfirmation = true
             await loadLotData()
             await refreshAllLotStats()
+            // Start Live Activity with fresh prediction data
+            if let session = currentSession, let prediction = prediction {
+                await LiveActivityService.shared.start(
+                    session: session,
+                    prediction: prediction,
+                    lastSightingMinutesAgo: currentLotLastSightingMinutesAgo,
+                    recentSightingsCount: currentLotRecentSightingsCount
+                )
+            }
         } catch {
             self.error = error.localizedDescription
             showError = true
@@ -636,6 +673,23 @@ class AppViewModel: ObservableObject {
             }
             self.isAnimatingProbability = false
         }
+    }
+
+    // MARK: - Live Activity Helpers
+
+    /// The most recent sighting at the currently parked lot (or selected lot), in minutes ago.
+    private var currentLotLastSightingMinutesAgo: Int? {
+        allFeedSightings
+            .filter { $0.parkingLotId == (currentSession?.parkingLotId ?? selectedLotId) }
+            .min(by: { $0.minutesAgo < $1.minutesAgo })?
+            .minutesAgo
+    }
+
+    /// Number of sightings in the 3-hour feed window for the currently parked lot.
+    private var currentLotRecentSightingsCount: Int {
+        allFeedSightings
+            .filter { $0.parkingLotId == (currentSession?.parkingLotId ?? selectedLotId) }
+            .count
     }
 
     // MARK: - Helpers

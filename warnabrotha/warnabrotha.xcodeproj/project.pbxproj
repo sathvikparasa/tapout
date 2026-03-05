@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -11,6 +11,9 @@
 		570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B82F3E9CB40050CF10 /* MapTab.swift */; };
 		57BBC6DD2F45316F00A10E3D /* ScanTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57BBC6DC2F45316F00A10E3D /* ScanTab.swift */; };
 		57F768B92F49635E002EE15F /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57F768B82F49635E002EE15F /* PreferencesView.swift */; };
+		98D451E02F563B0D00CD3991 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98D451DF2F563B0D00CD3991 /* WidgetKit.framework */; };
+		98D451E22F563B0D00CD3991 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98D451E12F563B0D00CD3991 /* SwiftUI.framework */; };
+		98D451EF2F563B0F00CD3991 /* TapOutWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 98D451DD2F563B0D00CD3991 /* TapOutWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		AA000001 /* warnabrothaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* warnabrothaApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* ContentView.swift */; };
 		AA000003 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003 /* APIModels.swift */; };
@@ -43,7 +46,28 @@
 			remoteGlobalIDString = 5733877C2F2010FB0053D6A8;
 			remoteInfo = warnabrotha;
 		};
+		98D451ED2F563B0F00CD3991 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 573387752F2010FB0053D6A8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 98D451DC2F563B0D00CD3991;
+			remoteInfo = TapOutWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		98D451F02F563B0F00CD3991 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				98D451EF2F563B0F00CD3991 /* TapOutWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		570EB4B52F3E737F0050CF10 /* warnabrotha.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = warnabrotha.entitlements; sourceTree = "<group>"; };
@@ -54,6 +78,9 @@
 		573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		57BBC6DC2F45316F00A10E3D /* ScanTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanTab.swift; sourceTree = "<group>"; };
 		57F768B82F49635E002EE15F /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		98D451DD2F563B0D00CD3991 /* TapOutWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TapOutWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		98D451DF2F563B0D00CD3991 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		98D451E12F563B0D00CD3991 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		AA100001 /* warnabrothaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaApp.swift; sourceTree = "<group>"; };
 		AA100002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA100003 /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModels.swift; sourceTree = "<group>"; };
@@ -71,6 +98,20 @@
 		AA100010 /* warnabrothaUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = warnabrothaUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		AA100011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		98D451F32F563B0F00CD3991 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 98D451DC2F563B0D00CD3991 /* TapOutWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		98D451E32F563B0D00CD3991 /* TapOutWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (98D451F32F563B0F00CD3991 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = TapOutWidget; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		5733877A2F2010FB0053D6A8 /* Frameworks */ = {
@@ -94,6 +135,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		98D451DA2F563B0D00CD3991 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				98D451E22F563B0D00CD3991 /* SwiftUI.framework in Frameworks */,
+				98D451E02F563B0D00CD3991 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -103,6 +153,8 @@
 				AA200001 /* warnabrotha */,
 				AA200005 /* warnabrothaTests */,
 				AA200006 /* warnabrothaUITests */,
+				98D451E32F563B0D00CD3991 /* TapOutWidget */,
+				98D451DE2F563B0D00CD3991 /* Frameworks */,
 				5733877E2F2010FB0053D6A8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -113,8 +165,18 @@
 				5733877D2F2010FB0053D6A8 /* warnabrotha.app */,
 				5733878D2F2010FE0053D6A8 /* warnabrothaTests.xctest */,
 				573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */,
+				98D451DD2F563B0D00CD3991 /* TapOutWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		98D451DE2F563B0D00CD3991 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				98D451DF2F563B0D00CD3991 /* WidgetKit.framework */,
+				98D451E12F563B0D00CD3991 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		AA200001 /* warnabrotha */ = {
@@ -217,10 +279,12 @@
 				573387792F2010FB0053D6A8 /* Sources */,
 				5733877A2F2010FB0053D6A8 /* Frameworks */,
 				5733877B2F2010FB0053D6A8 /* Resources */,
+				98D451F02F563B0F00CD3991 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				98D451EE2F563B0F00CD3991 /* PBXTargetDependency */,
 			);
 			name = warnabrotha;
 			packageProductDependencies = (
@@ -269,6 +333,28 @@
 			productReference = 573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		98D451DC2F563B0D00CD3991 /* TapOutWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 98D451F42F563B0F00CD3991 /* Build configuration list for PBXNativeTarget "TapOutWidgetExtension" */;
+			buildPhases = (
+				98D451D92F563B0D00CD3991 /* Sources */,
+				98D451DA2F563B0D00CD3991 /* Frameworks */,
+				98D451DB2F563B0D00CD3991 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				98D451E32F563B0D00CD3991 /* TapOutWidget */,
+			);
+			name = TapOutWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = TapOutWidgetExtension;
+			productReference = 98D451DD2F563B0D00CD3991 /* TapOutWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -276,7 +362,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1500;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					5733877C2F2010FB0053D6A8 = {
@@ -289,6 +375,9 @@
 					573387962F2010FE0053D6A8 = {
 						CreatedOnToolsVersion = 15.0;
 						TestTargetID = 5733877C2F2010FB0053D6A8;
+					};
+					98D451DC2F563B0D00CD3991 = {
+						CreatedOnToolsVersion = 26.3;
 					};
 				};
 			};
@@ -308,6 +397,7 @@
 				5733877C2F2010FB0053D6A8 /* warnabrotha */,
 				5733878C2F2010FE0053D6A8 /* warnabrothaTests */,
 				573387962F2010FE0053D6A8 /* warnabrothaUITests */,
+				98D451DC2F563B0D00CD3991 /* TapOutWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -330,6 +420,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		573387952F2010FE0053D6A8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		98D451DB2F563B0D00CD3991 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -377,6 +474,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		98D451D92F563B0D00CD3991 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -389,6 +493,11 @@
 			isa = PBXTargetDependency;
 			target = 5733877C2F2010FB0053D6A8 /* warnabrotha */;
 			targetProxy = 573387982F2010FE0053D6A8 /* PBXContainerItemProxy */;
+		};
+		98D451EE2F563B0F00CD3991 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 98D451DC2F563B0D00CD3991 /* TapOutWidgetExtension */;
+			targetProxy = 98D451ED2F563B0F00CD3991 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -654,6 +763,68 @@
 			};
 			name = Release;
 		};
+		98D451F12F563B0F00CD3991 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7GJQ6GCG5P;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TapOutWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TapOutWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.warnabrotha.tapout.TapOutWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		98D451F22F563B0F00CD3991 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7GJQ6GCG5P;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TapOutWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TapOutWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.warnabrotha.tapout.TapOutWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -689,6 +860,15 @@
 			buildConfigurations = (
 				573387A82F2010FE0053D6A8 /* Debug */,
 				573387A92F2010FE0053D6A8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		98D451F42F563B0F00CD3991 /* Build configuration list for PBXNativeTarget "TapOutWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				98D451F12F563B0F00CD3991 /* Debug */,
+				98D451F22F563B0F00CD3991 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
