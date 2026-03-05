@@ -56,6 +56,19 @@ async def _create_lot(db: AsyncSession, name: str, code: str) -> ParkingLot:
     return lot
 
 
+async def _direct_sighting(
+    db_session: AsyncSession,
+    lot: ParkingLot,
+    device: Device,
+) -> TapsSighting:
+    """Insert a sighting directly into the DB, bypassing API-level rate limiting."""
+    sighting = TapsSighting(parking_lot_id=lot.id, reported_by_device_id=device.id)
+    db_session.add(sighting)
+    await db_session.commit()
+    await db_session.refresh(sighting)
+    return sighting
+
+
 # ---------------------------------------------------------------------------
 # Checkin / Checkout → Lot Stats
 # ---------------------------------------------------------------------------
@@ -200,13 +213,16 @@ class TestSightingPredictionLotStats:
         devs = [await create_verified_device_with_headers(db_session) for _ in range(2)]
 
         with patch.object(NotificationService, "send_push_notification", new_callable=AsyncMock, return_value=True):
-            for _, hdrs in devs:
-                r = await client.post(
-                    f"{API}/sightings",
-                    json={"parking_lot_id": test_parking_lot.id},
-                    headers=hdrs,
-                )
-                assert r.status_code == 201
+            r = await client.post(
+                f"{API}/sightings",
+                json={"parking_lot_id": test_parking_lot.id},
+                headers=devs[0][1],
+            )
+            assert r.status_code == 201
+
+        # Second sighting inserted directly to bypass the 10-min rate limit
+        s_b = await _direct_sighting(db_session, test_parking_lot, devs[1][0])
+        sid_b = s_b.id
 
         r = await client.get(f"{API}/lots/{test_parking_lot.id}", headers=devs[0][1])
         assert r.json()["recent_sightings"] == 2
@@ -611,7 +627,9 @@ class TestVotingFeedDisplay:
         d1, h1 = await create_verified_device_with_headers(db_session)
         d2, h2 = await create_verified_device_with_headers(db_session)
         sid_a = await self._create_sighting_at(client, db_session, lot.id, h1)
-        sid_b = await self._create_sighting_at(client, db_session, lot.id, h2)
+        # Second sighting inserted directly to bypass the 10-min rate limit
+        s_b = await _direct_sighting(db_session, lot, d2)
+        sid_b = s_b.id
 
         await client.post(f"{API}/feed/sightings/{sid_a}/vote", json={"vote_type": "upvote"}, headers=h1)
         await client.post(f"{API}/feed/sightings/{sid_b}/vote", json={"vote_type": "downvote"}, headers=h1)
@@ -701,7 +719,8 @@ class TestSightingFeed:
         with patch.object(NotificationService, "send_push_notification", new_callable=AsyncMock, return_value=True):
             await client.post(f"{API}/sightings", json={"parking_lot_id": lot_a.id}, headers=devs[0][1])
             await client.post(f"{API}/sightings", json={"parking_lot_id": lot_b.id}, headers=devs[1][1])
-            await client.post(f"{API}/sightings", json={"parking_lot_id": lot_b.id}, headers=devs[2][1])
+        # Third sighting inserted directly to bypass the 10-min rate limit
+        await _direct_sighting(db_session, lot_b, devs[2][0])
 
         r = await client.get(f"{API}/feed", headers=devs[0][1])
         data = r.json()
@@ -848,7 +867,7 @@ class TestNotificationLifecycle:
         lot = await _create_lot(db_session, "NNew Lot", "NNW1")
         d_parker, h_parker = await create_verified_device_with_headers(db_session)
         _, h_r1 = await create_verified_device_with_headers(db_session)
-        _, h_r2 = await create_verified_device_with_headers(db_session)
+        d_r2, _ = await create_verified_device_with_headers(db_session)
 
         await client.post(f"{API}/sessions/checkin", json={"parking_lot_id": lot.id}, headers=h_parker)
 
@@ -857,8 +876,13 @@ class TestNotificationLifecycle:
 
         await client.post(f"{API}/notifications/read/all", headers=h_parker)
 
+        # Second sighting inserted directly (bypasses rate limit) + manually fire notifications
+        await _direct_sighting(db_session, lot, d_r2)
         with patch.object(NotificationService, "send_push_notification", new_callable=AsyncMock, return_value=True):
-            await client.post(f"{API}/sightings", json={"parking_lot_id": lot.id}, headers=h_r2)
+            await NotificationService.notify_parked_users(
+                db=db_session, parking_lot_id=lot.id,
+                parking_lot_name=lot.name, parking_lot_code=lot.code,
+            )
 
         r = await client.get(f"{API}/notifications/unread", headers=h_parker)
         assert r.json()["unread_count"] == 1
@@ -879,7 +903,7 @@ class TestPushTokenNotificationDelivery:
         dev, hdrs = await create_verified_device_with_headers(db_session)
         lot = await _create_lot(db_session, "Push Lot", "PSH1")
         _, h_r1 = await create_verified_device_with_headers(db_session)
-        _, h_r2 = await create_verified_device_with_headers(db_session)
+        d_r2, _ = await create_verified_device_with_headers(db_session)
 
         await client.post(f"{API}/sessions/checkin", json={"parking_lot_id": lot.id}, headers=hdrs)
 
@@ -893,9 +917,16 @@ class TestPushTokenNotificationDelivery:
             json={"push_token": "fake-fcm-token:abc123", "is_push_enabled": True},
             headers=hdrs,
         )
+        # Refresh dev so db_session sees the updated push token from the API PATCH
+        await db_session.refresh(dev)
 
+        # Second sighting inserted directly (bypasses rate limit) + manually fire notifications
+        await _direct_sighting(db_session, lot, d_r2)
         with patch.object(NotificationService, "send_push_notification", new_callable=AsyncMock, return_value=True) as mock_push:
-            await client.post(f"{API}/sightings", json={"parking_lot_id": lot.id}, headers=h_r2)
+            await NotificationService.notify_parked_users(
+                db=db_session, parking_lot_id=lot.id,
+                parking_lot_name=lot.name, parking_lot_code=lot.code,
+            )
             mock_push.assert_called()
 
     async def test_push_disabled_skips_push_but_creates_in_app(
