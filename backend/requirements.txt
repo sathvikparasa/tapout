@@ -53,5 +53,8 @@ redis[asyncio]>=5.0
 # Anthropic VLM for ticket OCR
 anthropic>=0.40.0
 
+# Email (OTP delivery)
+resend>=2.0.0
+
 # Image processing (compress before sending to Anthropic API)
 Pillow>=10.0.0
