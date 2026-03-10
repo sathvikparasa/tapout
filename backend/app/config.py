@@ -8,7 +8,7 @@ import os
 from pydantic_settings import BaseSettings
 from typing import Optional
 
-GCP_PROJECT = "tapout-485821"
+GCP_PROJECT = os.environ.get("GCP_PROJECT", "tapout-485821")
 SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "RESEND_API_KEY", "ANTHROPIC_API_KEY", "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_KEY_CONTENT", "APNS_BUNDLE_ID", "ADMIN_BYPASS_EMAIL", "ADMIN_BYPASS_OTP"]
 
 
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # Firebase Cloud Messaging (Android push notifications)
     firebase_credentials_json: Optional[str] = None  # JSON string or file path to service account key
 
-    # Anthropic API key for ticket OCR
+    # Anthropic API key for ticket OCR and chat moderation
     anthropic_api_key: str = ""
 
     # Redis cache (GCP MemoryStore)

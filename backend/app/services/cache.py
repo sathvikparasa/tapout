@@ -18,6 +18,7 @@ TTL_LOTS_LIST = 600       # 10 min  — lot list is nearly static
 TTL_LOT_STATS = 60        # 1 min   — active parkers + recent sightings
 TTL_VOTE_COUNTS = 30      # 30 sec  — invalidated on every vote
 TTL_PREDICTION = 300      # 5 min   — prediction per lot
+TTL_CHAT = 4              # 4 sec   — busted on new message or deletion
 
 
 def init_cache(host: str, port: int = 6379) -> None:
