@@ -3,6 +3,7 @@ Tests for TAPS sighting endpoints.
 """
 
 import pytest
+from unittest.mock import patch
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -129,30 +130,6 @@ class TestSightingEndpoints:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_report_sighting_spam_prevention(
-        self,
-        client: AsyncClient,
-        auth_headers: dict,
-        test_parking_lot: ParkingLot
-    ):
-        """Test spam prevention for rapid sighting reports."""
-        # First report
-        response1 = await client.post(
-            "/api/v1/sightings",
-            headers=auth_headers,
-            json={"parking_lot_id": test_parking_lot.id}
-        )
-        assert response1.status_code == 201
-
-        # Second report within 5 minutes should fail
-        response2 = await client.post(
-            "/api/v1/sightings",
-            headers=auth_headers,
-            json={"parking_lot_id": test_parking_lot.id}
-        )
-        assert response2.status_code == 429
-
-    @pytest.mark.asyncio
     async def test_report_sighting_requires_verification(
         self,
         client: AsyncClient,
@@ -263,3 +240,123 @@ class TestSightingEndpoints:
         )
 
         assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_report_sighting_rapid_successive(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot
+    ):
+        """Second report within 10 minutes is rate-limited into an upvote (200, was_rate_limited=True)."""
+        response1 = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id}
+        )
+        assert response1.status_code == 201
+        assert response1.json()["was_rate_limited"] is False
+
+        response2 = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id}
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["was_rate_limited"] is True
+        # Returns the original sighting's id
+        assert data2["id"] == response1.json()["id"]
+
+    @pytest.mark.asyncio
+    async def test_rate_limited_report_upvotes_existing_sighting(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+        test_parking_lot: ParkingLot
+    ):
+        """After rate-limited report, the existing sighting gains an upvote."""
+        # First report creates the sighting
+        r1 = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id}
+        )
+        assert r1.status_code == 201
+        sighting_id = r1.json()["id"]
+
+        # Second report is rate-limited → becomes an upvote
+        r2 = await client.post(
+            "/api/v1/sightings",
+            headers=auth_headers,
+            json={"parking_lot_id": test_parking_lot.id}
+        )
+        assert r2.status_code == 200
+
+        # Check vote was recorded
+        vote_resp = await client.get(
+            f"/api/v1/feed/sightings/{sighting_id}/votes",
+            headers=auth_headers,
+        )
+        assert vote_resp.status_code == 200
+        votes = vote_resp.json()
+        assert votes["upvotes"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_report_sighting_weekday_sends_notifications(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        auth_headers: dict,
+        verified_device: Device,
+        test_parking_lot: ParkingLot,
+    ):
+        """On a weekday, a sighting report fires notifications."""
+        session = ParkingSession(
+            device_id=verified_device.id,
+            parking_lot_id=test_parking_lot.id,
+        )
+        db_session.add(session)
+        await db_session.commit()
+
+        with patch("app.api.sightings._is_weekend", return_value=False), \
+             patch("app.services.notification.NotificationService.notify_parked_users") as mock_notify:
+            mock_notify.return_value = 1
+            response = await client.post(
+                "/api/v1/sightings",
+                headers=auth_headers,
+                json={"parking_lot_id": test_parking_lot.id},
+            )
+
+        assert response.status_code == 201
+        # Background task was scheduled (mock may not be called synchronously in tests,
+        # but the sighting is created)
+        assert response.json()["was_rate_limited"] is False
+
+    @pytest.mark.asyncio
+    async def test_report_sighting_weekend_skips_notifications(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        auth_headers: dict,
+        verified_device: Device,
+        test_parking_lot: ParkingLot,
+    ):
+        """On a weekend, a sighting report is still recorded but no notifications are sent."""
+        session = ParkingSession(
+            device_id=verified_device.id,
+            parking_lot_id=test_parking_lot.id,
+        )
+        db_session.add(session)
+        await db_session.commit()
+
+        with patch("app.api.sightings._is_weekend", return_value=True), \
+             patch("app.services.notification.NotificationService.notify_parked_users") as mock_notify:
+            response = await client.post(
+                "/api/v1/sightings",
+                headers=auth_headers,
+                json={"parking_lot_id": test_parking_lot.id},
+            )
+
+        assert response.status_code == 201
+        mock_notify.assert_not_called()

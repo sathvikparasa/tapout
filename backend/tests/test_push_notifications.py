@@ -79,7 +79,7 @@ class TestSendPushNotification:
             )
 
             assert result is True
-            mock_apns.assert_called_once_with(apns_token, "Title", "Body", None)
+            mock_apns.assert_called_once_with(apns_token, "Title", "Body", None, 1, False)
             mock_fcm.assert_not_called()
 
     @pytest.mark.asyncio

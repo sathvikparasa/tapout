@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 GCP_PROJECT = "tapout-485821"
-SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "SMTP_EMAIL", "SMTP_PASSWORD", "ANTHROPIC_API_KEY", "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_KEY_CONTENT", "APNS_BUNDLE_ID", "ADMIN_BYPASS_EMAIL", "ADMIN_BYPASS_OTP"]
+SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "RESEND_API_KEY", "ANTHROPIC_API_KEY", "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_KEY_CONTENT", "APNS_BUNDLE_ID", "ADMIN_BYPASS_EMAIL", "ADMIN_BYPASS_OTP"]
 
 
 def _load_secrets_from_gcp():
@@ -68,8 +68,7 @@ class Settings(BaseSettings):
     admin_bypass_otp: Optional[str] = None
 
     # SMTP settings for OTP emails
-    smtp_email: str = ""
-    smtp_password: str = ""
+    resend_api_key: str = ""
 
     # APNs (Apple Push Notification service) configuration
     apns_key_id: Optional[str] = None

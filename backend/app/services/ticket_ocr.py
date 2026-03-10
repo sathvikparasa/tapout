@@ -3,11 +3,13 @@ Ticket OCR service using Anthropic VLM to extract date/time/location from UC Dav
 """
 
 import base64
+import io
 import json
 import logging
 import re
 
 import anthropic
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +45,53 @@ TICKET_LOCATION_TO_LOT_CODE = {
 DATE_PATTERN = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
 TIME_PATTERN = re.compile(r"^\d{1,2}:\d{2}$")
 
+# Anthropic's base64 image size limit is 5 MB (5,242,880 bytes).
+# We target 3.5 MB pre-encoding so the ~33% base64 overhead stays safely under the limit.
+_MAX_IMAGE_BYTES = 3_500_000
+_MAX_DIMENSION = 2048  # px — plenty for OCR readability
+
+
+class ImageTooLargeError(Exception):
+    """Raised when an image cannot be compressed below the Anthropic API limit."""
+
+
+class CorruptImageError(Exception):
+    """Raised when Pillow cannot open the uploaded image."""
+
+
+def _compress_image(image_bytes: bytes, media_type: str) -> tuple[bytes, str]:
+    """
+    Resize and/or JPEG-compress an image so it stays under _MAX_IMAGE_BYTES.
+    Returns (compressed_bytes, effective_media_type).
+    """
+    if len(image_bytes) <= _MAX_IMAGE_BYTES:
+        return image_bytes, media_type
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+    except Exception as exc:
+        raise CorruptImageError("Could not open image file") from exc
+
+    # Downscale if either dimension exceeds _MAX_DIMENSION
+    if max(img.width, img.height) > _MAX_DIMENSION:
+        img.thumbnail((_MAX_DIMENSION, _MAX_DIMENSION), Image.LANCZOS)
+
+    # Re-encode as JPEG, reducing quality until small enough
+    for quality in (85, 70, 55, 40):
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="JPEG", quality=quality, optimize=True)
+        if buf.tell() <= _MAX_IMAGE_BYTES:
+            return buf.getvalue(), "image/jpeg"
+
+    # Last resort: shrink further
+    img.thumbnail((_MAX_DIMENSION // 2, _MAX_DIMENSION // 2), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="JPEG", quality=40, optimize=True)
+    if buf.tell() <= _MAX_IMAGE_BYTES:
+        return buf.getvalue(), "image/jpeg"
+
+    raise ImageTooLargeError("Image is too large to process even after compression")
+
 
 class TicketOCRService:
     """Extracts ticket data via Anthropic VLM and maps locations to parking lots."""
@@ -62,6 +111,7 @@ class TicketOCRService:
         Raises:
             ValueError: If VLM response is invalid or cannot be parsed
         """
+        image_bytes, media_type = _compress_image(image_bytes, media_type)
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
         client = anthropic.Anthropic(api_key=settings.anthropic_api_key)

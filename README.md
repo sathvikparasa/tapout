@@ -4,8 +4,6 @@ A parking enforcement tracking app for UC Davis students. Get real-time alerts w
 
 **Website**: [tapoutparking.info](https://tapoutparking.info)
 
-![TapOut App](screen.png)
-
 ## Overview
 
 TapOut helps UC Davis students avoid parking tickets by:
@@ -172,9 +170,8 @@ We'd love to hear from you! Whether you have bug reports, feature requests, or j
 
 ### Contact Us
 
-- **Email**: warnabrotha@ucdavis.edu
-- **Discord**: discord.gg/warnabrotha
-- **GitHub Issues**: [github.com/warnabrotha/app/issues](https://github.com/warnabrotha/app/issues)
+- **Email**: ucd.tapout@gmail.com
+- **GitHub Issues**: [github.com/tapout/app/issues](https://github.com/tapout/app/issues)
 
 ### Team
 

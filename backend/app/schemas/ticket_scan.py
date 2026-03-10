@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 class TicketScanResponse(BaseModel):
     success: bool
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
     ticket_date: Optional[str] = None
     ticket_time: Optional[str] = None
     ticket_location: Optional[str] = None

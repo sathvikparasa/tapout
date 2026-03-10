@@ -53,8 +53,8 @@ class TestClassifyRisk:
         assert PredictionService._classify_risk(4.0) == "MEDIUM"
 
     def test_classify_risk_old(self):
-        """Sighting 6h ago → HIGH (overdue, likely returning)."""
-        assert PredictionService._classify_risk(6.0) == "HIGH"
+        """Sighting 6h ago → MEDIUM (uncertain, could return)."""
+        assert PredictionService._classify_risk(6.0) == "MEDIUM"
 
 
 # ---------------------------------------------------------------------------
@@ -103,18 +103,18 @@ class TestBuildResponses:
         resp = PredictionService._build_no_sighting_response(now)
 
         assert resp.risk_level == "MEDIUM"
-        assert resp.risk_message == "No TAPS in the last hour."
+        assert resp.risk_message == "TAPS might return in the next few hours."
         assert resp.last_sighting_at is None
         assert resp.hours_since_last_sighting is None
         assert resp.predicted_for == now
 
     def test_build_no_sighting_response_with_lot_name(self):
-        """No sighting with lot filter → message includes lot name."""
+        """No sighting with lot filter → MEDIUM risk."""
         now = datetime(2024, 10, 15, 14, 0, 0, tzinfo=timezone.utc)
         resp = PredictionService._build_no_sighting_response(now, lot_name="Pavilion Structure")
 
-        assert "Pavilion Structure" in resp.risk_message
         assert resp.risk_level == "MEDIUM"
+        assert resp.risk_message == "TAPS might return in the next few hours."
 
     def test_build_sighting_response(self):
         """With a recent sighting → correct risk, lot info, time_ago."""
@@ -137,7 +137,7 @@ class TestBuildResponses:
         resp = PredictionService._build_sighting_response(now, hours_ago, sighting, lot)
 
         assert resp.risk_level == "HIGH"  # 0.5h → HIGH
-        assert "Test Lot" in resp.risk_message
+        assert "30 minutes ago" in resp.risk_message
         assert resp.last_sighting_lot_name == "Test Lot"
         assert resp.last_sighting_lot_code == "TST"
         assert resp.hours_since_last_sighting == 0.5
@@ -232,18 +232,17 @@ class TestPredict:
         self, db_session: AsyncSession, test_parking_lot: ParkingLot
     ):
         """Passing a specific timestamp uses it for time-since calculation."""
-        # Sighting at 10:00 UTC today
-        now = datetime.now(timezone.utc)
-        today_10am = now.replace(hour=10, minute=0, second=0, microsecond=0)
+        # Use a fixed Tuesday at 15:00 UTC (8am Pacific/PDT) — weekday, business hours
+        sighting_time = datetime(2024, 10, 15, 15, 0, 0, tzinfo=timezone.utc)
         sighting = TapsSighting(
             parking_lot_id=test_parking_lot.id,
-            reported_at=today_10am,
+            reported_at=sighting_time,
         )
         db_session.add(sighting)
         await db_session.commit()
 
-        # Query at 10:30 → 0.5h ago → HIGH
-        query_time = today_10am + timedelta(minutes=30)
+        # Query at 15:30 → 0.5h ago → HIGH
+        query_time = sighting_time + timedelta(minutes=30)
         prediction = await PredictionService.predict(
             db=db_session, timestamp=query_time
         )

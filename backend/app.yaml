@@ -1,0 +1,15 @@
+runtime: python312
+
+entrypoint: gunicorn -b :$PORT -k uvicorn.workers.UvicornWorker app.main:app
+
+instance_class: F1
+
+automatic_scaling:
+  max_instances: 5
+  min_instances: 1
+
+env_variables:
+  DEBUG: "false"
+  UCD_EMAIL_DOMAIN: "ucdavis.edu"
+  ACCESS_TOKEN_EXPIRE_HOURS: "87600"
+  PARKING_REMINDER_HOURS: "3"

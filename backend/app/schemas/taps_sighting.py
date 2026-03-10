@@ -52,6 +52,7 @@ class TapsSightingWithNotifications(TapsSightingResponse):
     Returned when a sighting is reported to show impact.
     """
     users_notified: int = Field(0, description="Number of users who were notified")
+    was_rate_limited: bool = Field(False, description="True if this report was converted to an upvote (duplicate within 10 min)")
 
     class Config:
         json_schema_extra = {
@@ -62,6 +63,7 @@ class TapsSightingWithNotifications(TapsSightingResponse):
                 "parking_lot_code": "HUTCH",
                 "reported_at": "2024-01-15T14:30:00Z",
                 "notes": "White TAPS truck on level 3",
-                "users_notified": 15
+                "users_notified": 15,
+                "was_rate_limited": False,
             }
         }

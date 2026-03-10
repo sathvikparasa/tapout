@@ -1,4 +1,4 @@
-# FastAPI and server
+# FastAPI, server
 fastapi==0.109.0
 uvicorn==0.27.0
 python-multipart==0.0.6
@@ -52,3 +52,9 @@ redis[asyncio]>=5.0
 
 # Anthropic VLM for ticket OCR
 anthropic>=0.40.0
+
+# Email (OTP delivery)
+resend>=2.0.0
+
+# Image processing (compress before sending to Anthropic API)
+Pillow>=10.0.0
