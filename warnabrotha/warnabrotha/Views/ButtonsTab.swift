@@ -35,7 +35,7 @@ struct ButtonsTab: View {
                         if viewModel.isParked && viewModel.currentSession?.parkingLotId == viewModel.selectedLotId {
                             // Viewing the lot we're parked at → CHECK OUT
                             DashboardActionButton(
-                                title: "CHECK OUT",
+                                title: "LEAVE \(viewModel.currentSession?.parkingLotCode ?? "LOT")",
                                 systemIcon: "arrow.right.circle",
                                 color: AppColors.textSecondary
                             ) {

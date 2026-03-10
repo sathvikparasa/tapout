@@ -31,7 +31,7 @@ struct ContentView: View {
                             case 1:
                                 ProbabilityTab(viewModel: viewModel)
                             case 2:
-                                ScanTab(viewModel: viewModel)
+                                ChatTab(viewModel: viewModel)
                             case 3:
                                 MapTab(viewModel: viewModel, hideTabBar: $hideTabBar)
                             default:
@@ -102,8 +102,8 @@ struct AppTabBar: View {
             }
 
             TabBarItem(
-                icon: "doc.viewfinder",
-                label: "Scan",
+                icon: "bubble.left.and.bubble.right",
+                label: "Chat",
                 isSelected: selectedTab == 2
             ) {
                 selectedTab = 2

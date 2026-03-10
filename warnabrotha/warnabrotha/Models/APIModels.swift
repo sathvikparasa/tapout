@@ -428,47 +428,6 @@ struct NotificationList: Codable {
     }
 }
 
-// MARK: - Ticket Scanning
-
-struct TicketHistoryEntry: Codable, Identifiable {
-    let id: UUID
-    let lotCode: String?
-    let lotName: String?
-    let ticketDate: String?
-    let ticketTime: String?
-    let ticketLocation: String?
-    let ticketAmount: String?
-    let scannedAt: Date
-    let sightingId: Int?
-    let isRecent: Bool
-}
-
-struct TicketScanResponse: Codable {
-    let success: Bool
-    let ticketDate: String?
-    let ticketTime: String?
-    let ticketLocation: String?
-    let mappedLotId: Int?
-    let mappedLotName: String?
-    let mappedLotCode: String?
-    let isRecent: Bool
-    let sightingId: Int?
-    let usersNotified: Int
-
-    enum CodingKeys: String, CodingKey {
-        case success
-        case ticketDate = "ticket_date"
-        case ticketTime = "ticket_time"
-        case ticketLocation = "ticket_location"
-        case mappedLotId = "mapped_lot_id"
-        case mappedLotName = "mapped_lot_name"
-        case mappedLotCode = "mapped_lot_code"
-        case isRecent = "is_recent"
-        case sightingId = "sighting_id"
-        case usersNotified = "users_notified"
-    }
-}
-
 // MARK: - Global Statistics
 
 struct GlobalStatsResponse: Codable {
@@ -487,4 +446,27 @@ struct GlobalStatsResponse: Codable {
 
 struct APIError: Codable {
     let detail: String
+}
+
+// MARK: - Global Chat
+
+struct ChatMessage: Codable, Identifiable {
+    let id: Int
+    let content: String
+    let sentAt: String
+    let minutesAgo: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id, content
+        case sentAt = "sent_at"
+        case minutesAgo = "minutes_ago"
+    }
+}
+
+struct ChatListResponse: Codable {
+    let messages: [ChatMessage]
+}
+
+struct SendChatMessageRequest: Codable {
+    let content: String
 }

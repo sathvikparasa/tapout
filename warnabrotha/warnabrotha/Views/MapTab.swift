@@ -404,14 +404,14 @@ private struct LotBottomSheet: View {
                 HStack(spacing: 12) {
                     if isCheckedInHere {
                         PrimaryButton(
-                            title: "CHECK OUT",
+                            title: "LEAVE \(lot.code)",
                             icon: "arrow.right.circle",
                             color: AppColors.textSecondary,
                             action: onCheckOut
                         )
                     } else {
                         PrimaryButton(
-                            title: "GET ALERTS",
+                            title: "GET \(lot.code) ALERTS",
                             icon: "bell.fill",
                             color: isCheckedInElsewhere ? AppColors.textMuted : AppColors.accent,
                             action: onCheckIn

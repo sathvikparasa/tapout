@@ -170,23 +170,20 @@ class APIClient {
         try await delete(endpoint: "/feed/sightings/\(sightingId)/vote")
     }
 
-    // MARK: - Ticket Scanning
+    // MARK: - Global Chat
 
-    func scanTicket(imageData: Data) async throws -> TicketScanResponse {
-        var request = try buildRequest(endpoint: "/ticket-scan", method: "POST")
+    func getChatMessages(afterId: Int? = nil) async throws -> [ChatMessage] {
+        var endpoint = "/chat/messages"
+        if let afterId = afterId {
+            endpoint += "?after_id=\(afterId)"
+        }
+        let response: ChatListResponse = try await get(endpoint: endpoint)
+        return response.messages
+    }
 
-        let boundary = UUID().uuidString
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"ticket.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-
-        request.httpBody = body
-        return try await execute(request)
+    func sendChatMessage(content: String) async throws -> ChatMessage {
+        let body = SendChatMessageRequest(content: content)
+        return try await post(endpoint: "/chat/messages", body: body)
     }
 
     // MARK: - Global Stats
