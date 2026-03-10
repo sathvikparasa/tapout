@@ -36,7 +36,11 @@ enum APIClientError: Error, LocalizedError {
 class APIClient {
     static let shared = APIClient()
 
+    #if DEV_ENDPOINT
+    private let baseURL = "https://tapout-dev-488419.wl.r.appspot.com/api/v1"
+    #else
     private let baseURL = "https://tapout-485821.wl.r.appspot.com/api/v1"
+    #endif
 
     private let session: URLSession
     private let keychain = KeychainService.shared
