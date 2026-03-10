@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete
 
 from app.config import settings
 from app.database import init_db, close_db, AsyncSessionLocal, engine
@@ -29,6 +29,8 @@ from app.api import (
 from app.services.reminder import run_reminder_job, ReminderService
 from apscheduler.triggers.cron import CronTrigger
 from app.models.parking_lot import ParkingLot
+from app.models.chat_message import ChatMessage
+from app.services.cache import cache_delete
 from app.database import Base
 from app.api.auth import limiter
 from app.services.cache import init_cache, close_cache
@@ -108,6 +110,15 @@ async def run_scheduled_reminder_job():
         await run_reminder_job(db)
 
 
+async def run_clear_chat_job():
+    """Delete all chat messages and bust the cache."""
+    async with AsyncSessionLocal() as db:
+        await db.execute(sa_delete(ChatMessage))
+        await db.commit()
+    await cache_delete("chat:messages")
+    logger.info("Chat messages cleared")
+
+
 async def run_auto_checkout_job():
     """Wrapper to run the nightly auto-checkout job with a database session."""
     async with AsyncSessionLocal() as db:
@@ -171,6 +182,12 @@ async def lifespan(app: FastAPI):
         run_auto_checkout_job,
         CronTrigger(hour=22, minute=0, timezone="America/Los_Angeles"),
         id="auto_checkout",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_clear_chat_job,
+        CronTrigger(hour=2, minute=0, timezone="America/Los_Angeles"),
+        id="clear_chat",
         replace_existing=True,
     )
     scheduler.start()

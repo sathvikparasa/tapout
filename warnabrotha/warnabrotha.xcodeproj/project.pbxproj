@@ -10,7 +10,6 @@
 		570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B62F3E74030050CF10 /* PushNotificationService.swift */; };
 		570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B82F3E9CB40050CF10 /* MapTab.swift */; };
 		572A31482F60A08C00E1B556 /* ChatTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572A31472F60A08C00E1B556 /* ChatTab.swift */; };
-		572A314E2F60C70000E1B556 /* ChatWebSocketService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572A314D2F60C70000E1B556 /* ChatWebSocketService.swift */; };
 		57F768B92F49635E002EE15F /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57F768B82F49635E002EE15F /* PreferencesView.swift */; };
 		AA000001 /* warnabrothaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* warnabrothaApp.swift */; };
 		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* ContentView.swift */; };
@@ -51,7 +50,6 @@
 		570EB4B62F3E74030050CF10 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
 		570EB4B82F3E9CB40050CF10 /* MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTab.swift; sourceTree = "<group>"; };
 		572A31472F60A08C00E1B556 /* ChatTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTab.swift; sourceTree = "<group>"; };
-		572A314D2F60C70000E1B556 /* ChatWebSocketService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWebSocketService.swift; sourceTree = "<group>"; };
 		5733877D2F2010FB0053D6A8 /* warnabrotha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = warnabrotha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5733878D2F2010FE0053D6A8 /* warnabrothaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -148,7 +146,6 @@
 		AA200003 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				572A314D2F60C70000E1B556 /* ChatWebSocketService.swift */,
 				570EB4B62F3E74030050CF10 /* PushNotificationService.swift */,
 				AA100004 /* APIClient.swift */,
 				AA100005 /* KeychainService.swift */,
@@ -346,7 +343,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				572A314E2F60C70000E1B556 /* ChatWebSocketService.swift in Sources */,
 				AA000001 /* warnabrothaApp.swift in Sources */,
 				570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */,
 				AA000002 /* ContentView.swift in Sources */,
