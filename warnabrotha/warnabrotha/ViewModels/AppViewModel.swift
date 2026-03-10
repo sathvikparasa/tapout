@@ -14,18 +14,6 @@ enum OTPStep {
     case codeInput
 }
 
-enum ScanState {
-    case idle
-    case preview
-    case processing
-    case success
-    case error
-}
-
-enum ScanSubTab {
-    case scanner
-    case records
-}
 
 @MainActor
 class AppViewModel: ObservableObject {
@@ -54,13 +42,13 @@ class AppViewModel: ObservableObject {
     @Published var allFeedSightings: [FeedSighting] = []
     @Published var allFeedsLoaded = false
 
-    // Scan state
-    @Published var scanState: ScanState = .idle
-    @Published var scanImageData: Data? = nil
-    @Published var scanResult: TicketScanResponse? = nil
-    @Published var scanError: String? = nil
-    @Published var scanSubTab: ScanSubTab = .scanner
-    @Published var ticketHistory: [TicketHistoryEntry] = []
+    // Chat state
+    @Published var chatMessages: [ChatMessage] = []
+    @Published var chatInputText: String = ""
+    @Published var chatIsLoading = false
+    @Published var chatIsSending = false
+    @Published var chatError: String? = nil
+    @Published var chatShowError = false
 
     // Map state
     @Published var lotStats: [Int: ParkingLotWithStats] = [:]
@@ -123,7 +111,6 @@ class AppViewModel: ObservableObject {
             }
         }
 
-        loadTicketHistory()
     }
 
     private func silentRefresh() async {
@@ -466,72 +453,6 @@ class AppViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Scan Actions
-
-    func loadTicketHistory() {
-        guard let data = UserDefaults.standard.data(forKey: "ticketHistory"),
-              let entries = try? JSONDecoder().decode([TicketHistoryEntry].self, from: data) else { return }
-        ticketHistory = entries
-    }
-
-    private func saveTicketToHistory(_ result: TicketScanResponse) {
-        let entry = TicketHistoryEntry(
-            id: UUID(),
-            lotCode: result.mappedLotCode,
-            lotName: result.mappedLotName,
-            ticketDate: result.ticketDate,
-            ticketTime: result.ticketTime,
-            ticketLocation: result.ticketLocation,
-            ticketAmount: nil,
-            scannedAt: Date(),
-            sightingId: result.sightingId,
-            isRecent: result.isRecent
-        )
-        ticketHistory.insert(entry, at: 0)
-        if ticketHistory.count > 50 { ticketHistory = Array(ticketHistory.prefix(50)) }
-        if let data = try? JSONEncoder().encode(ticketHistory) {
-            UserDefaults.standard.set(data, forKey: "ticketHistory")
-        }
-    }
-
-    func selectScanImage(_ data: Data) {
-        scanImageData = data
-        scanResult = nil
-        scanError = nil
-        scanState = .preview
-    }
-
-    func submitTicketScan() async {
-        guard let imageData = scanImageData else { return }
-        scanState = .processing
-
-        do {
-            let result = try await api.scanTicket(imageData: imageData)
-            if result.success {
-                scanResult = result
-                scanState = .success
-                saveTicketToHistory(result)
-                if result.sightingId != nil {
-                    await loadAllFeeds()
-                    await refreshAllLotStats()
-                }
-            } else {
-                scanError = "Could not extract ticket details."
-                scanState = .error
-            }
-        } catch {
-            scanError = error.localizedDescription
-            scanState = .error
-        }
-    }
-
-    func resetScan() {
-        scanState = .idle
-        scanImageData = nil
-        scanResult = nil
-        scanError = nil
-    }
-
     // MARK: - Map Actions
 
     func checkInAtLot(_ lotId: Int) async {
@@ -636,6 +557,55 @@ class AppViewModel: ObservableObject {
             }
             self.isAnimatingProbability = false
         }
+    }
+
+    // MARK: - Global Chat
+
+    func loadChatMessages() async {
+        chatIsLoading = true
+        do {
+            chatMessages = try await api.getChatMessages()
+        } catch {
+            print("Failed to load chat messages: \(error)")
+        }
+        chatIsLoading = false
+    }
+
+    func pollChatMessages() async {
+        let lastId = chatMessages.last?.id
+        do {
+            let newMessages = try await api.getChatMessages(afterId: lastId)
+            if !newMessages.isEmpty {
+                chatMessages.append(contentsOf: newMessages)
+            }
+        } catch {
+            // Silent — polling failure should not interrupt the user
+            print("Failed to poll chat messages: \(error)")
+        }
+    }
+
+    func sendChatMessage() async {
+        let content = chatInputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else { return }
+
+        chatIsSending = true
+        let savedInput = chatInputText
+        chatInputText = ""
+
+        do {
+            let message = try await api.sendChatMessage(content: content)
+            chatMessages.append(message)
+        } catch APIClientError.serverError(_, let message) {
+            chatInputText = savedInput
+            chatError = message
+            chatShowError = true
+        } catch {
+            chatInputText = savedInput
+            chatError = error.localizedDescription
+            chatShowError = true
+        }
+
+        chatIsSending = false
     }
 
     // MARK: - Helpers

@@ -64,12 +64,12 @@ class ReminderService:
 
         for session in sessions:
             try:
-                await NotificationService.send_checkout_reminder(
-                    db=db,
-                    session=session,
-                    device=session.device,
-                    parking_lot_name=session.parking_lot.name,
-                )
+                # await NotificationService.send_checkout_reminder(
+                #     db=db,
+                #     session=session,
+                #     device=session.device,
+                #     parking_lot_name=session.parking_lot.name,
+                # )
                 reminders_sent += 1
                 logger.info(
                     f"Sent checkout reminder for session {session.id} "

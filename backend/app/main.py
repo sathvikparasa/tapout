@@ -24,6 +24,7 @@ from app.api import (
     predictions_router,
     feed_router,
     ticket_scan_router,
+    chat_router,
 )
 from app.services.reminder import run_reminder_job, ReminderService
 from apscheduler.triggers.cron import CronTrigger
@@ -231,6 +232,7 @@ app.include_router(notifications_router, prefix=f"/api/{settings.api_version}")
 app.include_router(predictions_router, prefix=f"/api/{settings.api_version}")
 app.include_router(feed_router, prefix=f"/api/{settings.api_version}")
 app.include_router(ticket_scan_router, prefix=f"/api/{settings.api_version}")
+app.include_router(chat_router, prefix=f"/api/{settings.api_version}")
 
 
 @app.get("/", tags=["Health"])

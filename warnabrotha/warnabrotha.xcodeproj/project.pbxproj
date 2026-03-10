@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		570EB4B72F3E74030050CF10 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B62F3E74030050CF10 /* PushNotificationService.swift */; };
 		570EB4B92F3E9CB40050CF10 /* MapTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 570EB4B82F3E9CB40050CF10 /* MapTab.swift */; };
+		572A31482F60A08C00E1B556 /* ChatTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572A31472F60A08C00E1B556 /* ChatTab.swift */; };
 		57BBC6DD2F45316F00A10E3D /* ScanTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57BBC6DC2F45316F00A10E3D /* ScanTab.swift */; };
 		57F768B92F49635E002EE15F /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57F768B82F49635E002EE15F /* PreferencesView.swift */; };
 		AA000001 /* warnabrothaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* warnabrothaApp.swift */; };
@@ -49,6 +50,7 @@
 		570EB4B52F3E737F0050CF10 /* warnabrotha.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = warnabrotha.entitlements; sourceTree = "<group>"; };
 		570EB4B62F3E74030050CF10 /* PushNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationService.swift; sourceTree = "<group>"; };
 		570EB4B82F3E9CB40050CF10 /* MapTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTab.swift; sourceTree = "<group>"; };
+		572A31472F60A08C00E1B556 /* ChatTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTab.swift; sourceTree = "<group>"; };
 		5733877D2F2010FB0053D6A8 /* warnabrotha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = warnabrotha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5733878D2F2010FE0053D6A8 /* warnabrothaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		573387972F2010FE0053D6A8 /* warnabrothaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = warnabrothaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -189,6 +191,7 @@
 		AA200008 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				572A31472F60A08C00E1B556 /* ChatTab.swift */,
 				57F768B82F49635E002EE15F /* PreferencesView.swift */,
 				57BBC6DC2F45316F00A10E3D /* ScanTab.swift */,
 				570EB4B82F3E9CB40050CF10 /* MapTab.swift */,
@@ -356,6 +359,7 @@
 				AA000008 /* ButtonsTab.swift in Sources */,
 				AA000009 /* EmailVerificationView.swift in Sources */,
 				AA00000A /* FeedTab.swift in Sources */,
+				572A31482F60A08C00E1B556 /* ChatTab.swift in Sources */,
 				57F768B92F49635E002EE15F /* PreferencesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

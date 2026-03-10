@@ -10,6 +10,7 @@ from app.api.notifications import router as notifications_router
 from app.api.predictions import router as predictions_router
 from app.api.feed import router as feed_router
 from app.api.ticket_scan import router as ticket_scan_router
+from app.api.chat import router as chat_router
 
 __all__ = [
     "auth_router",
@@ -20,4 +21,5 @@ __all__ = [
     "predictions_router",
     "feed_router",
     "ticket_scan_router",
+    "chat_router",
 ]
