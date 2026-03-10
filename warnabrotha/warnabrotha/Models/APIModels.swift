@@ -455,11 +455,14 @@ struct ChatMessage: Codable, Identifiable {
     let content: String
     let sentAt: String
     let minutesAgo: Int
+    var isPending: Bool = false
+    var isOwn: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case id, content
         case sentAt = "sent_at"
         case minutesAgo = "minutes_ago"
+        // isPending and isOwn are local-only — not from server
     }
 }
 

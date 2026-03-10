@@ -80,6 +80,7 @@ class AppViewModel: ObservableObject {
 
     private let api = APIClient.shared
     private let keychain = KeychainService.shared
+    private var ownMessageIds: Set<Int> = []
 
     private var resendTimer: Timer?
 
@@ -123,6 +124,7 @@ class AppViewModel: ObservableObject {
                 await loadInitialData()
                 await requestNotificationPermission()
             } else {
+                isEmailVerified = false
                 showEmailVerification = true
             }
         } catch {
@@ -564,24 +566,12 @@ class AppViewModel: ObservableObject {
     func loadChatMessages() async {
         chatIsLoading = true
         do {
-            chatMessages = try await api.getChatMessages()
+            let response = try await api.getChatMessages()
+            chatMessages = response.messages
         } catch {
             print("Failed to load chat messages: \(error)")
         }
         chatIsLoading = false
-    }
-
-    func pollChatMessages() async {
-        let lastId = chatMessages.last?.id
-        do {
-            let newMessages = try await api.getChatMessages(afterId: lastId)
-            if !newMessages.isEmpty {
-                chatMessages.append(contentsOf: newMessages)
-            }
-        } catch {
-            // Silent — polling failure should not interrupt the user
-            print("Failed to poll chat messages: \(error)")
-        }
     }
 
     func sendChatMessage() async {
@@ -592,14 +582,34 @@ class AppViewModel: ObservableObject {
         let savedInput = chatInputText
         chatInputText = ""
 
+        // Optimistic: show the message immediately while the POST is in flight
+        let tempId = -(chatMessages.count + 1)
+        let pending = ChatMessage(
+            id: tempId,
+            content: content,
+            sentAt: ISO8601DateFormatter().string(from: Date()),
+            minutesAgo: 0,
+            isPending: true,
+            isOwn: true
+        )
+        chatMessages.append(pending)
+
         do {
             let message = try await api.sendChatMessage(content: content)
-            chatMessages.append(message)
-        } catch APIClientError.serverError(_, let message) {
+            ownMessageIds.insert(message.id)
+            chatMessages.removeAll { $0.id == tempId }
+            if !chatMessages.contains(where: { $0.id == message.id }) {
+                var msg = message
+                msg.isOwn = true
+                chatMessages.append(msg)
+            }
+        } catch APIClientError.serverError(_, let msg) {
+            chatMessages.removeAll { $0.id == tempId }
             chatInputText = savedInput
-            chatError = message
+            chatError = msg
             chatShowError = true
         } catch {
+            chatMessages.removeAll { $0.id == tempId }
             chatInputText = savedInput
             chatError = error.localizedDescription
             chatShowError = true

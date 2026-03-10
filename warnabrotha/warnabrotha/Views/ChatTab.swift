@@ -67,9 +67,9 @@ struct ChatTab: View {
         .task {
             await viewModel.loadChatMessages()
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
                 if !Task.isCancelled {
-                    await viewModel.pollChatMessages()
+                    await viewModel.loadChatMessages()
                 }
             }
         }
@@ -97,20 +97,35 @@ private struct ChatMessageRow: View {
     let message: ChatMessage
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .bottom, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(message.content)
-                    .appFont(size: 14)
+                    .appFont(size: 15)
                     .foregroundColor(AppColors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color(hex: "E9E9EB"))
+                    )
+                    .opacity(message.isPending ? 0.55 : 1.0)
 
-                Text(relativeTime)
-                    .appFont(size: 11)
-                    .foregroundColor(AppColors.textMuted)
+                HStack(spacing: 4) {
+                    if message.isPending {
+                        ProgressView()
+                            .scaleEffect(0.45)
+                            .frame(width: 10, height: 10)
+                            .tint(AppColors.textMuted)
+                    }
+                    Text(relativeTime)
+                        .appFont(size: 11)
+                        .foregroundColor(AppColors.textMuted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .cardStyle(padding: 12, cornerRadius: 12)
+
+            Spacer(minLength: 64)
         }
     }
 
