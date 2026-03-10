@@ -176,13 +176,8 @@ class APIClient {
 
     // MARK: - Global Chat
 
-    func getChatMessages(afterId: Int? = nil) async throws -> [ChatMessage] {
-        var endpoint = "/chat/messages"
-        if let afterId = afterId {
-            endpoint += "?after_id=\(afterId)"
-        }
-        let response: ChatListResponse = try await get(endpoint: endpoint)
-        return response.messages
+    func getChatMessages() async throws -> ChatListResponse {
+        return try await get(endpoint: "/chat/messages")
     }
 
     func sendChatMessage(content: String) async throws -> ChatMessage {
