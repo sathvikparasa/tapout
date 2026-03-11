@@ -179,7 +179,7 @@ async def get_messages(
         "a `message_removed` WebSocket event is broadcast to all clients."
     ),
 )
-@limiter.limit("10/minute")
+@limiter.limit("30/minute")
 async def send_message(
     request: Request,
     body: ChatMessageCreate,

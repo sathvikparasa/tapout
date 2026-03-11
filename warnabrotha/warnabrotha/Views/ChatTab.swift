@@ -22,10 +22,15 @@ struct ChatTab: View {
                     .foregroundColor(AppColors.accent))
                     .appFont(size: 11, weight: .bold)
 
-                Text("Global Chat")
+                Text("Chat")
                     .appFont(size: 30, weight: .heavy)
                     .foregroundColor(AppColors.textPrimary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
             ZStack {
                 AppColors.background.ignoresSafeArea()
 
@@ -219,7 +224,7 @@ private struct ChatInputBar: View {
                             .tint(AppColors.accent)
                     } else {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 32))
+                            .font(.system(size: 24))
                             .foregroundColor(inputIsEmpty ? AppColors.textMuted : AppColors.accent)
                     }
                 }

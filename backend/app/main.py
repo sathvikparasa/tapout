@@ -34,7 +34,7 @@ from app.services.cache import cache_delete
 from app.database import Base
 from app.api.auth import limiter
 from app.services.cache import init_cache, close_cache
-from slowapi import _rate_limit_exceeded_handler
+from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 # Configure logging
@@ -74,7 +74,7 @@ async def seed_initial_data():
                 "longitude": -121.7574,
             },
             {
-                "name": "Tercero Parking Lot",
+                "name": "Lot 47",
                 "code": "TERCERO",
                 "latitude": 38.534834,
                 "longitude": -121.756463,
@@ -228,8 +228,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _rate_limit_handler(request, exc):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please slow down."},
+    )
+
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 # Add CORS middleware for iOS app
 app.add_middleware(
