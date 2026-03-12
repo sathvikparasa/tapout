@@ -9,7 +9,6 @@ The prediction service uses time-since-last-sighting to classify risk:
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.parking_lot import ParkingLot
@@ -260,45 +259,45 @@ class TestPredictionEndpoints:
 
     @pytest.mark.asyncio
     async def test_get_global_prediction(
-        self, client: AsyncClient, auth_headers: dict
+        self, client, auth_headers: dict
     ):
         """GET /api/v1/predictions → 200, has risk_level."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/predictions",
             headers=auth_headers,
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["risk_level"] in ("LOW", "MEDIUM", "HIGH")
         assert "risk_message" in data
 
     @pytest.mark.asyncio
     async def test_get_lot_prediction(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot,
     ):
         """GET /api/v1/predictions/{lot_id} → 200, has risk_level."""
-        response = await client.get(
+        response = client.get(
             f"/api/v1/predictions/{test_parking_lot.id}",
             headers=auth_headers,
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["risk_level"] in ("LOW", "MEDIUM", "HIGH")
 
     @pytest.mark.asyncio
     async def test_post_prediction_specific_time(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot,
     ):
         """POST /api/v1/predictions with timestamp → 200."""
-        response = await client.post(
+        response = client.post(
             "/api/v1/predictions",
             headers=auth_headers,
             json={
@@ -308,6 +307,6 @@ class TestPredictionEndpoints:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["risk_level"] in ("LOW", "MEDIUM", "HIGH")
         assert "predicted_for" in data

@@ -3,7 +3,6 @@ Tests for notification endpoints and services.
 """
 
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.parking_lot import ParkingLot
@@ -193,7 +192,7 @@ class TestNotificationEndpoints:
     @pytest.mark.asyncio
     async def test_get_notifications(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device
@@ -209,13 +208,13 @@ class TestNotificationEndpoints:
                 message=f"Message {i}",
             )
 
-        response = await client.get(
+        response = client.get(
             "/api/v1/notifications",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total"] == 3
         assert data["unread_count"] == 3
         assert len(data["notifications"]) == 3
@@ -223,7 +222,7 @@ class TestNotificationEndpoints:
     @pytest.mark.asyncio
     async def test_get_unread_notifications(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device
@@ -238,19 +237,19 @@ class TestNotificationEndpoints:
             message="Message",
         )
 
-        response = await client.get(
+        response = client.get(
             "/api/v1/notifications/unread",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["unread_count"] == 1
 
     @pytest.mark.asyncio
     async def test_mark_notifications_read(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device
@@ -265,21 +264,21 @@ class TestNotificationEndpoints:
             message="Message",
         )
 
-        response = await client.post(
+        response = client.post(
             "/api/v1/notifications/read",
             headers=auth_headers,
             json={"notification_ids": [notification.id]}
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["success"] is True
         assert data["marked_count"] == 1
 
     @pytest.mark.asyncio
     async def test_mark_all_notifications_read(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device
@@ -295,20 +294,20 @@ class TestNotificationEndpoints:
                 message=f"Message {i}",
             )
 
-        response = await client.post(
+        response = client.post(
             "/api/v1/notifications/read/all",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["success"] is True
         assert data["marked_count"] == 3
 
     @pytest.mark.asyncio
     async def test_cannot_read_other_devices_notifications(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_device: Device
@@ -324,12 +323,12 @@ class TestNotificationEndpoints:
         )
 
         # Try to mark it read (should not affect it)
-        response = await client.post(
+        response = client.post(
             "/api/v1/notifications/read",
             headers=auth_headers,  # Auth for verified_device
             json={"notification_ids": [notification.id]}
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["marked_count"] == 0  # None marked

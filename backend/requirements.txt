@@ -1,7 +1,7 @@
-# FastAPI, server
-fastapi==0.109.0
-uvicorn==0.27.0
-python-multipart==0.0.6
+# Flask, server
+flask[async]>=3.0.3
+flask-limiter>=3.5.0
+flask-cors>=4.0.0
 gunicorn>=22.0.0
 
 # Database (Cloud SQL PostgreSQL)
@@ -41,11 +41,9 @@ pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.1.0
 freezegun==1.4.0
+aiosqlite==0.19.0
 # Utilities
 python-dotenv==1.0.0
-
-# Rate limiting
-slowapi==0.1.9
 
 # Redis cache
 redis[asyncio]>=5.0
