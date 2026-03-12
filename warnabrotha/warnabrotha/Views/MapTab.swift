@@ -309,6 +309,9 @@ struct MapTab: View {
                 hideTabBar = focused
             }
         }
+        .task {
+            await viewModel.refreshAllLotStats()
+        }
     }
 
     private func coordinateFor(_ lot: ParkingLot) -> CLLocationCoordinate2D {

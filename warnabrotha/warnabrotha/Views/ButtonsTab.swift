@@ -7,6 +7,15 @@
 
 import SwiftUI
 
+// Captures the lot-selector button's frame so the dropdown can be
+// rendered at the ZStack level (proper z-ordering + dismiss backdrop).
+private struct LotButtonAnchor: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = value ?? nextValue()
+    }
+}
+
 struct ButtonsTab: View {
     @ObservedObject var viewModel: AppViewModel
     @Binding var selectedTab: Int
@@ -82,13 +91,21 @@ struct ButtonsTab: View {
                     riskIndicatorsSection
                         .padding(.horizontal, 20)
 
-                    Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
-                        .appFont(size: 10)
+                    (Text("Disclaimer: We cannot report all TAPS agents and do not guarantee 100% accuracy. Please be diligent in your parking practices.")
                         .foregroundColor(AppColors.textMuted)
+                    + Text("\nFeedback Form")
+                        .underline()
+                        .foregroundColor(AppColors.accent))
+                        .appFont(size: 10)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 32)
+                        .onTapGesture {
+                            if let url = URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSeuItGWSxsGhuI4BPS2YreewQg8BUZjCl_2hAw80o3E9h-2Sw/viewform") {
+                                UIApplication.shared.open(url)
+                            }
+                        }
 
                     Spacer(minLength: 0)
                 }
@@ -98,13 +115,29 @@ struct ButtonsTab: View {
             // Top bar
             topBar
         }
-        .simultaneousGesture(TapGesture().onEnded {
-            if showLotDropdown {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showLotDropdown = false
+        .overlayPreferenceValue(LotButtonAnchor.self) { anchor in
+            if showLotDropdown, let anchor {
+                GeometryReader { geo in
+                    let frame = geo[anchor]
+                    ZStack(alignment: .topLeading) {
+                        // Fullscreen dismiss backdrop — sits behind the dropdown
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showLotDropdown = false
+                                }
+                            }
+                        // Dropdown pinned directly below the button
+                        lotDropdownMenu
+                            .frame(width: frame.width)
+                            .offset(x: frame.minX, y: frame.maxY)
+                    }
                 }
+                .ignoresSafeArea()
             }
-        })
+        }
         .overlay {
             if showPreferences {
                 ZStack {
@@ -260,15 +293,7 @@ struct ButtonsTab: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
-            .overlay(alignment: .top) {
-                GeometryReader { geo in
-                    if showLotDropdown {
-                        lotDropdownMenu
-                            .offset(y: geo.size.height)
-                    }
-                }
-                .allowsHitTesting(showLotDropdown)
-            }
+            .anchorPreference(key: LotButtonAnchor.self, value: .bounds) { $0 }
             .zIndex(1)
         }
         .padding(.top, 56) // space for top bar

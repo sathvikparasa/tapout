@@ -23,29 +23,30 @@ struct ContentView: View {
                 } else if viewModel.showEmailVerification && !viewModel.isEmailVerified {
                     EmailVerificationView(viewModel: viewModel)
                 } else {
-                    VStack(spacing: 0) {
-                        Group {
-                            switch selectedTab {
-                            case 0:
-                                ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
-                            case 1:
-                                ProbabilityTab(viewModel: viewModel)
-                            case 2:
-                                ChatTab(viewModel: viewModel)
-                            case 3:
-                                MapTab(viewModel: viewModel, hideTabBar: $hideTabBar)
-                            default:
-                                ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
-                            }
+                    Group {
+                        switch selectedTab {
+                        case 0:
+                            ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
+                        case 1:
+                            ProbabilityTab(viewModel: viewModel)
+                        case 2:
+                            ChatTab(viewModel: viewModel)
+                        case 3:
+                            MapTab(viewModel: viewModel, hideTabBar: $hideTabBar)
+                        default:
+                            ButtonsTab(viewModel: viewModel, selectedTab: $selectedTab)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
                         AppTabBar(
                             selectedTab: $selectedTab,
                             feedBadgeCount: viewModel.unreadNotificationCount
                         )
                         .opacity(hideTabBar ? 0 : 1)
                         .allowsHitTesting(!hideTabBar)
+                        // Stay fixed at bottom — keyboard slides over it
+                        .ignoresSafeArea(.keyboard)
                     }
                     .onChange(of: selectedTab) { _, tab in
                         if tab == 1 {
@@ -63,6 +64,9 @@ struct ContentView: View {
                 }
             }
         }
+        // Disable system-level keyboard avoidance — the whole hierarchy (including
+        // the tab bar) would otherwise shift up. ChatTab handles its own offset.
+        .ignoresSafeArea(.keyboard)
         .alert("Enable Time-Sensitive Notifications", isPresented: $viewModel.showTimeSensitivePrompt) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
