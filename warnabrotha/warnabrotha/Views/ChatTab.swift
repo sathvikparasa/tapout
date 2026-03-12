@@ -11,6 +11,9 @@ import SwiftUI
 
 struct ChatTab: View {
     @ObservedObject var viewModel: AppViewModel
+    @FocusState private var isInputFocused: Bool
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var safeAreaBottom: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,9 +33,11 @@ struct ChatTab: View {
             .padding(.horizontal, 24)
             .padding(.top, 12)
             .padding(.bottom, 8)
+            .onTapGesture { isInputFocused = false }
 
             ZStack {
                 AppColors.background.ignoresSafeArea()
+                    .onTapGesture { isInputFocused = false }
 
                 if viewModel.chatIsLoading && viewModel.chatMessages.isEmpty {
                     VStack {
@@ -56,6 +61,8 @@ struct ChatTab: View {
                             .padding(.top, 12)
                             .padding(.bottom, 8)
                         }
+                        .scrollDismissesKeyboard(.immediately)
+                        .simultaneousGesture(TapGesture().onEnded { isInputFocused = false })
                         .onAppear {
                             scrollToBottom(proxy: proxy, animated: false)
                         }
@@ -67,7 +74,27 @@ struct ChatTab: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            ChatInputBar(viewModel: viewModel)
+            ChatInputBar(viewModel: viewModel, isFocused: $isInputFocused)
+        }
+        // Offset only the chat content for keyboard — root view has ignoresSafeArea(.keyboard)
+        // so nothing moves automatically. safeAreaBottom accounts for tab bar + home indicator.
+        .padding(.bottom, max(0, keyboardHeight - safeAreaBottom))
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { safeAreaBottom = geo.safeAreaInsets.bottom }
+                    .onChange(of: geo.safeAreaInsets.bottom) { _, v in safeAreaBottom = v }
+            }
+        )
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIResponder.keyboardWillChangeFrameNotification)
+        ) { notification in
+            guard
+                let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
+            else { return }
+            let height = max(0, UIScreen.main.bounds.height - frame.minY)
+            withAnimation(.easeOut(duration: duration)) { keyboardHeight = height }
         }
         .task {
             await viewModel.loadChatMessages()
@@ -176,7 +203,7 @@ private struct ChatEmptyStateView: View {
 
 private struct ChatInputBar: View {
     @ObservedObject var viewModel: AppViewModel
-    @FocusState private var isInputFocused: Bool
+    var isFocused: FocusState<Bool>.Binding
 
     private let maxLength = 280
 
@@ -192,11 +219,16 @@ private struct ChatInputBar: View {
 
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .trailing, spacing: 4) {
-                    TextField("Say something...", text: $viewModel.chatInputText, axis: .vertical)
+                    TextField(
+                        "",
+                        text: $viewModel.chatInputText,
+                        prompt: Text("Say something...").foregroundColor(AppColors.textSecondary),
+                        axis: .vertical
+                    )
                         .appFont(size: 14)
                         .foregroundColor(AppColors.textPrimary)
                         .lineLimit(1...4)
-                        .focused($isInputFocused)
+                        .focused(isFocused)
                         .onChange(of: viewModel.chatInputText) { _, newValue in
                             if newValue.count > maxLength {
                                 viewModel.chatInputText = String(newValue.prefix(maxLength))
@@ -215,7 +247,6 @@ private struct ChatInputBar: View {
                 }
 
                 Button {
-                    isInputFocused = false
                     Task { await viewModel.sendChatMessage() }
                 } label: {
                     if viewModel.chatIsSending {
@@ -233,6 +264,8 @@ private struct ChatInputBar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { isFocused.wrappedValue = true }
         .background(
             AppColors.frosted
                 .ignoresSafeArea(edges: .bottom)

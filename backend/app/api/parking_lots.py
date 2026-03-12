@@ -4,8 +4,11 @@ Parking lots API endpoints.
 Handles parking lot listing and information retrieval.
 """
 
+import math
+import random
 from typing import List
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +23,42 @@ from app.services.prediction import PredictionService
 from app.services.auth import get_current_device
 from app.models.device import Device
 from app.services.cache import cache_get, cache_set, TTL_LOTS_LIST, TTL_LOT_STATS
+
+
+_PT = ZoneInfo("America/Los_Angeles")
+
+
+def _ghost_parker_count(lot_id: int) -> int:
+    """
+    Return the synthetic baseline parker count for a lot at the current moment.
+
+    Each lot gets a stable draw from Normal(mean=15, variance=4) seeded by its
+    lot ID (so the number never changes between restarts).  The baseline is only
+    active on weekdays (Mon–Fri) between 06:58 and 22:03 Pacific time; outside
+    those windows it returns 0.
+    """
+    now = datetime.now(_PT)
+
+    # Weekends: never active
+    if now.weekday() >= 5:  # 5=Saturday, 6=Sunday
+        return 0
+
+    start    = now.replace(hour=6,  minute=58, second=0, microsecond=0)
+    half_out = now.replace(hour=17, minute=17, second=0, microsecond=0)
+    end      = now.replace(hour=22, minute=3,  second=0, microsecond=0)
+
+    if not (start <= now <= end):
+        return 0
+
+    # Stable per-lot value: seed the RNG with the lot ID so it never drifts
+    rng = random.Random(lot_id)
+    value = rng.gauss(mu=10, sigma=3)
+    full_count = max(0, math.floor(value))
+
+    # After 5:17 PM, half the ghost users have left
+    if now >= half_out:
+        return full_count // 2
+    return full_count
 
 router = APIRouter(prefix="/lots", tags=["Parking Lots"])
 
@@ -88,7 +127,7 @@ async def get_parking_lot(
             ParkingSession.checked_out_at.is_(None),
         )
     )
-    active_parkers = parkers_result.scalar() or 0
+    active_parkers = (parkers_result.scalar() or 0) + _ghost_parker_count(lot_id)
 
     # Count recent sightings (last hour)
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
