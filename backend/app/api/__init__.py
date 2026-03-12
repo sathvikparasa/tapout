@@ -1,25 +1,25 @@
 """
-API route modules.
+API Blueprint modules.
 """
 
-from app.api.auth import router as auth_router
-from app.api.parking_lots import router as parking_lots_router
-from app.api.parking_sessions import router as parking_sessions_router
-from app.api.sightings import router as sightings_router
-from app.api.notifications import router as notifications_router
-from app.api.predictions import router as predictions_router
-from app.api.feed import router as feed_router
-from app.api.ticket_scan import router as ticket_scan_router
-from app.api.chat import router as chat_router
+from app.api.auth import bp as auth_bp
+from app.api.parking_lots import bp as parking_lots_bp
+from app.api.parking_sessions import bp as parking_sessions_bp
+from app.api.sightings import bp as sightings_bp
+from app.api.notifications import bp as notifications_bp
+from app.api.predictions import bp as predictions_bp
+from app.api.feed import bp as feed_bp
+from app.api.ticket_scan import bp as ticket_scan_bp
+from app.api.chat import bp as chat_bp
 
 __all__ = [
-    "auth_router",
-    "parking_lots_router",
-    "parking_sessions_router",
-    "sightings_router",
-    "notifications_router",
-    "predictions_router",
-    "feed_router",
-    "ticket_scan_router",
-    "chat_router",
+    "auth_bp",
+    "parking_lots_bp",
+    "parking_sessions_bp",
+    "sightings_bp",
+    "notifications_bp",
+    "predictions_bp",
+    "feed_bp",
+    "ticket_scan_bp",
+    "chat_bp",
 ]

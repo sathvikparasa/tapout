@@ -8,7 +8,6 @@ import asyncio
 from unittest.mock import patch, AsyncMock
 
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.device import Device
@@ -53,27 +52,27 @@ async def _create_lot(db: AsyncSession, name: str, code: str) -> ParkingLot:
 @pytest.mark.asyncio
 class TestResponseTimes:
 
-    async def test_health_check_fast(self, client: AsyncClient):
+    async def test_health_check_fast(self, client):
         start = time.perf_counter()
-        r = await client.get("/health")
+        r = client.get("/health")
         elapsed_ms = (time.perf_counter() - start) * 1000
         assert r.status_code == 200
         assert elapsed_ms < 200
 
     async def test_list_lots_fast(
-        self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict,
+        self, client, db_session: AsyncSession, auth_headers: dict,
     ):
         start = time.perf_counter()
-        r = await client.get(f"{API}/lots", headers=auth_headers)
+        r = client.get(f"{API}/lots", headers=auth_headers)
         elapsed_ms = (time.perf_counter() - start) * 1000
         assert r.status_code == 200
         assert elapsed_ms < 500
 
     async def test_prediction_fast(
-        self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict,
+        self, client, db_session: AsyncSession, auth_headers: dict,
     ):
         start = time.perf_counter()
-        r = await client.get(f"{API}/predictions", headers=auth_headers)
+        r = client.get(f"{API}/predictions", headers=auth_headers)
         elapsed_ms = (time.perf_counter() - start) * 1000
         assert r.status_code == 200
         assert elapsed_ms < 500
@@ -88,7 +87,7 @@ class TestResponseTimes:
 class TestConcurrentOperations:
 
     async def test_concurrent_sighting_reports(
-        self, client: AsyncClient, db_session: AsyncSession,
+        self, client, db_session: AsyncSession,
     ):
         lot = await _create_lot(db_session, "Conc Sight", "CS01")
         devices = [await create_verified_device_with_headers(db_session) for _ in range(10)]
@@ -110,13 +109,13 @@ class TestConcurrentOperations:
         assert all(s == 201 for s in statuses), f"statuses={statuses}"
 
     async def test_concurrent_votes_same_sighting(
-        self, client: AsyncClient, db_session: AsyncSession,
+        self, client, db_session: AsyncSession,
     ):
         lot = await _create_lot(db_session, "Conc Vote", "CV01")
         creator, c_hdrs = await create_verified_device_with_headers(db_session)
 
         with patch.object(NotificationService, "send_push_notification", new_callable=AsyncMock, return_value=True):
-            r = await client.post(
+            r = client.post(
                 f"{API}/sightings",
                 json={"parking_lot_id": lot.id},
                 headers=c_hdrs,
@@ -142,13 +141,13 @@ class TestConcurrentOperations:
         assert all(s == 200 for s in statuses), f"statuses={statuses}"
 
         # Verify tallies
-        r = await client.get(f"{API}/feed/sightings/{sid}/votes", headers=c_hdrs)
+        r = client.get(f"{API}/feed/sightings/{sid}/votes", headers=c_hdrs)
         data = r.json()
         assert data["upvotes"] == 5
         assert data["downvotes"] == 5
 
     async def test_concurrent_checkins_different_lots(
-        self, client: AsyncClient, db_session: AsyncSession,
+        self, client, db_session: AsyncSession,
     ):
         lots = [await _create_lot(db_session, f"Conc Lot {i}", f"CL{i:02d}") for i in range(10)]
         devices = [await create_verified_device_with_headers(db_session) for _ in range(10)]

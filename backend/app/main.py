@@ -1,90 +1,55 @@
 """
-WarnABrotha API - Main application entry point.
-
-A parking enforcement tracking app for UC Davis students.
+WarnABrotha API - Main application entry point (Flask).
 """
 
+import atexit
+import asyncio
 import json
 import logging
-from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from flask import Flask, jsonify
+from flask_cors import CORS
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select, delete as sa_delete
 
 from app.config import settings
-from app.database import init_db, close_db, AsyncSessionLocal, engine
-from app.api import (
-    auth_router,
-    parking_lots_router,
-    parking_sessions_router,
-    sightings_router,
-    notifications_router,
-    predictions_router,
-    feed_router,
-    ticket_scan_router,
-    chat_router,
-)
-from app.services.reminder import run_reminder_job, ReminderService
-from apscheduler.triggers.cron import CronTrigger
+from app.database import init_db, close_db, AsyncSessionLocal, engine, Base
 from app.models.parking_lot import ParkingLot
 from app.models.chat_message import ChatMessage
-from app.services.cache import cache_delete
-from app.database import Base
-from app.api.auth import limiter
-from app.services.cache import init_cache, close_cache
-from fastapi.responses import JSONResponse
-from slowapi.errors import RateLimitExceeded
+from app.services.cache import cache_delete, init_cache, close_cache
+from app.services.reminder import run_reminder_job, ReminderService
 
-# Configure logging
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Background scheduler for reminder jobs
-scheduler = AsyncIOScheduler()
+scheduler = BackgroundScheduler()
 
 
-async def seed_initial_data():
-    """
-    Seed the database with initial parking lot data.
-    Only adds data if the table is empty.
-    """
+def _run_async(coro):
+    """Run an async coroutine synchronously in a new event loop."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+async def _seed_initial_data():
+    """Seed the database with initial parking lot data."""
     async with AsyncSessionLocal() as db:
         lots_to_seed = [
-            {
-                "name": "Pavilion Structure",
-                "code": "HUTCH",
-                "latitude": 38.539674579414715,
-                "longitude": -121.75836514704442,
-            },
-            {
-                "name": "Quad Structure",
-                "code": "MU",
-                "latitude": 38.54451981723509,
-                "longitude": -121.74950799295135,
-            },
-            {
-                "name": "Lot 25",
-                "code": "ARC",
-                "latitude": 38.5433,
-                "longitude": -121.7574,
-            },
-            {
-                "name": "Lot 47",
-                "code": "TERCERO",
-                "latitude": 38.534834,
-                "longitude": -121.756463,
-            },
+            {"name": "Pavilion Structure", "code": "HUTCH", "latitude": 38.539674579414715, "longitude": -121.75836514704442},
+            {"name": "Quad Structure", "code": "MU", "latitude": 38.54451981723509, "longitude": -121.74950799295135},
+            {"name": "Lot 25", "code": "ARC", "latitude": 38.5433, "longitude": -121.7574},
+            {"name": "Lot 47", "code": "TERCERO", "latitude": 38.534834, "longitude": -121.756463},
         ]
-
         for lot_data in lots_to_seed:
-            result = await db.execute(
-                select(ParkingLot).where(ParkingLot.code == lot_data["code"])
-            )
+            result = await db.execute(select(ParkingLot).where(ParkingLot.code == lot_data["code"]))
             existing = result.scalar_one_or_none()
             if existing is None:
                 db.add(ParkingLot(**lot_data, is_active=True))
@@ -104,175 +69,156 @@ async def seed_initial_data():
         await db.commit()
 
 
-async def run_scheduled_reminder_job():
-    """Wrapper to run the reminder job with a database session."""
-    async with AsyncSessionLocal() as db:
-        await run_reminder_job(db)
+def _scheduled_reminder_job():
+    async def _job():
+        async with AsyncSessionLocal() as db:
+            await run_reminder_job(db)
+    _run_async(_job())
 
 
-async def run_clear_chat_job():
-    """Delete all chat messages and bust the cache."""
-    async with AsyncSessionLocal() as db:
-        await db.execute(sa_delete(ChatMessage))
-        await db.commit()
-    await cache_delete("chat:messages")
-    logger.info("Chat messages cleared")
+def _scheduled_auto_checkout_job():
+    async def _job():
+        async with AsyncSessionLocal() as db:
+            await ReminderService.auto_checkout_expired_sessions(db)
+    _run_async(_job())
 
 
-async def run_auto_checkout_job():
-    """Wrapper to run the nightly auto-checkout job with a database session."""
-    async with AsyncSessionLocal() as db:
-        await ReminderService.auto_checkout_expired_sessions(db)
+def _scheduled_clear_chat_job():
+    async def _job():
+        async with AsyncSessionLocal() as db:
+            await db.execute(sa_delete(ChatMessage))
+            await db.commit()
+        await cache_delete("chat:messages")
+        logger.info("Chat messages cleared")
+    _run_async(_job())
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Application lifespan handler.
-    Manages startup and shutdown events.
-    """
-    # Startup
+def create_app():
+    """Create and configure the Flask application."""
+    app = Flask(__name__)
+
+    CORS(app, resources={r"/*": {"origins": "*"}})
+
+    # Rate limiter
+    from app.api.auth import limiter
+    limiter.init_app(app)
+
+    # JSON error handlers
+    @app.errorhandler(400)
+    def bad_request(e):
+        return jsonify({"detail": e.description or "Bad request"}), 400
+
+    @app.errorhandler(401)
+    def unauthorized(e):
+        return jsonify({"detail": e.description or "Unauthorized"}), 401
+
+    @app.errorhandler(403)
+    def forbidden(e):
+        return jsonify({"detail": e.description or "Forbidden"}), 403
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({"detail": e.description or "Not found"}), 404
+
+    @app.errorhandler(422)
+    def unprocessable(e):
+        return jsonify({"detail": e.description or "Unprocessable entity"}), 422
+
+    @app.errorhandler(429)
+    def rate_limited(e):
+        return jsonify({"detail": "Too many requests. Please slow down."}), 429
+
+    @app.errorhandler(500)
+    def server_error(e):
+        return jsonify({"detail": "Internal server error"}), 500
+
+    # Register blueprints
+    from app.api import (
+        auth_bp, parking_lots_bp, parking_sessions_bp,
+        sightings_bp, notifications_bp, predictions_bp,
+        feed_bp, ticket_scan_bp, chat_bp,
+    )
+    prefix = f"/api/{settings.api_version}"
+    app.register_blueprint(auth_bp, url_prefix=f"{prefix}/auth")
+    app.register_blueprint(parking_lots_bp, url_prefix=f"{prefix}/lots")
+    app.register_blueprint(parking_sessions_bp, url_prefix=f"{prefix}/sessions")
+    app.register_blueprint(sightings_bp, url_prefix=f"{prefix}/sightings")
+    app.register_blueprint(notifications_bp, url_prefix=f"{prefix}/notifications")
+    app.register_blueprint(predictions_bp, url_prefix=f"{prefix}/predictions")
+    app.register_blueprint(feed_bp, url_prefix=f"{prefix}/feed")
+    app.register_blueprint(ticket_scan_bp, url_prefix=f"{prefix}/ticket-scan")
+    app.register_blueprint(chat_bp, url_prefix=f"{prefix}/chat")
+
+    @app.route("/")
+    def root():
+        return jsonify({
+            "status": "healthy",
+            "app": settings.app_name,
+            "version": settings.api_version,
+        })
+
+    @app.route("/health")
+    def health_check():
+        return jsonify({
+            "status": "healthy",
+            "database": "connected",
+            "scheduler": "running" if scheduler.running else "stopped",
+        })
+
+    return app
+
+
+def _startup():
+    """Initialize app resources at startup."""
     logger.info("Starting WarnABrotha API...")
 
-    # Initialize Firebase Admin SDK for FCM
+    # Firebase
     if settings.firebase_credentials_json:
         try:
             import firebase_admin
             from firebase_admin import credentials
-
             cred_value = settings.firebase_credentials_json
             if cred_value.strip().startswith("{"):
-                # JSON string (e.g., from env var in app.yaml)
                 cred = credentials.Certificate(json.loads(cred_value))
             else:
-                # File path (e.g., for local development)
                 cred = credentials.Certificate(cred_value)
             firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin SDK initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
     else:
-        logger.warning(
-            "Firebase credentials not configured, FCM push notifications disabled"
-        )
+        logger.warning("Firebase credentials not configured, FCM push notifications disabled")
 
-    # Initialize Redis cache (GCP MemoryStore)
+    # Redis
     if settings.redis_host:
         init_cache(settings.redis_host, settings.redis_port)
     else:
         logger.warning("REDIS_HOST not set — caching disabled")
 
-    # Initialize database
-    await init_db()
+    # Database
+    _run_async(init_db())
     logger.info("Database initialized")
+    _run_async(_seed_initial_data())
 
-    # Seed initial data
-    await seed_initial_data()
-
-    # Start background scheduler for reminders
-    # Run every 5 minutes to check for sessions needing reminders
-    scheduler.add_job(
-        run_scheduled_reminder_job,
-        "interval",
-        minutes=5,
-        id="checkout_reminder",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_auto_checkout_job,
-        CronTrigger(hour=22, minute=0, timezone="America/Los_Angeles"),
-        id="auto_checkout",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_clear_chat_job,
-        CronTrigger(hour=2, minute=0, timezone="America/Los_Angeles"),
-        id="clear_chat",
-        replace_existing=True,
-    )
+    # Scheduler
+    scheduler.add_job(_scheduled_reminder_job, "interval", minutes=5, id="checkout_reminder", replace_existing=True)
+    scheduler.add_job(_scheduled_auto_checkout_job, CronTrigger(hour=22, minute=0, timezone="America/Los_Angeles"), id="auto_checkout", replace_existing=True)
+    scheduler.add_job(_scheduled_clear_chat_job, CronTrigger(hour=2, minute=0, timezone="America/Los_Angeles"), id="clear_chat", replace_existing=True)
     scheduler.start()
     logger.info("Background scheduler started")
 
-    yield
 
-    # Shutdown
+def _shutdown():
+    """Cleanup on shutdown."""
     logger.info("Shutting down WarnABrotha API...")
-    scheduler.shutdown()
-    await close_cache()
-    await close_db()
+    if scheduler.running:
+        scheduler.shutdown()
+    _run_async(close_cache())
+    _run_async(close_db())
     logger.info("Shutdown complete")
 
 
-# Create FastAPI application
-app = FastAPI(
-    title=settings.app_name,
-    description="""
-    WarnABrotha API - A parking enforcement tracking app for UC Davis.
-
-    ## Features
-
-    - **Device Registration**: Register your device and verify UC Davis email
-    - **Parking Sessions**: Check in when you park, check out when you leave
-    - **TAPS Sightings**: Report TAPS sightings to warn other parkers
-    - **Feed**: View recent sightings (last 3 hours) with upvote/downvote voting
-    - **Notifications**: Receive alerts when TAPS is spotted at your lot
-    - **Predictions**: AI-powered probability predictions for TAPS presence
-
-    ## Authentication
-
-    All endpoints (except registration) require a Bearer token.
-    Register your device first, then use the returned token in the
-    Authorization header: `Authorization: Bearer <token>`
-    """,
-    version=settings.api_version,
-    lifespan=lifespan,
-)
-
-def _rate_limit_handler(request, exc):
-    return JSONResponse(
-        status_code=429,
-        content={"detail": "Too many requests. Please slow down."},
-    )
-
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
-
-# Add CORS middleware for iOS app
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Include API routers
-app.include_router(auth_router, prefix=f"/api/{settings.api_version}")
-app.include_router(parking_lots_router, prefix=f"/api/{settings.api_version}")
-app.include_router(parking_sessions_router, prefix=f"/api/{settings.api_version}")
-app.include_router(sightings_router, prefix=f"/api/{settings.api_version}")
-app.include_router(notifications_router, prefix=f"/api/{settings.api_version}")
-app.include_router(predictions_router, prefix=f"/api/{settings.api_version}")
-app.include_router(feed_router, prefix=f"/api/{settings.api_version}")
-app.include_router(ticket_scan_router, prefix=f"/api/{settings.api_version}")
-app.include_router(chat_router, prefix=f"/api/{settings.api_version}")
-
-
-@app.get("/", tags=["Health"])
-async def root():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "app": settings.app_name,
-        "version": settings.api_version,
-    }
-
-
-@app.get("/health", tags=["Health"])
-async def health_check():
-    """Detailed health check endpoint."""
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "scheduler": "running" if scheduler.running else "stopped",
-    }
+# Module-level app instance (for gunicorn: app.main:app)
+app = create_app()
+_startup()
+atexit.register(_shutdown)

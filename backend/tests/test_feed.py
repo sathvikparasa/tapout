@@ -5,7 +5,6 @@ Tests for feed and voting endpoints.
 import pytest
 import asyncio
 from datetime import datetime, timedelta, timezone
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.parking_lot import ParkingLot
@@ -20,25 +19,25 @@ class TestFeedEndpoints:
     @pytest.mark.asyncio
     async def test_get_all_feeds_empty(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot
     ):
         """Test getting all feeds when no sightings exist."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/feed",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert "feeds" in data
         assert data["total_sightings"] == 0
 
     @pytest.mark.asyncio
     async def test_get_all_feeds_with_sightings(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -52,13 +51,13 @@ class TestFeedEndpoints:
         db_session.add(sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             "/api/v1/feed",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total_sightings"] == 1
 
         # Find our test lot's feed
@@ -73,7 +72,7 @@ class TestFeedEndpoints:
     @pytest.mark.asyncio
     async def test_feed_excludes_old_sightings(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -89,19 +88,19 @@ class TestFeedEndpoints:
         db_session.add(old_sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             "/api/v1/feed",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total_sightings"] == 0
 
     @pytest.mark.asyncio
     async def test_feed_ordered_by_timestamp(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -118,13 +117,13 @@ class TestFeedEndpoints:
             db_session.add(sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         sightings = data["sightings"]
         assert len(sightings) == 3
 
@@ -136,7 +135,7 @@ class TestFeedEndpoints:
     @pytest.mark.asyncio
     async def test_get_lot_feed(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -150,24 +149,24 @@ class TestFeedEndpoints:
         db_session.add(sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["parking_lot_id"] == test_parking_lot.id
         assert data["total_sightings"] == 1
 
     @pytest.mark.asyncio
     async def test_get_lot_feed_not_found(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict
     ):
         """Test getting feed for non-existent lot."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/feed/99999",
             headers=auth_headers
         )
@@ -177,7 +176,7 @@ class TestFeedEndpoints:
     @pytest.mark.asyncio
     async def test_feed_includes_vote_counts(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device,
@@ -199,13 +198,13 @@ class TestFeedEndpoints:
         db_session.add(vote)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         sighting_data = data["sightings"][0]
         assert sighting_data["upvotes"] == 1
         assert sighting_data["downvotes"] == 0
@@ -216,7 +215,7 @@ class TestFeedEndpoints:
     @pytest.mark.asyncio
     async def test_feed_user_vote_null_when_not_voted(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot,
@@ -226,40 +225,40 @@ class TestFeedEndpoints:
         db_session.add(sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/{test_parking_lot.id}",
             headers=auth_headers,
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["sightings"][0]["user_vote"] is None
 
     @pytest.mark.asyncio
     async def test_get_lot_feed_empty(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot,
     ):
         """Lot with no sightings → empty feed."""
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/{test_parking_lot.id}",
             headers=auth_headers,
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total_sightings"] == 0
         assert data["sightings"] == []
 
     @pytest.mark.asyncio
     async def test_feed_requires_auth(
         self,
-        client: AsyncClient,
+        client,
     ):
         """Feed without auth → 403."""
-        response = await client.get("/api/v1/feed")
+        response = client.get("/api/v1/feed")
         assert response.status_code == 403
 
 
@@ -269,7 +268,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_upvote_sighting(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -281,14 +280,14 @@ class TestVotingEndpoints:
         await db_session.commit()
         await db_session.refresh(sighting)
 
-        response = await client.post(
+        response = client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers,
             json={"vote_type": "upvote"}
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["success"] is True
         assert data["action"] == "created"
         assert data["vote_type"] == "upvote"
@@ -296,7 +295,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_downvote_sighting(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -308,21 +307,21 @@ class TestVotingEndpoints:
         await db_session.commit()
         await db_session.refresh(sighting)
 
-        response = await client.post(
+        response = client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers,
             json={"vote_type": "downvote"}
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["success"] is True
         assert data["vote_type"] == "downvote"
 
     @pytest.mark.asyncio
     async def test_toggle_vote_removes_it(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -335,28 +334,28 @@ class TestVotingEndpoints:
         await db_session.refresh(sighting)
 
         # First vote
-        await client.post(
+        client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers,
             json={"vote_type": "upvote"}
         )
 
         # Second vote (same type) should remove
-        response = await client.post(
+        response = client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers,
             json={"vote_type": "upvote"}
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["action"] == "removed"
         assert data["vote_type"] is None
 
     @pytest.mark.asyncio
     async def test_change_vote(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -369,28 +368,28 @@ class TestVotingEndpoints:
         await db_session.refresh(sighting)
 
         # First upvote
-        await client.post(
+        client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers,
             json={"vote_type": "upvote"}
         )
 
         # Change to downvote
-        response = await client.post(
+        response = client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers,
             json={"vote_type": "downvote"}
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["action"] == "updated"
         assert data["vote_type"] == "downvote"
 
     @pytest.mark.asyncio
     async def test_vote_requires_verification(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         unverified_auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -402,7 +401,7 @@ class TestVotingEndpoints:
         await db_session.commit()
         await db_session.refresh(sighting)
 
-        response = await client.post(
+        response = client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=unverified_auth_headers,
             json={"vote_type": "upvote"}
@@ -413,11 +412,11 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_vote_nonexistent_sighting(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict
     ):
         """Test voting on non-existent sighting."""
-        response = await client.post(
+        response = client.post(
             "/api/v1/feed/sightings/99999/vote",
             headers=auth_headers,
             json={"vote_type": "upvote"}
@@ -428,7 +427,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_remove_vote(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device,
@@ -450,19 +449,19 @@ class TestVotingEndpoints:
         db_session.add(vote)
         await db_session.commit()
 
-        response = await client.delete(
+        response = client.delete(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["success"] is True
 
     @pytest.mark.asyncio
     async def test_remove_vote_not_exists(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -474,7 +473,7 @@ class TestVotingEndpoints:
         await db_session.commit()
         await db_session.refresh(sighting)
 
-        response = await client.delete(
+        response = client.delete(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             headers=auth_headers
         )
@@ -484,7 +483,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_get_sighting_votes(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device,
@@ -506,13 +505,13 @@ class TestVotingEndpoints:
         db_session.add(vote)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/sightings/{sighting.id}/votes",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["upvotes"] == 1
         assert data["downvotes"] == 0
         assert data["net_score"] == 1
@@ -521,11 +520,11 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_get_votes_nonexistent_sighting(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
     ):
         """Getting votes for nonexistent sighting → 404."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/feed/sightings/99999/votes",
             headers=auth_headers,
         )
@@ -535,7 +534,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_vote_requires_auth(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         test_parking_lot: ParkingLot,
     ):
@@ -545,7 +544,7 @@ class TestVotingEndpoints:
         await db_session.commit()
         await db_session.refresh(sighting)
 
-        response = await client.post(
+        response = client.post(
             f"/api/v1/feed/sightings/{sighting.id}/vote",
             json={"vote_type": "upvote"},
         )
@@ -554,7 +553,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_feed_minutes_ago(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -565,13 +564,13 @@ class TestVotingEndpoints:
         db_session.add(sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/feed/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         sighting_data = data["sightings"][0]
         assert "minutes_ago" in sighting_data
         assert sighting_data["minutes_ago"] >= 0
@@ -579,7 +578,7 @@ class TestVotingEndpoints:
     @pytest.mark.asyncio
     async def test_concurrent_same_device_votes_no_500(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot,
@@ -606,7 +605,7 @@ class TestVotingEndpoints:
         assert all(s == 200 for s in statuses), f"Got non-200 statuses: {statuses}"
 
         # Final state: at most 1 upvote from this device, no downvotes
-        r = await client.get(
+        r = client.get(
             f"/api/v1/feed/sightings/{sighting.id}/votes",
             headers=auth_headers,
         )

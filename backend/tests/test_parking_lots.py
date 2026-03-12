@@ -3,7 +3,6 @@ Tests for parking lot endpoints.
 """
 
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.parking_lot import ParkingLot
@@ -18,18 +17,18 @@ class TestParkingLotEndpoints:
     @pytest.mark.asyncio
     async def test_list_parking_lots(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot
     ):
         """Test listing parking lots."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/lots",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert len(data) >= 1
         lot_codes = [lot["code"] for lot in data]
         assert test_parking_lot.code in lot_codes
@@ -37,28 +36,28 @@ class TestParkingLotEndpoints:
     @pytest.mark.asyncio
     async def test_list_parking_lots_requires_auth(
         self,
-        client: AsyncClient,
+        client,
         test_parking_lot: ParkingLot
     ):
         """Test that listing lots requires authentication."""
-        response = await client.get("/api/v1/lots")
+        response = client.get("/api/v1/lots")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_get_parking_lot_by_id(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot
     ):
         """Test getting a parking lot by ID."""
-        response = await client.get(
+        response = client.get(
             f"/api/v1/lots/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["id"] == test_parking_lot.id
         assert data["name"] == test_parking_lot.name
         assert data["code"] == test_parking_lot.code
@@ -69,11 +68,11 @@ class TestParkingLotEndpoints:
     @pytest.mark.asyncio
     async def test_get_parking_lot_not_found(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict
     ):
         """Test getting non-existent parking lot."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/lots/99999",
             headers=auth_headers
         )
@@ -83,29 +82,29 @@ class TestParkingLotEndpoints:
     @pytest.mark.asyncio
     async def test_get_parking_lot_by_code(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot
     ):
         """Test getting a parking lot by code."""
-        response = await client.get(
+        response = client.get(
             f"/api/v1/lots/code/{test_parking_lot.code}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["code"] == test_parking_lot.code
 
     @pytest.mark.asyncio
     async def test_get_parking_lot_by_code_case_insensitive(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
         test_parking_lot: ParkingLot
     ):
         """Test that code lookup is case-insensitive."""
-        response = await client.get(
+        response = client.get(
             f"/api/v1/lots/code/{test_parking_lot.code.lower()}",
             headers=auth_headers
         )
@@ -115,7 +114,7 @@ class TestParkingLotEndpoints:
     @pytest.mark.asyncio
     async def test_list_lots_excludes_inactive(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
     ):
@@ -130,20 +129,20 @@ class TestParkingLotEndpoints:
         db_session.add(inactive_lot)
         await db_session.commit()
 
-        response = await client.get("/api/v1/lots", headers=auth_headers)
+        response = client.get("/api/v1/lots", headers=auth_headers)
 
         assert response.status_code == 200
-        codes = [lot["code"] for lot in response.json()]
+        codes = [lot["code"] for lot in response.get_json()]
         assert "CLOSED" not in codes
 
     @pytest.mark.asyncio
     async def test_get_parking_lot_by_code_not_found(
         self,
-        client: AsyncClient,
+        client,
         auth_headers: dict,
     ):
         """Non-existent lot code → 404."""
-        response = await client.get(
+        response = client.get(
             "/api/v1/lots/code/DOESNOTEXIST",
             headers=auth_headers,
         )
@@ -153,7 +152,7 @@ class TestParkingLotEndpoints:
     @pytest.mark.asyncio
     async def test_parking_lot_stats_active_parkers(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         verified_device: Device,
@@ -168,19 +167,19 @@ class TestParkingLotEndpoints:
         db_session.add(session)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/lots/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["active_parkers"] >= 1
 
     @pytest.mark.asyncio
     async def test_parking_lot_stats_recent_sightings(
         self,
-        client: AsyncClient,
+        client,
         db_session: AsyncSession,
         auth_headers: dict,
         test_parking_lot: ParkingLot
@@ -191,11 +190,11 @@ class TestParkingLotEndpoints:
         db_session.add(sighting)
         await db_session.commit()
 
-        response = await client.get(
+        response = client.get(
             f"/api/v1/lots/{test_parking_lot.id}",
             headers=auth_headers
         )
 
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["recent_sightings"] >= 1

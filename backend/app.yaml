@@ -1,6 +1,6 @@
 runtime: python312
 
-entrypoint: gunicorn -b :$PORT -k uvicorn.workers.UvicornWorker app.main:app
+entrypoint: gunicorn -b :$PORT app.main:app
 
 instance_class: F1
 

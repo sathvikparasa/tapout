@@ -1,7 +1,5 @@
 """
 Parking lots API endpoints.
-
-Handles parking lot listing and information retrieval.
 """
 
 import math
@@ -10,18 +8,15 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from flask import Blueprint, jsonify, abort
 
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.schemas.parking_lot import ParkingLotResponse, ParkingLotWithStats
 from app.models.parking_lot import ParkingLot
 from app.models.parking_session import ParkingSession
 from app.models.taps_sighting import TapsSighting
-from app.services.prediction import PredictionService
 from app.services.auth import get_current_device
-from app.models.device import Device
+from app.services.prediction import PredictionService
 from app.services.cache import cache_get, cache_set, TTL_LOTS_LIST, TTL_LOT_STATS
 
 
@@ -129,7 +124,6 @@ async def get_parking_lot(
     )
     active_parkers = (parkers_result.scalar() or 0) + _ghost_parker_count(lot_id)
 
-    # Count recent sightings (last hour)
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
     sightings_result = await db.execute(
         select(func.count(TapsSighting.id)).where(
@@ -145,47 +139,63 @@ async def get_parking_lot(
     except Exception:
         taps_probability = 0.0
 
-    data = ParkingLotWithStats(
-        id=lot.id,
-        name=lot.name,
-        code=lot.code,
-        latitude=lot.latitude,
-        longitude=lot.longitude,
+    return ParkingLotWithStats(
+        id=lot.id, name=lot.name, code=lot.code,
+        latitude=lot.latitude, longitude=lot.longitude,
         is_active=lot.is_active,
         active_parkers=active_parkers,
         recent_sightings=recent_sightings,
         taps_probability=taps_probability,
     ).model_dump(mode="json")
 
-    await cache_set(f"lot_stats:{lot_id}", data, TTL_LOT_STATS)
-    return data
 
+@bp.route("", methods=["GET"])
+async def list_parking_lots():
+    cached = await cache_get("lots:all")
+    if cached is not None:
+        return jsonify(cached)
 
-@router.get(
-    "/code/{code}",
-    response_model=ParkingLotWithStats,
-    summary="Get parking lot by code",
-    description="Get detailed information about a parking lot by its code.",
-)
-async def get_parking_lot_by_code(
-    code: str,
-    db: AsyncSession = Depends(get_db),
-    _device: Device = Depends(get_current_device),
-):
-    """
-    Get parking lot by its short code (e.g., 'HUTCH').
-
-    Same response as get_parking_lot but looks up by code instead of ID.
-    """
-    # Get the parking lot
-    result = await db.execute(select(ParkingLot).where(ParkingLot.code == code.upper()))
-    lot = result.scalar_one_or_none()
-
-    if lot is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Parking lot with code '{code}' not found",
+    async with AsyncSessionLocal() as db:
+        await get_current_device(db)
+        result = await db.execute(
+            select(ParkingLot).where(ParkingLot.is_active == True).order_by(ParkingLot.name)
         )
+        lots = result.scalars().all()
+        data = [ParkingLotResponse.model_validate(lot).model_dump(mode="json") for lot in lots]
+        await cache_set("lots:all", data, TTL_LOTS_LIST)
+        return jsonify(data)
 
-    # Reuse the ID-based endpoint logic
-    return await get_parking_lot(lot.id, db, _device)
+
+@bp.route("/<int:lot_id>", methods=["GET"])
+async def get_parking_lot(lot_id: int):
+    cached = await cache_get(f"lot_stats:{lot_id}")
+    if cached is not None:
+        return jsonify(cached)
+
+    async with AsyncSessionLocal() as db:
+        await get_current_device(db)
+        result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
+        lot = result.scalar_one_or_none()
+        if lot is None:
+            abort(404, description=f"Parking lot {lot_id} not found")
+        data = await _build_lot_stats(db, lot)
+        await cache_set(f"lot_stats:{lot_id}", data, TTL_LOT_STATS)
+        return jsonify(data)
+
+
+@bp.route("/code/<string:code>", methods=["GET"])
+async def get_parking_lot_by_code(code: str):
+    async with AsyncSessionLocal() as db:
+        await get_current_device(db)
+        result = await db.execute(select(ParkingLot).where(ParkingLot.code == code.upper()))
+        lot = result.scalar_one_or_none()
+        if lot is None:
+            abort(404, description=f"Parking lot with code '{code}' not found")
+
+        cached = await cache_get(f"lot_stats:{lot.id}")
+        if cached is not None:
+            return jsonify(cached)
+
+        data = await _build_lot_stats(db, lot)
+        await cache_set(f"lot_stats:{lot.id}", data, TTL_LOT_STATS)
+        return jsonify(data)

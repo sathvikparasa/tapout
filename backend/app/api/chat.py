@@ -1,28 +1,25 @@
 """
 Global anonymous chat API endpoints.
 
-Provides REST (GET/POST) and a WebSocket endpoint for real-time delivery.
 POST saves instantly and returns; AI moderation runs concurrently via
-asyncio.create_task and broadcasts a `message_removed` event if rejected.
+a background thread and deletes the message if rejected.
 """
 
 import asyncio
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
 import anthropic
-from fastapi import APIRouter, Depends, HTTPException, status
+from flask import Blueprint, request, jsonify, abort
 from sqlalchemy import select, delete as sa_delete
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.requests import Request
 
 from app.api.auth import limiter
 from app.config import settings
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.models.chat_message import ChatMessage
-from app.models.device import Device
 from app.schemas.chat import ChatListResponse, ChatMessageCreate, ChatMessageResponse
 from app.services.auth import require_verified_device
 from app.services.cache import cache_get, cache_set, cache_delete, TTL_CHAT
@@ -31,7 +28,7 @@ _CHAT_CACHE_KEY = "chat:messages"
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/chat", tags=["Global Chat"])
+bp = Blueprint("chat", __name__)
 
 _DEFAULT_LIMIT = 50
 
@@ -114,9 +111,8 @@ def _moderate_sync(content: str) -> tuple[bool, Optional[str]]:
 
 async def _moderate_and_flag(msg_id: int, content: str) -> None:
     """
-    Background task: run moderation concurrently with the response.
-    If rejected, flag the message in the DB and broadcast `message_removed`
-    to all connected WebSocket clients.
+    Background task: run moderation.
+    If rejected, delete the message from the DB and bust the cache.
     """
     allowed, reason = await asyncio.to_thread(_moderate_sync, content)
     if not allowed:
@@ -125,6 +121,18 @@ async def _moderate_and_flag(msg_id: int, content: str) -> None:
             await db.commit()
         await cache_delete(_CHAT_CACHE_KEY)
         logger.info("Message %d flagged post-send: %s", msg_id, reason)
+
+
+def _run_background(coro):
+    """Run an async coroutine in a background thread."""
+    def _run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(coro)
+        finally:
+            loop.close()
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _to_response(msg: ChatMessage) -> ChatMessageResponse:
@@ -145,57 +153,47 @@ def _to_response(msg: ChatMessage) -> ChatMessageResponse:
 # REST endpoints
 # ---------------------------------------------------------------------------
 
-@router.get(
-    "/messages",
-    response_model=ChatListResponse,
-    summary="Get recent chat messages",
-    description="Returns messages in chronological order. Pass after_id to poll for new messages. Pass known_ids to get back which ones were removed.",
-)
-async def get_messages(
-    limit: int = _DEFAULT_LIMIT,
-    device: Device = Depends(require_verified_device),
-    db: AsyncSession = Depends(get_db),
-) -> ChatListResponse:
+@bp.route("/messages", methods=["GET"])
+async def get_messages():
+    limit = request.args.get("limit", _DEFAULT_LIMIT, type=int)
+
     cached = await cache_get(_CHAT_CACHE_KEY)
     if cached is not None:
-        return cached
+        return jsonify(cached)
 
-    query = select(ChatMessage).order_by(ChatMessage.id.asc()).limit(min(limit, 100))
-    result = await db.execute(query)
-    messages = result.scalars().all()
-    data = ChatListResponse(messages=[_to_response(m) for m in messages]).model_dump(mode="json")
-    await cache_set(_CHAT_CACHE_KEY, data, TTL_CHAT)
-    return data
+    async with AsyncSessionLocal() as db:
+        await require_verified_device(db)
+
+        query = select(ChatMessage).order_by(ChatMessage.id.asc()).limit(min(limit, 100))
+        result = await db.execute(query)
+        messages = result.scalars().all()
+        data = ChatListResponse(messages=[_to_response(m) for m in messages]).model_dump(mode="json")
+        await cache_set(_CHAT_CACHE_KEY, data, TTL_CHAT)
+        return jsonify(data)
 
 
-@router.post(
-    "/messages",
-    response_model=ChatMessageResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Send an anonymous chat message",
-    description=(
-        "Saves the message immediately and returns — no blocking moderation. "
-        "AI moderation runs concurrently; if rejected the message is flagged and "
-        "a `message_removed` WebSocket event is broadcast to all clients."
-    ),
-)
+@bp.route("/messages", methods=["POST"])
 @limiter.limit("30/minute")
-async def send_message(
-    request: Request,
-    body: ChatMessageCreate,
-    device: Device = Depends(require_verified_device),
-    db: AsyncSession = Depends(get_db),
-) -> ChatMessageResponse:
-    # Persist immediately — client gets a response right away
-    msg = ChatMessage(content=body.content)
-    db.add(msg)
-    await db.commit()
-    await db.refresh(msg)
-    response = _to_response(msg)
+async def send_message():
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        body = ChatMessageCreate(**data)
+    except Exception as e:
+        abort(422, description=str(e))
 
-    await cache_delete(_CHAT_CACHE_KEY)
+    async with AsyncSessionLocal() as db:
+        await require_verified_device(db)
 
-    # Moderation runs in the background — does not block the response
-    asyncio.create_task(_moderate_and_flag(msg.id, body.content))
+        # Persist immediately — client gets a response right away
+        msg = ChatMessage(content=body.content)
+        db.add(msg)
+        await db.commit()
+        await db.refresh(msg)
+        response = _to_response(msg)
 
-    return response
+        await cache_delete(_CHAT_CACHE_KEY)
+
+        # Moderation runs in the background — does not block the response
+        _run_background(_moderate_and_flag(msg.id, body.content))
+
+        return jsonify(response.model_dump(mode="json")), 201
