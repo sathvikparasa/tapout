@@ -12,8 +12,6 @@ import SwiftUI
 struct ChatTab: View {
     @ObservedObject var viewModel: AppViewModel
     @FocusState private var isInputFocused: Bool
-    @State private var keyboardHeight: CGFloat = 0
-    @State private var safeAreaBottom: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,7 +49,7 @@ struct ChatTab: View {
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
-                            VStack(spacing: 8) {
+                            LazyVStack(spacing: 8) {
                                 ForEach(viewModel.chatMessages) { message in
                                     ChatMessageRow(message: message)
                                         .id(message.id)
@@ -61,7 +59,7 @@ struct ChatTab: View {
                             .padding(.top, 12)
                             .padding(.bottom, 8)
                         }
-                        .scrollDismissesKeyboard(.immediately)
+                        .scrollDismissesKeyboard(.interactively)
                         .simultaneousGesture(TapGesture().onEnded { isInputFocused = false })
                         .onAppear {
                             scrollToBottom(proxy: proxy, animated: false)
@@ -69,32 +67,25 @@ struct ChatTab: View {
                         .onChange(of: viewModel.chatMessages.count) { _, _ in
                             scrollToBottom(proxy: proxy, animated: true)
                         }
+                        .onChange(of: isInputFocused) { _, focused in
+                            if focused {
+                                // Delay until after the keyboard animation finishes so
+                                // the scroll view has its final height before anchoring.
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                    scrollToBottom(proxy: proxy, animated: true)
+                                }
+                            }
+                        }
                     }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             ChatInputBar(viewModel: viewModel, isFocused: $isInputFocused)
-        }
-        // Offset only the chat content for keyboard — root view has ignoresSafeArea(.keyboard)
-        // so nothing moves automatically. safeAreaBottom accounts for tab bar + home indicator.
-        .padding(.bottom, max(0, keyboardHeight - safeAreaBottom))
-        .background(
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { safeAreaBottom = geo.safeAreaInsets.bottom }
-                    .onChange(of: geo.safeAreaInsets.bottom) { _, v in safeAreaBottom = v }
-            }
-        )
-        .onReceive(NotificationCenter.default.publisher(
-            for: UIResponder.keyboardWillChangeFrameNotification)
-        ) { notification in
-            guard
-                let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-                let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
-            else { return }
-            let height = max(0, UIScreen.main.bounds.height - frame.minY)
-            withAnimation(.easeOut(duration: duration)) { keyboardHeight = height }
+
+            // Isolated keyboard spacer — only this tiny view re-renders on
+            // keyboard events, keeping the message list untouched.
+            KeyboardSpacer()
         }
         .task {
             await viewModel.loadChatMessages()
@@ -123,6 +114,46 @@ struct ChatTab: View {
         }
     }
 }
+
+// MARK: - Keyboard Spacer
+//
+// Owns all keyboard-height state. When the keyboard appears/disappears,
+// only this view re-renders — the scroll view and message list are unaffected,
+// which prevents the OOM crash triggered by switching to the emoji keyboard.
+
+private struct KeyboardSpacer: View {
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var safeAreaBottom: CGFloat = 0
+
+    var body: some View {
+        Color.clear
+            .frame(height: max(0, keyboardHeight - safeAreaBottom))
+            .background(
+                GeometryReader { geo in
+                    Color.clear.onAppear {
+                        safeAreaBottom = geo.safeAreaInsets.bottom
+                    }
+                }
+            )
+            .onReceive(NotificationCenter.default.publisher(
+                for: UIResponder.keyboardWillShowNotification)
+            ) { notification in
+                guard
+                    let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                    let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
+                else { return }
+                let height = max(0, UIScreen.main.bounds.height - frame.minY)
+                withAnimation(.easeOut(duration: duration)) { keyboardHeight = height }
+            }
+            .onReceive(NotificationCenter.default.publisher(
+                for: UIResponder.keyboardWillHideNotification)
+            ) { notification in
+                let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
+                withAnimation(.easeOut(duration: duration)) { keyboardHeight = 0 }
+            }
+    }
+}
+
 // MARK: - Message Row
 
 private struct ChatMessageRow: View {
