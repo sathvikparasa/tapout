@@ -8,8 +8,9 @@ import os
 from pydantic_settings import BaseSettings
 from typing import Optional
 
-GCP_PROJECT = os.environ.get("GCP_PROJECT", "tapout-485821")
-SECRET_NAMES = ["DATABASE_URL", "DATABASE_URL_SYNC", "SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "RESEND_API_KEY", "ANTHROPIC_API_KEY", "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_KEY_CONTENT", "APNS_BUNDLE_ID", "ADMIN_BYPASS_EMAIL", "ADMIN_BYPASS_OTP"]
+# Set GCP_PROJECT to your dev project (starts with 'tapout-dev') or prod project
+GCP_PROJECT = os.environ.get("GCP_PROJECT", "")
+SECRET_NAMES = ["SECRET_KEY", "FIREBASE_CREDENTIALS_JSON", "RESEND_API_KEY", "ANTHROPIC_API_KEY", "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_KEY_CONTENT", "APNS_BUNDLE_ID", "ADMIN_BYPASS_EMAIL", "ADMIN_BYPASS_OTP"]
 
 
 def _load_secrets_from_gcp():
@@ -49,10 +50,6 @@ class Settings(BaseSettings):
     app_name: str = "WarnABrotha API"
     debug: bool = False
     api_version: str = "v1"
-
-    # Database (Cloud SQL PostgreSQL)
-    database_url: str
-    database_url_sync: str
 
     # Authentication
     # Secret key for JWT token signing
@@ -97,6 +94,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore unknown env vars (e.g. legacy DATABASE_URL)
 
 
 # Global settings instance

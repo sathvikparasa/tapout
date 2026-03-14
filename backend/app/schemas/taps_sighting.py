@@ -23,18 +23,15 @@ class TapsSightingCreate(BaseModel):
 
 class TapsSightingResponse(BaseModel):
     """Schema for TAPS sighting response."""
-    id: int
+    id: str
     parking_lot_id: int
     parking_lot_name: str
     parking_lot_code: str
     reported_at: datetime
     notes: Optional[str]
 
-    class Config:
-        from_attributes = True
-
     @classmethod
-    def from_sighting(cls, sighting, lot_name: str, lot_code: str):
+    def from_sighting(cls, sighting, lot_name: str, lot_code: str) -> "TapsSightingResponse":
         """Create response from sighting model with lot details."""
         return cls(
             id=sighting.id,
@@ -57,7 +54,7 @@ class TapsSightingWithNotifications(TapsSightingResponse):
     class Config:
         json_schema_extra = {
             "example": {
-                "id": 1,
+                "id": "abc123",
                 "parking_lot_id": 1,
                 "parking_lot_name": "Hutchinson Parking Structure",
                 "parking_lot_code": "HUTCH",

@@ -270,6 +270,13 @@ struct EmailVerificationView: View {
             .disabled(otpCode.count != 6 || isValidating)
             .padding(.horizontal, 24)
 
+            // Disclaimer
+            Text("Please allow up to 2 minutes for the OTP to arrive in your inbox and please check your spam folder before requesting a new code.")
+                .appFont(size: 11)
+                .foregroundColor(AppColors.textMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
             // Resend / Change email
             VStack(spacing: 12) {
                 if viewModel.canResendOTP {

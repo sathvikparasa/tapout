@@ -9,7 +9,7 @@ from typing import Optional, List
 
 class NotificationResponse(BaseModel):
     """Schema for notification response."""
-    id: int
+    id: str
     notification_type: str
     title: str
     message: str
@@ -17,9 +17,6 @@ class NotificationResponse(BaseModel):
     created_at: datetime
     read_at: Optional[datetime]
     is_read: bool
-
-    class Config:
-        from_attributes = True
 
 
 class NotificationList(BaseModel):
@@ -33,7 +30,7 @@ class NotificationList(BaseModel):
             "example": {
                 "notifications": [
                     {
-                        "id": 1,
+                        "id": "abc123",
                         "notification_type": "taps_spotted",
                         "title": "TAPS Alert!",
                         "message": "TAPS has been spotted at Hutchinson Parking Structure",
@@ -51,11 +48,11 @@ class NotificationList(BaseModel):
 
 class MarkReadRequest(BaseModel):
     """Schema for marking notifications as read."""
-    notification_ids: List[int] = Field(..., min_length=1, description="List of notification IDs to mark as read")
+    notification_ids: List[str] = Field(..., min_length=1, description="List of notification IDs to mark as read")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "notification_ids": [1, 2, 3]
+                "notification_ids": ["abc123", "def456", "ghi789"]
             }
         }

@@ -35,9 +35,6 @@ class ParkingLotResponse(BaseModel):
     longitude: Optional[float]
     is_active: bool
 
-    class Config:
-        from_attributes = True
-
 
 class ParkingLotWithStats(ParkingLotResponse):
     """

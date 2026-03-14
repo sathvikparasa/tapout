@@ -12,7 +12,7 @@ class PredictionRequest(BaseModel):
     Schema for requesting a TAPS probability prediction.
     If timestamp is not provided, uses current time.
     """
-    parking_lot_id: int = Field(..., description="ID of the parking lot")
+    parking_lot_id: Optional[int] = Field(None, description="ID of the parking lot")
     timestamp: Optional[datetime] = Field(None, description="Time to predict for (defaults to now)")
 
     class Config:

@@ -1,54 +1,43 @@
-"""
-Vote model for tracking user votes on TAPS sightings.
-"""
-
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Enum, UniqueConstraint
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+"""Vote model for Firestore."""
 import enum
-
-from app.database import Base
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Optional
 
 
 class VoteType(str, enum.Enum):
-    """Types of votes users can cast."""
-    UPVOTE = "upvote"      # Confirms the sighting is accurate
-    DOWNVOTE = "downvote"  # Indicates sighting may be inaccurate
+    UPVOTE = "upvote"
+    DOWNVOTE = "downvote"
 
 
-class Vote(Base):
-    """
-    Represents a user's vote on a TAPS sighting.
+@dataclass
+class Vote:
+    id: str          # composite: "{device_id}_{sighting_id}"
+    device_id: str
+    sighting_id: str
+    vote_type: VoteType
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-    Each device can only vote once per sighting (enforced by unique constraint).
-    Users can change their vote by updating the vote_type.
+    @classmethod
+    def from_dict(cls, data: dict, doc_id: str = "") -> "Vote":
+        vt = data.get("vote_type", "upvote")
+        return cls(
+            id=doc_id or data.get("id", ""),
+            device_id=data.get("device_id", ""),
+            sighting_id=data.get("sighting_id", ""),
+            vote_type=VoteType(vt) if isinstance(vt, str) else vt,
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+        )
 
-    Attributes:
-        id: Primary key
-        device_id: FK to the device that cast the vote
-        sighting_id: FK to the sighting being voted on
-        vote_type: UPVOTE or DOWNVOTE
-        created_at: When the vote was initially cast
-        updated_at: When the vote was last modified
-    """
-
-    __tablename__ = "votes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, index=True)
-    sighting_id = Column(Integer, ForeignKey("taps_sightings.id"), nullable=False, index=True)
-    vote_type = Column(Enum(VoteType), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    # Ensure one vote per device per sighting
-    __table_args__ = (
-        UniqueConstraint('device_id', 'sighting_id', name='unique_device_sighting_vote'),
-    )
-
-    # Relationships
-    device = relationship("Device", back_populates="votes")
-    sighting = relationship("TapsSighting", back_populates="votes")
-
-    def __repr__(self):
-        return f"<Vote(id={self.id}, device_id={self.device_id}, sighting_id={self.sighting_id}, type={self.vote_type})>"
+    def to_dict(self) -> dict:
+        now = datetime.now(timezone.utc)
+        return {
+            "id": self.id,
+            "device_id": self.device_id,
+            "sighting_id": self.sighting_id,
+            "vote_type": self.vote_type.value,
+            "created_at": self.created_at or now,
+            "updated_at": now,
+        }

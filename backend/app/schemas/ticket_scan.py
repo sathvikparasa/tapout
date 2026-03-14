@@ -18,5 +18,5 @@ class TicketScanResponse(BaseModel):
     mapped_lot_name: Optional[str] = None
     mapped_lot_code: Optional[str] = None
     is_recent: bool
-    sighting_id: Optional[int] = None
+    sighting_id: Optional[str] = None
     users_notified: int = 0

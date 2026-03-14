@@ -1,40 +1,42 @@
-"""
-EmailOTP model for storing OTP codes sent to users for email verification.
-"""
-
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
-from sqlalchemy.sql import func
-
-from app.database import Base
+"""EmailOTP model for Firestore."""
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Optional
 
 
-class EmailOTP(Base):
-    """
-    Stores OTP codes for email verification.
+@dataclass
+class EmailOTP:
+    id: str
+    device_id: str        # device UUID string (not int PK)
+    email: str
+    otp_code: str
+    expires_at: datetime
+    created_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
+    attempts: int = 0
 
-    Attributes:
-        id: Primary key
-        device_id: FK to devices.id
-        email: Email address the OTP was sent to
-        otp_code: Hashed 6-digit OTP code
-        created_at: When the OTP was created
-        expires_at: When the OTP expires (10 minutes after creation)
-        verified_at: When the OTP was successfully verified (nullable)
-        attempts: Number of verification attempts made
-    """
+    @classmethod
+    def from_dict(cls, data: dict, doc_id: str = "") -> "EmailOTP":
+        return cls(
+            id=doc_id or data.get("id", ""),
+            device_id=data.get("device_id", ""),
+            email=data.get("email", ""),
+            otp_code=data.get("otp_code", ""),
+            expires_at=data.get("expires_at", datetime.now(timezone.utc)),
+            created_at=data.get("created_at"),
+            verified_at=data.get("verified_at"),
+            attempts=data.get("attempts", 0),
+        )
 
-    __tablename__ = "email_otps"
-
-    id = Column(Integer, primary_key=True, index=True)
-    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False)
-    email = Column(String(255), nullable=False)
-    otp_code = Column(String(6), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    verified_at = Column(DateTime(timezone=True), nullable=True)
-    attempts = Column(Integer, default=0, nullable=False)
-
-    __table_args__ = (
-        Index("ix_email_otps_device_id", "device_id"),
-        Index("ix_email_otps_email", "email"),
-    )
+    def to_dict(self) -> dict:
+        now = datetime.now(timezone.utc)
+        return {
+            "id": self.id,
+            "device_id": self.device_id,
+            "email": self.email,
+            "otp_code": self.otp_code,
+            "expires_at": self.expires_at,
+            "created_at": self.created_at or now,
+            "verified_at": self.verified_at,
+            "attempts": self.attempts,
+        }

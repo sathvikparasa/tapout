@@ -7,9 +7,8 @@ from typing import Optional
 import re
 
 from jose import JWTError, jwt
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from flask import request, abort
+from google.cloud.firestore_v1 import AsyncClient
 
 from app.config import settings
 from app.models.device import Device
@@ -44,41 +43,44 @@ class AuthService:
             return None
 
     @staticmethod
-    async def get_or_create_device(db: AsyncSession, device_id: str, push_token: Optional[str] = None) -> Device:
-        result = await db.execute(select(Device).where(Device.device_id == device_id))
-        device = result.scalar_one_or_none()
-        if device:
-            if push_token:
+    async def get_or_create_device(
+        db: AsyncClient,
+        device_id: str,
+        push_token: Optional[str] = None
+    ) -> Device:
+        ref = db.collection("devices").document(device_id)
+        doc = await ref.get()
+        if doc.exists:
+            device = Device.from_dict(doc.to_dict(), doc_id=doc.id)
+            if push_token and device.push_token != push_token:
+                await ref.update({"push_token": push_token, "is_push_enabled": True, "last_seen_at": datetime.now(timezone.utc)})
                 device.push_token = push_token
                 device.is_push_enabled = True
-            await db.commit()
-            await db.refresh(device)
             return device
         device = Device(
             device_id=device_id,
             push_token=push_token,
             is_push_enabled=push_token is not None,
             email_verified=False,
+            created_at=datetime.now(timezone.utc),
+            last_seen_at=datetime.now(timezone.utc),
         )
-        db.add(device)
-        await db.commit()
-        await db.refresh(device)
+        await ref.set(device.to_dict())
         return device
 
     @staticmethod
-    async def verify_email_for_device(db: AsyncSession, device_id: str, email: str) -> tuple[bool, str]:
+    async def verify_email_for_device(db: AsyncClient, device_id: str, email: str) -> tuple[bool, str]:
         if not AuthService.is_valid_ucd_email(email):
             return False, f"Email must be a valid {settings.ucd_email_domain} address"
-        result = await db.execute(select(Device).where(Device.device_id == device_id))
-        device = result.scalar_one_or_none()
-        if not device:
+        ref = db.collection("devices").document(device_id)
+        doc = await ref.get()
+        if not doc.exists:
             return False, "Device not registered"
-        device.email_verified = True
-        await db.commit()
+        await ref.update({"email_verified": True})
         return True, "Email verified successfully"
 
 
-async def get_current_device(db: AsyncSession) -> Device:
+async def get_current_device(db: AsyncClient) -> Device:
     """
     Extract Bearer token from Flask request, validate it, and return the Device.
     Calls abort(401) if token is missing/invalid or device not found.
@@ -90,14 +92,13 @@ async def get_current_device(db: AsyncSession) -> Device:
     device_id = AuthService.decode_token(token)
     if not device_id:
         abort(401, description="Invalid or expired token")
-    result = await db.execute(select(Device).where(Device.device_id == device_id))
-    device = result.scalar_one_or_none()
-    if not device:
+    doc = await db.collection("devices").document(device_id).get()
+    if not doc.exists:
         abort(401, description="Device not found")
-    return device
+    return Device.from_dict(doc.to_dict(), doc_id=doc.id)
 
 
-async def require_verified_device(db: AsyncSession) -> Device:
+async def require_verified_device(db: AsyncClient) -> Device:
     """
     Like get_current_device but also requires email_verified == True.
     Calls abort(403) if not verified.

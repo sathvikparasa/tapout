@@ -18,8 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from google.cloud.firestore_v1 import AsyncClient
 
 from app.models.taps_sighting import TapsSighting
 from app.models.parking_lot import ParkingLot
@@ -40,7 +39,7 @@ class PredictionService:
     @classmethod
     async def predict(
         cls,
-        db: AsyncSession,
+        db: AsyncClient,
         timestamp: Optional[datetime] = None,
         lot_id: Optional[int] = None,
     ) -> PredictionResponse:
@@ -66,36 +65,39 @@ class PredictionService:
             )
 
         # Find the most recent sighting from today, filtered by lot if provided
-        query = (
-            select(TapsSighting, ParkingLot)
-            .join(ParkingLot, TapsSighting.parking_lot_id == ParkingLot.id)
-            .where(TapsSighting.reported_at >= today_start_utc)
-        )
-
+        query = db.collection("taps_sightings")\
+            .where("reported_at", ">=", today_start_utc)
         if lot_id is not None:
-            query = query.where(TapsSighting.parking_lot_id == lot_id)
+            query = query.where("parking_lot_id", "==", lot_id)
 
-        query = query.order_by(TapsSighting.reported_at.desc()).limit(1)
+        # Fetch and sort in Python (Firestore ordering with multiple where clauses
+        # requires composite indexes — simpler to sort client-side for small datasets)
+        sightings = []
+        async for doc in query.stream():
+            sightings.append(TapsSighting.from_dict(doc.to_dict(), doc_id=doc.id))
 
-        result = await db.execute(query)
-        row = result.first()
+        # Sort by reported_at descending, take the most recent
+        sightings.sort(key=lambda s: s.reported_at, reverse=True)
 
         # If filtering by lot, fetch the lot name for a better no-sighting message
         lot_name = None
-        if row is None and lot_id is not None:
-            lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
-            lot_obj = lot_result.scalar_one_or_none()
-            if lot_obj:
-                lot_name = lot_obj.name
+        if not sightings and lot_id is not None:
+            lot_doc = await db.collection("parking_lots").document(str(lot_id)).get()
+            if lot_doc.exists:
+                lot_name = lot_doc.to_dict().get("name")
 
-        if row is None:
+        if not sightings:
             return cls._build_no_sighting_response(now, lot_name=lot_name)
 
-        sighting, lot = row
+        sighting = sightings[0]
         reported_at = sighting.reported_at
         if reported_at.tzinfo is None:
             reported_at = reported_at.replace(tzinfo=timezone.utc)
         hours_ago = (now - reported_at).total_seconds() / 3600
+
+        # Get parking lot for sighting (denormalized — use parking_lot_id from sighting)
+        lot_doc = await db.collection("parking_lots").document(str(sighting.parking_lot_id)).get()
+        lot = ParkingLot.from_dict(lot_doc.to_dict(), doc_id=lot_doc.id) if lot_doc.exists else None
 
         return cls._build_sighting_response(now, hours_ago, sighting, lot)
 
@@ -163,22 +165,26 @@ class PredictionService:
         now: datetime,
         hours_ago: float,
         sighting: TapsSighting,
-        lot: ParkingLot,
+        lot: Optional[ParkingLot],
     ) -> PredictionResponse:
         risk_level = cls._classify_risk(hours_ago)
         time_str = cls._format_time_ago(hours_ago)
         risk_message = f"TAPS spotted {time_str}."
 
+        lot_name = lot.name if lot else sighting.parking_lot_name
+        lot_code = lot.code if lot else sighting.parking_lot_code
+        lot_id = lot.id if lot else sighting.parking_lot_id
+
         return PredictionResponse(
             risk_level=risk_level,
             risk_message=risk_message,
-            last_sighting_lot_name=lot.name,
-            last_sighting_lot_code=lot.code,
+            last_sighting_lot_name=lot_name,
+            last_sighting_lot_code=lot_code,
             last_sighting_at=sighting.reported_at,
             hours_since_last_sighting=round(hours_ago, 2),
-            parking_lot_id=lot.id,
-            parking_lot_name=lot.name,
-            parking_lot_code=lot.code,
+            parking_lot_id=lot_id,
+            parking_lot_name=lot_name,
+            parking_lot_code=lot_code,
             probability=_RISK_TO_PROBABILITY[risk_level],
             predicted_for=now,
             confidence=0.0,

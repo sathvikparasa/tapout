@@ -13,3 +13,5 @@ env_variables:
   UCD_EMAIL_DOMAIN: "ucdavis.edu"
   ACCESS_TOKEN_EXPIRE_HOURS: "87600"
   PARKING_REMINDER_HOURS: "3"
+  # GCP_PROJECT must be set explicitly — dev project starts with 'tapout-dev'
+  # DATABASE_URL is no longer used (migrated to Firestore)

@@ -1,49 +1,44 @@
-"""
-ParkingSession model tracking when users park at and leave lots.
-"""
-
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-
-from app.database import Base
+"""ParkingSession model for Firestore."""
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Optional
 
 
-class ParkingSession(Base):
-    """
-    Represents a parking session - from when a user parks until they leave.
+@dataclass
+class ParkingSession:
+    id: str
+    device_id: str
+    parking_lot_id: int
+    parking_lot_name: str
+    parking_lot_code: str
+    checked_in_at: datetime
+    is_active: bool = True
+    checked_out_at: Optional[datetime] = None
+    reminder_sent: bool = False
 
-    A session is "active" if checked_out_at is NULL, meaning the user
-    is still parked and should receive TAPS notifications.
+    @classmethod
+    def from_dict(cls, data: dict, doc_id: str = "") -> "ParkingSession":
+        return cls(
+            id=doc_id or data.get("id", ""),
+            device_id=data.get("device_id", ""),
+            parking_lot_id=data.get("parking_lot_id", 0),
+            parking_lot_name=data.get("parking_lot_name", ""),
+            parking_lot_code=data.get("parking_lot_code", ""),
+            checked_in_at=data.get("checked_in_at", datetime.now(timezone.utc)),
+            is_active=data.get("is_active", True),
+            checked_out_at=data.get("checked_out_at"),
+            reminder_sent=data.get("reminder_sent", False),
+        )
 
-    Attributes:
-        id: Primary key
-        device_id: FK to the device that created this session
-        parking_lot_id: FK to the parking lot
-        checked_in_at: When the user parked
-        checked_out_at: When the user left (NULL if still parked)
-        reminder_sent: Whether the 3-hour reminder was sent
-        is_active: Computed property - True if user is still parked
-    """
-
-    __tablename__ = "parking_sessions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, index=True)
-    parking_lot_id = Column(Integer, ForeignKey("parking_lots.id"), nullable=False, index=True)
-    checked_in_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    checked_out_at = Column(DateTime(timezone=True), nullable=True)
-    reminder_sent = Column(Boolean, default=False, nullable=False)
-
-    # Relationships
-    device = relationship("Device", back_populates="parking_sessions")
-    parking_lot = relationship("ParkingLot", back_populates="parking_sessions")
-
-    @property
-    def is_active(self) -> bool:
-        """Returns True if the user is still parked (hasn't checked out)."""
-        return self.checked_out_at is None
-
-    def __repr__(self):
-        status = "active" if self.is_active else "checked_out"
-        return f"<ParkingSession(id={self.id}, lot_id={self.parking_lot_id}, status={status})>"
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "device_id": self.device_id,
+            "parking_lot_id": self.parking_lot_id,
+            "parking_lot_name": self.parking_lot_name,
+            "parking_lot_code": self.parking_lot_code,
+            "checked_in_at": self.checked_in_at,
+            "is_active": self.is_active,
+            "checked_out_at": self.checked_out_at,
+            "reminder_sent": self.reminder_sent,
+        }

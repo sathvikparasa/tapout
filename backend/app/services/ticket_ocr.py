@@ -10,8 +10,7 @@ import re
 
 import anthropic
 from PIL import Image
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from google.cloud.firestore_v1 import AsyncClient
 
 from app.config import settings
 from app.models.parking_lot import ParkingLot
@@ -185,12 +184,12 @@ class TicketOCRService:
         return data
 
     @staticmethod
-    async def map_location_to_lot(db: AsyncSession, location_text: str):
+    async def map_location_to_lot(db: AsyncClient, location_text: str) -> ParkingLot | None:
         """
         Map ticket location text to a ParkingLot record.
 
         Args:
-            db: Database session
+            db: Firestore async client
             location_text: Location string from the ticket (e.g. "LOT 15")
 
         Returns:
@@ -202,7 +201,10 @@ class TicketOCRService:
         if lot_code is None:
             return None
 
-        result = await db.execute(
-            select(ParkingLot).where(ParkingLot.code == lot_code)
-        )
-        return result.scalar_one_or_none()
+        # Query all active lots and find the one matching the code
+        lots_stream = db.collection("parking_lots").where("is_active", "==", True).stream()
+        async for doc in lots_stream:
+            lot = ParkingLot.from_dict(doc.to_dict(), doc_id=doc.id)
+            if lot.code == lot_code:
+                return lot
+        return None

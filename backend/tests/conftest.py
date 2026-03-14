@@ -1,28 +1,28 @@
 """
-Test fixtures and configuration for Flask app.
-"""
+Test fixtures using the Firestore emulator via gcloud CLI.
 
-import asyncio
+Start the emulator before running tests:
+    gcloud beta emulators firestore start --host-port=localhost:8080
+
+Then in a separate terminal:
+    cd backend && pytest
+"""
+import os
 import uuid
+import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base
+# Point to Firestore emulator
+os.environ.setdefault("FIRESTORE_EMULATOR_HOST", "localhost:8080")
+os.environ.setdefault("GCP_PROJECT", "tapout-dev-test")
+
 from app.models.parking_lot import ParkingLot
 from app.models.device import Device
 from app.models.parking_session import ParkingSession
-from app.models.taps_sighting import TapsSighting
-from app.models.notification import Notification
-from app.models.vote import Vote
-from app.models.email_otp import EmailOTP
 from app.services.auth import AuthService
-
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture(scope="session")
@@ -33,80 +33,64 @@ def event_loop():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_engine():
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        echo=False,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+async def db():
+    """Firestore async client pointing at emulator."""
+    import firebase_admin
+    from firebase_admin import firestore_async
 
+    # Initialize Firebase app if not already done
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        firebase_admin.initialize_app(options={"projectId": "tapout-dev-test"})
 
-@pytest_asyncio.fixture(scope="function")
-async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    async_session = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
+    client = firestore_async.client(database="warnabrotha")
+    yield client
+
+    # Cleanup: delete all test documents
+    collections = ["devices", "parking_lots", "parking_sessions", "taps_sightings",
+                   "notifications", "votes", "email_otps", "chat_messages"]
+    for col in collections:
+        async for doc in client.collection(col).stream():
+            await doc.reference.delete()
 
 
 @pytest.fixture(scope="function")
-def app(test_engine):
-    """Create Flask test app with overridden database."""
-    import app.database as db_module
+def app(db):
+    """Create Flask test app."""
+    from unittest.mock import patch
     from app.main import create_app
-
-    original_session_local = db_module.AsyncSessionLocal
-    original_engine = db_module.engine
-
-    test_session_factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-    db_module.AsyncSessionLocal = test_session_factory
-    db_module.engine = test_engine
-
     flask_app = create_app()
     flask_app.config["TESTING"] = True
 
-    yield flask_app
-
-    db_module.AsyncSessionLocal = original_session_local
-    db_module.engine = original_engine
+    with patch("app.firestore_db.get_db", return_value=db):
+        yield flask_app
 
 
 @pytest.fixture(scope="function")
 def client(app):
-    """Flask test client."""
     return app.test_client()
 
 
 @pytest_asyncio.fixture
-async def test_parking_lot(db_session: AsyncSession) -> ParkingLot:
-    lot = ParkingLot(name="Test Parking Structure", code="TEST", latitude=38.5382, longitude=-121.7617, is_active=True)
-    db_session.add(lot)
-    await db_session.commit()
-    await db_session.refresh(lot)
+async def test_parking_lot(db) -> ParkingLot:
+    lot = ParkingLot(id=1, name="Test Parking Structure", code="TEST",
+                     latitude=38.5382, longitude=-121.7617, is_active=True)
+    await db.collection("parking_lots").document("1").set(lot.to_dict())
     return lot
 
 
 @pytest_asyncio.fixture
-async def test_device(db_session: AsyncSession) -> Device:
+async def test_device(db) -> Device:
     device = Device(device_id=str(uuid.uuid4()), email_verified=False, is_push_enabled=False)
-    db_session.add(device)
-    await db_session.commit()
-    await db_session.refresh(device)
+    await db.collection("devices").document(device.device_id).set(device.to_dict())
     return device
 
 
 @pytest_asyncio.fixture
-async def verified_device(db_session: AsyncSession) -> Device:
+async def verified_device(db) -> Device:
     device = Device(device_id=str(uuid.uuid4()), email_verified=True, is_push_enabled=False)
-    db_session.add(device)
-    await db_session.commit()
-    await db_session.refresh(device)
+    await db.collection("devices").document(device.device_id).set(device.to_dict())
     return device
 
 
@@ -123,14 +107,17 @@ async def unverified_auth_headers(test_device: Device) -> dict:
 
 
 @pytest_asyncio.fixture
-async def active_session(db_session: AsyncSession, verified_device: Device, test_parking_lot: ParkingLot) -> ParkingSession:
+async def active_session(db, verified_device: Device, test_parking_lot: ParkingLot) -> ParkingSession:
+    ref = db.collection("parking_sessions").document()
     session = ParkingSession(
-        device_id=verified_device.id,
+        id=ref.id,
+        device_id=verified_device.device_id,
         parking_lot_id=test_parking_lot.id,
+        parking_lot_name=test_parking_lot.name,
+        parking_lot_code=test_parking_lot.code,
         checked_in_at=datetime.now(timezone.utc) - timedelta(hours=4),
+        is_active=True,
         reminder_sent=False,
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    await ref.set(session.to_dict())
     return session

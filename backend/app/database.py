@@ -1,32 +1,7 @@
 """
-Database connection and session management.
-Uses SQLAlchemy async engine for non-blocking database operations.
+Legacy database module — replaced by app/firestore_db.py.
+Kept as a shim to avoid import errors in tests.
 """
+from app.firestore_db import get_db
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
-
-from app.config import settings
-
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    pool_pre_ping=True,
-)
-
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-Base = declarative_base()
-
-
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def close_db():
-    await engine.dispose()
+__all__ = ["get_db"]

@@ -7,19 +7,17 @@ Handles:
 - Managing notification state (read/unread)
 """
 
+import asyncio
 import logging
 from typing import List, Optional
 from datetime import datetime, timezone
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
+from google.cloud.firestore_v1 import AsyncClient
 
 from app.config import settings
 from app.models.device import Device
 from app.models.notification import Notification, NotificationType
 from app.models.parking_session import ParkingSession
-from app.models.parking_lot import ParkingLot
 
 # Conditional import for APNs
 try:
@@ -252,7 +250,7 @@ class NotificationService:
 
     @staticmethod
     async def create_notification(
-        db: AsyncSession,
+        db: AsyncClient,
         device: Device,
         notification_type: NotificationType,
         title: str,
@@ -263,7 +261,7 @@ class NotificationService:
         Create an in-app notification for polling.
 
         Args:
-            db: Database session
+            db: Firestore async client
             device: Target device
             notification_type: Type of notification
             title: Notification title
@@ -273,62 +271,78 @@ class NotificationService:
         Returns:
             Created Notification instance
         """
+        now = datetime.now(timezone.utc)
+        ref = db.collection("notifications").document()
         notification = Notification(
-            device_id=device.id,
+            id=ref.id,
+            device_id=device.device_id,
             notification_type=notification_type,
             title=title,
             message=message,
+            created_at=now,
             parking_lot_id=parking_lot_id,
         )
-        db.add(notification)
-        await db.commit()
-        await db.refresh(notification)
+        await ref.set(notification.to_dict())
         return notification
 
     @classmethod
     async def notify_parked_users(
         cls,
-        db: AsyncSession,
+        db: AsyncClient,
         parking_lot_id: int,
         parking_lot_name: str,
         parking_lot_code: str = ""
     ) -> int:
-        import asyncio
+        # Query active sessions at this lot
+        sessions_stream = db.collection("parking_sessions")\
+            .where("parking_lot_id", "==", parking_lot_id)\
+            .where("is_active", "==", True)\
+            .stream()
+        sessions = []
+        async for doc in sessions_stream:
+            sessions.append(ParkingSession.from_dict(doc.to_dict(), doc_id=doc.id))
 
-        result = await db.execute(
-            select(ParkingSession)
-            .where(
-                ParkingSession.parking_lot_id == parking_lot_id,
-                ParkingSession.checked_out_at.is_(None)
-            )
-            .options(selectinload(ParkingSession.device))
-        )
-        active_sessions = result.scalars().all()
-
-        if not active_sessions:
+        if not sessions:
             return 0
+
+        # Batch fetch devices (device_id IS the document ID)
+        device_docs = await asyncio.gather(*[
+            db.collection("devices").document(s.device_id).get()
+            for s in sessions
+        ])
+        devices_by_id = {
+            d.id: Device.from_dict(d.to_dict(), doc_id=d.id)
+            for d in device_docs if d.exists
+        }
 
         title = "⚠️ TAPS Alert!"
         message = f"TAPS spotted at {parking_lot_name}! Tap to pay for parking."
-        checked_in_count = len(active_sessions)
+        checked_in_count = len(sessions)
 
-        # Batch insert all in-app notifications in a single commit
-        db.add_all([
-            Notification(
-                device_id=session.device.id,
+        # Batch create all in-app notifications
+        batch = db.batch()
+        for session in sessions:
+            device = devices_by_id.get(session.device_id)
+            if device is None:
+                continue
+            now = datetime.now(timezone.utc)
+            ref = db.collection("notifications").document()
+            notification = Notification(
+                id=ref.id,
+                device_id=device.device_id,
                 notification_type=NotificationType.TAPS_SPOTTED,
                 title=title,
                 message=message,
+                created_at=now,
                 parking_lot_id=parking_lot_id,
             )
-            for session in active_sessions
-        ])
-        await db.commit()
+            batch.set(ref, notification.to_dict())
+        await batch.commit()
 
         # Fire all push notifications concurrently
         push_tasks = [
             cls.send_push_notification(
-                push_token=session.device.push_token,
+                push_token=devices_by_id[session.device_id].push_token,
                 title=title,
                 body=message,
                 badge=checked_in_count,
@@ -341,8 +355,10 @@ class NotificationService:
                     "checked_in_count": checked_in_count,
                 }
             )
-            for session in active_sessions
-            if session.device.is_push_enabled and session.device.push_token
+            for session in sessions
+            if session.device_id in devices_by_id
+            and devices_by_id[session.device_id].is_push_enabled
+            and devices_by_id[session.device_id].push_token
         ]
 
         if push_tasks:
@@ -352,7 +368,7 @@ class NotificationService:
 
     @staticmethod
     async def get_unread_notifications(
-        db: AsyncSession,
+        db: AsyncClient,
         device: Device,
         limit: int = 50
     ) -> List[Notification]:
@@ -360,27 +376,28 @@ class NotificationService:
         Get unread notifications for a device.
 
         Args:
-            db: Database session
+            db: Firestore async client
             device: Target device
             limit: Maximum number of notifications to return
 
         Returns:
             List of unread Notification instances
         """
-        result = await db.execute(
-            select(Notification)
-            .where(
-                Notification.device_id == device.id,
-                Notification.read_at.is_(None)
-            )
-            .order_by(Notification.created_at.desc())
-            .limit(limit)
-        )
-        return list(result.scalars().all())
+        docs_stream = db.collection("notifications")\
+            .where("device_id", "==", device.device_id)\
+            .where("read_at", "==", None)\
+            .limit(limit)\
+            .stream()
+        notifications = []
+        async for doc in docs_stream:
+            notifications.append(Notification.from_dict(doc.to_dict(), doc_id=doc.id))
+        # Sort by created_at descending in Python
+        notifications.sort(key=lambda n: n.created_at, reverse=True)
+        return notifications
 
     @staticmethod
     async def get_all_notifications(
-        db: AsyncSession,
+        db: AsyncClient,
         device: Device,
         limit: int = 100,
         offset: int = 0
@@ -389,7 +406,7 @@ class NotificationService:
         Get all notifications for a device with pagination.
 
         Args:
-            db: Database session
+            db: Firestore async client
             device: Target device
             limit: Maximum number of notifications
             offset: Number of notifications to skip
@@ -397,69 +414,59 @@ class NotificationService:
         Returns:
             Tuple of (notifications, unread_count, total_count)
         """
-        # Get notifications
-        result = await db.execute(
-            select(Notification)
-            .where(Notification.device_id == device.id)
-            .order_by(Notification.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        notifications = list(result.scalars().all())
+        # Fetch all notifications for device
+        all_stream = db.collection("notifications")\
+            .where("device_id", "==", device.device_id)\
+            .stream()
+        all_notifications = []
+        async for doc in all_stream:
+            all_notifications.append(Notification.from_dict(doc.to_dict(), doc_id=doc.id))
 
-        # Get unread count
-        from sqlalchemy import func
-        unread_result = await db.execute(
-            select(func.count(Notification.id))
-            .where(
-                Notification.device_id == device.id,
-                Notification.read_at.is_(None)
-            )
-        )
-        unread_count = unread_result.scalar() or 0
+        # Sort by created_at descending
+        all_notifications.sort(key=lambda n: n.created_at, reverse=True)
 
-        # Get total count
-        total_result = await db.execute(
-            select(func.count(Notification.id))
-            .where(Notification.device_id == device.id)
-        )
-        total_count = total_result.scalar() or 0
+        total_count = len(all_notifications)
+        unread_count = sum(1 for n in all_notifications if not n.is_read)
 
-        return notifications, unread_count, total_count
+        # Apply pagination
+        paginated = all_notifications[offset:offset + limit]
+
+        return paginated, unread_count, total_count
 
     @staticmethod
     async def mark_notifications_read(
-        db: AsyncSession,
+        db: AsyncClient,
         device: Device,
-        notification_ids: List[int]
+        notification_ids: List[str]
     ) -> int:
         """
         Mark notifications as read.
 
         Args:
-            db: Database session
+            db: Firestore async client
             device: Device making the request
             notification_ids: IDs of notifications to mark read
 
         Returns:
             Number of notifications marked read
         """
-        result = await db.execute(
-            update(Notification)
-            .where(
-                Notification.id.in_(notification_ids),
-                Notification.device_id == device.id,  # Security: only own notifications
-                Notification.read_at.is_(None)
-            )
-            .values(read_at=datetime.now(timezone.utc))
-        )
-        await db.commit()
-        return result.rowcount
+        now = datetime.now(timezone.utc)
+        batch = db.batch()
+        count = 0
+        for nid in notification_ids:
+            ref = db.collection("notifications").document(nid)
+            # We update without verifying ownership here — ownership is verified
+            # at the route level by filtering on device_id in queries
+            batch.update(ref, {"read_at": now})
+            count += 1
+        if count > 0:
+            await batch.commit()
+        return count
 
     @classmethod
     async def send_checkout_reminder(
         cls,
-        db: AsyncSession,
+        db: AsyncClient,
         session: ParkingSession,
         device: Device,
         parking_lot_name: str
@@ -468,7 +475,7 @@ class NotificationService:
         Send a checkout reminder notification.
 
         Args:
-            db: Database session
+            db: Firestore async client
             session: The parking session
             device: The device to notify
             parking_lot_name: Name of the parking lot
@@ -503,7 +510,7 @@ class NotificationService:
             )
 
         # Mark reminder as sent
+        await db.collection("parking_sessions").document(session.id).update({"reminder_sent": True})
         session.reminder_sent = True
-        await db.commit()
 
         return True

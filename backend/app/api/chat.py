@@ -14,11 +14,10 @@ from typing import Optional
 
 import anthropic
 from flask import Blueprint, request, jsonify, abort
-from sqlalchemy import select, delete as sa_delete
 
 from app.api.auth import limiter
 from app.config import settings
-from app.database import AsyncSessionLocal
+from app.firestore_db import get_db
 from app.models.chat_message import ChatMessage
 from app.schemas.chat import ChatListResponse, ChatMessageCreate, ChatMessageResponse
 from app.services.auth import require_verified_device
@@ -109,18 +108,17 @@ def _moderate_sync(content: str) -> tuple[bool, Optional[str]]:
         return True, None
 
 
-async def _moderate_and_flag(msg_id: int, content: str) -> None:
+async def _moderate_and_flag(msg_id: str, content: str) -> None:
     """
     Background task: run moderation.
-    If rejected, delete the message from the DB and bust the cache.
+    If rejected, delete the message from Firestore and bust the cache.
     """
     allowed, reason = await asyncio.to_thread(_moderate_sync, content)
     if not allowed:
-        async with AsyncSessionLocal() as db:
-            await db.execute(sa_delete(ChatMessage).where(ChatMessage.id == msg_id))
-            await db.commit()
+        db = get_db()
+        await db.collection("chat_messages").document(msg_id).delete()
         await cache_delete(_CHAT_CACHE_KEY)
-        logger.info("Message %d flagged post-send: %s", msg_id, reason)
+        logger.info("Message %s flagged post-send: %s", msg_id, reason)
 
 
 def _run_background(coro):
@@ -161,15 +159,20 @@ async def get_messages():
     if cached is not None:
         return jsonify(cached)
 
-    async with AsyncSessionLocal() as db:
-        await require_verified_device(db)
+    db = get_db()
+    await require_verified_device(db)
 
-        query = select(ChatMessage).order_by(ChatMessage.id.asc()).limit(min(limit, 100))
-        result = await db.execute(query)
-        messages = result.scalars().all()
-        data = ChatListResponse(messages=[_to_response(m) for m in messages]).model_dump(mode="json")
-        await cache_set(_CHAT_CACHE_KEY, data, TTL_CHAT)
-        return jsonify(data)
+    messages_stream = db.collection("chat_messages")\
+        .order_by("sent_at")\
+        .limit(min(limit, 100))\
+        .stream()
+    messages = []
+    async for doc in messages_stream:
+        messages.append(ChatMessage.from_dict(doc.to_dict(), doc_id=doc.id))
+
+    data = ChatListResponse(messages=[_to_response(m) for m in messages]).model_dump(mode="json")
+    await cache_set(_CHAT_CACHE_KEY, data, TTL_CHAT)
+    return jsonify(data)
 
 
 @bp.route("/messages", methods=["POST"])
@@ -181,19 +184,24 @@ async def send_message():
     except Exception as e:
         abort(422, description=str(e))
 
-    async with AsyncSessionLocal() as db:
-        await require_verified_device(db)
+    db = get_db()
+    await require_verified_device(db)
 
-        # Persist immediately — client gets a response right away
-        msg = ChatMessage(content=body.content)
-        db.add(msg)
-        await db.commit()
-        await db.refresh(msg)
-        response = _to_response(msg)
+    # Persist immediately — client gets a response right away
+    now = datetime.now(timezone.utc)
+    ref = db.collection("chat_messages").document()
+    msg = ChatMessage(
+        id=ref.id,
+        content=body.content,
+        sent_at=now,
+        is_flagged=False,
+    )
+    await ref.set(msg.to_dict())
+    response = _to_response(msg)
 
-        await cache_delete(_CHAT_CACHE_KEY)
+    await cache_delete(_CHAT_CACHE_KEY)
 
-        # Moderation runs in the background — does not block the response
-        _run_background(_moderate_and_flag(msg.id, body.content))
+    # Moderation runs in the background — does not block the response
+    _run_background(_moderate_and_flag(msg.id, body.content))
 
-        return jsonify(response.model_dump(mode="json")), 201
+    return jsonify(response.model_dump(mode="json")), 201

@@ -225,7 +225,7 @@ class AppViewModel: ObservableObject {
 
     private func startResendCooldown() {
         canResendOTP = false
-        resendCooldown = 30
+        resendCooldown = 60
         resendTimer?.invalidate()
         resendTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             Task { @MainActor in

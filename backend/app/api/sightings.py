@@ -9,11 +9,8 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, request, jsonify, abort
-from sqlalchemy import select, text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from app.database import AsyncSessionLocal
+from app.firestore_db import get_db
 from app.schemas.taps_sighting import TapsSightingCreate, TapsSightingResponse, TapsSightingWithNotifications
 from app.models.taps_sighting import TapsSighting
 from app.models.parking_lot import ParkingLot
@@ -45,14 +42,6 @@ def _run_background(coro):
     threading.Thread(target=_run, daemon=True).start()
 
 
-def _insert_fn(db):
-    try:
-        dialect = db.get_bind().dialect.name
-    except Exception:
-        dialect = "postgresql"
-    return sqlite_insert if dialect == "sqlite" else pg_insert
-
-
 @bp.route("", methods=["POST"])
 async def report_sighting():
     data = request.get_json(force=True, silent=True) or {}
@@ -61,81 +50,91 @@ async def report_sighting():
     except Exception as e:
         abort(422, description=str(e))
 
-    async with AsyncSessionLocal() as db:
-        device = await require_verified_device(db)
+    db = get_db()
+    device = await require_verified_device(db)
 
-        result = await db.execute(select(ParkingLot).where(ParkingLot.id == sighting_data.parking_lot_id))
-        lot = result.scalar_one_or_none()
-        if lot is None:
-            abort(404, description=f"Parking lot {sighting_data.parking_lot_id} not found")
+    lot_doc = await db.collection("parking_lots").document(str(sighting_data.parking_lot_id)).get()
+    if not lot_doc.exists:
+        abort(404, description=f"Parking lot {sighting_data.parking_lot_id} not found")
+    lot = ParkingLot.from_dict(lot_doc.to_dict(), doc_id=lot_doc.id)
 
-        try:
-            await db.execute(text("SELECT pg_advisory_xact_lock(:lot_id)"), {"lot_id": lot.id})
-        except Exception:
-            pass
+    # Rate limit check: find recent sighting at this lot within last 10 minutes
+    rate_limit_cutoff = datetime.now(timezone.utc) - timedelta(minutes=RATE_LIMIT_MINUTES)
+    recent_stream = db.collection("taps_sightings")\
+        .where("parking_lot_id", "==", lot.id)\
+        .where("reported_at", ">=", rate_limit_cutoff)\
+        .stream()
 
-        rate_limit_cutoff = datetime.now(timezone.utc) - timedelta(minutes=RATE_LIMIT_MINUTES)
-        recent_result = await db.execute(
-            select(TapsSighting)
-            .where(TapsSighting.parking_lot_id == lot.id, TapsSighting.reported_at >= rate_limit_cutoff)
-            .order_by(TapsSighting.reported_at.desc())
-            .limit(1)
-        )
-        recent_sighting = recent_result.scalar_one_or_none()
+    recent_sighting = None
+    async for doc in recent_stream:
+        s = TapsSighting.from_dict(doc.to_dict(), doc_id=doc.id)
+        if recent_sighting is None or s.reported_at > recent_sighting.reported_at:
+            recent_sighting = s
 
-        if recent_sighting is not None:
-            stmt = (
-                _insert_fn(db)(Vote)
-                .values(device_id=device.id, sighting_id=recent_sighting.id, vote_type=VoteTypeModel.UPVOTE)
-                .on_conflict_do_update(
-                    index_elements=["device_id", "sighting_id"],
-                    set_={"vote_type": VoteTypeModel.UPVOTE},
-                )
-            )
-            await db.execute(stmt)
-            await db.commit()
-            await cache_delete(f"vote_counts:{recent_sighting.id}")
+    if recent_sighting is not None:
+        # Upsert vote using composite doc ID for uniqueness
+        vote_doc_id = f"{device.device_id}_{recent_sighting.id}"
+        vote_ref = db.collection("votes").document(vote_doc_id)
+        now = datetime.now(timezone.utc)
+        vote_data = {
+            "id": vote_doc_id,
+            "device_id": device.device_id,
+            "sighting_id": recent_sighting.id,
+            "vote_type": VoteTypeModel.UPVOTE.value,
+            "updated_at": now,
+        }
+        existing_vote_doc = await vote_ref.get()
+        if not existing_vote_doc.exists:
+            vote_data["created_at"] = now
+        await vote_ref.set(vote_data, merge=True)
+        await cache_delete(f"vote_counts:{recent_sighting.id}")
 
-            payload = TapsSightingWithNotifications(
-                id=recent_sighting.id,
-                parking_lot_id=lot.id, parking_lot_name=lot.name, parking_lot_code=lot.code,
-                reported_at=recent_sighting.reported_at, notes=recent_sighting.notes,
-                users_notified=0, was_rate_limited=True,
-            )
-            return jsonify(payload.model_dump(mode="json")), 200
-
-        sighting = TapsSighting(
-            parking_lot_id=lot.id,
-            reported_by_device_id=device.id,
-            notes=sighting_data.notes,
-        )
-        db.add(sighting)
-        await db.commit()
-        await db.refresh(sighting)
-
-        await cache_delete(f"lot_stats:{lot.id}", f"prediction:{lot.id}", "prediction:global")
-
-        lot_id = lot.id
-        lot_name = lot.name
-        lot_code = lot.code
-
-        if not _is_weekend():
-            async def _notify():
-                async with AsyncSessionLocal() as bg_db:
-                    await NotificationService.notify_parked_users(
-                        db=bg_db,
-                        parking_lot_id=lot_id,
-                        parking_lot_name=lot_name,
-                        parking_lot_code=lot_code,
-                    )
-            _run_background(_notify())
-
-        return jsonify(TapsSightingWithNotifications(
-            id=sighting.id,
+        payload = TapsSightingWithNotifications(
+            id=recent_sighting.id,
             parking_lot_id=lot.id, parking_lot_name=lot.name, parking_lot_code=lot.code,
-            reported_at=sighting.reported_at, notes=sighting.notes,
-            users_notified=0,
-        ).model_dump(mode="json")), 201
+            reported_at=recent_sighting.reported_at, notes=recent_sighting.notes,
+            users_notified=0, was_rate_limited=True,
+        )
+        return jsonify(payload.model_dump(mode="json")), 200
+
+    # Create new sighting
+    now = datetime.now(timezone.utc)
+    ref = db.collection("taps_sightings").document()
+    sighting = TapsSighting(
+        id=ref.id,
+        parking_lot_id=lot.id,
+        parking_lot_name=lot.name,
+        parking_lot_code=lot.code,
+        reported_at=now,
+        reported_by_device_id=device.device_id,
+        notes=sighting_data.notes,
+    )
+    await ref.set(sighting.to_dict())
+
+    await cache_delete(f"lot_stats:{lot.id}", f"prediction:{lot.id}", "prediction:global")
+
+    lot_id = lot.id
+    lot_name = lot.name
+    lot_code = lot.code
+
+    if not _is_weekend():
+        async def _notify():
+            from app.firestore_db import get_db as _get_db
+            bg_db = _get_db()
+            await NotificationService.notify_parked_users(
+                db=bg_db,
+                parking_lot_id=lot_id,
+                parking_lot_name=lot_name,
+                parking_lot_code=lot_code,
+            )
+        _run_background(_notify())
+
+    return jsonify(TapsSightingWithNotifications(
+        id=sighting.id,
+        parking_lot_id=lot.id, parking_lot_name=lot.name, parking_lot_code=lot.code,
+        reported_at=sighting.reported_at, notes=sighting.notes,
+        users_notified=0,
+    ).model_dump(mode="json")), 201
 
 
 @bp.route("", methods=["GET"])
@@ -144,47 +143,49 @@ async def list_sightings():
     lot_id = request.args.get("lot_id", type=int)
     limit = request.args.get("limit", 50, type=int)
 
-    async with AsyncSessionLocal() as db:
-        await require_verified_device(db)
+    db = get_db()
+    await require_verified_device(db)
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-        query = select(TapsSighting).where(TapsSighting.reported_at >= cutoff)
-        if lot_id is not None:
-            query = query.where(TapsSighting.parking_lot_id == lot_id)
-        query = query.order_by(TapsSighting.reported_at.desc()).limit(limit)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    query = db.collection("taps_sightings").where("reported_at", ">=", cutoff)
+    if lot_id is not None:
+        query = query.where("parking_lot_id", "==", lot_id)
 
-        result = await db.execute(query)
-        sightings = result.scalars().all()
+    sightings = []
+    async for doc in query.stream():
+        sightings.append(TapsSighting.from_dict(doc.to_dict(), doc_id=doc.id))
 
-        lot_ids = {s.parking_lot_id for s in sightings}
-        if lot_ids:
-            lots_result = await db.execute(select(ParkingLot).where(ParkingLot.id.in_(lot_ids)))
-            lots = {lot.id: lot for lot in lots_result.scalars().all()}
-        else:
-            lots = {}
+    # Sort by reported_at descending and apply limit
+    sightings.sort(key=lambda s: s.reported_at, reverse=True)
+    sightings = sightings[:limit]
 
-        return jsonify([
-            TapsSightingResponse.from_sighting(s, lots[s.parking_lot_id].name, lots[s.parking_lot_id].code).model_dump(mode="json")
-            for s in sightings
-        ])
+    return jsonify([
+        TapsSightingResponse.from_sighting(s, s.parking_lot_name, s.parking_lot_code).model_dump(mode="json")
+        for s in sightings
+    ])
 
 
 @bp.route("/latest/<int:lot_id>", methods=["GET"])
 async def get_latest_sighting(lot_id: int):
-    async with AsyncSessionLocal() as db:
-        await require_verified_device(db)
+    db = get_db()
+    await require_verified_device(db)
 
-        lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
-        lot = lot_result.scalar_one_or_none()
-        if lot is None:
-            abort(404, description=f"Parking lot {lot_id} not found")
+    lot_doc = await db.collection("parking_lots").document(str(lot_id)).get()
+    if not lot_doc.exists:
+        abort(404, description=f"Parking lot {lot_id} not found")
+    lot = ParkingLot.from_dict(lot_doc.to_dict(), doc_id=lot_doc.id)
 
-        result = await db.execute(
-            select(TapsSighting).where(TapsSighting.parking_lot_id == lot_id)
-            .order_by(TapsSighting.reported_at.desc()).limit(1)
-        )
-        sighting = result.scalar_one_or_none()
-        if sighting is None:
-            abort(404, description=f"No sightings found at {lot.name}")
+    sightings_stream = db.collection("taps_sightings")\
+        .where("parking_lot_id", "==", lot_id)\
+        .stream()
+    sightings = []
+    async for doc in sightings_stream:
+        sightings.append(TapsSighting.from_dict(doc.to_dict(), doc_id=doc.id))
 
-        return jsonify(TapsSightingResponse.from_sighting(sighting, lot.name, lot.code).model_dump(mode="json"))
+    if not sightings:
+        abort(404, description=f"No sightings found at {lot.name}")
+
+    sightings.sort(key=lambda s: s.reported_at, reverse=True)
+    sighting = sightings[0]
+
+    return jsonify(TapsSightingResponse.from_sighting(sighting, lot.name, lot.code).model_dump(mode="json"))

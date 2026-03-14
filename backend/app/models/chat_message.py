@@ -1,21 +1,32 @@
-"""
-ChatMessage model for the global anonymous chat.
-"""
-
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
-from sqlalchemy.sql import func
-
-from app.database import Base
+"""ChatMessage model for Firestore."""
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Optional
 
 
-class ChatMessage(Base):
-    __tablename__ = "chat_messages"
+@dataclass
+class ChatMessage:
+    id: str
+    content: str
+    sent_at: datetime
+    is_flagged: bool = False
+    flagged_reason: Optional[str] = None
 
-    id = Column(Integer, primary_key=True, index=True)
-    content = Column(Text, nullable=False)
-    sent_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
-    is_flagged = Column(Boolean, default=False, nullable=False)
-    flagged_reason = Column(String(255), nullable=True)
+    @classmethod
+    def from_dict(cls, data: dict, doc_id: str = "") -> "ChatMessage":
+        return cls(
+            id=doc_id or data.get("id", ""),
+            content=data.get("content", ""),
+            sent_at=data.get("sent_at", datetime.now(timezone.utc)),
+            is_flagged=data.get("is_flagged", False),
+            flagged_reason=data.get("flagged_reason"),
+        )
 
-    def __repr__(self):
-        return f"<ChatMessage(id={self.id}, sent_at={self.sent_at})>"
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "content": self.content,
+            "sent_at": self.sent_at,
+            "is_flagged": self.is_flagged,
+            "flagged_reason": self.flagged_reason,
+        }

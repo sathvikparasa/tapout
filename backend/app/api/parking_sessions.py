@@ -5,9 +5,8 @@ Parking sessions API endpoints.
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify, abort
-from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.firestore_db import get_db
 from app.schemas.parking_session import ParkingSessionCreate, ParkingSessionResponse, CheckoutResponse
 from app.models.parking_session import ParkingSession
 from app.models.parking_lot import ParkingLot
@@ -24,101 +23,119 @@ async def check_in():
     except Exception as e:
         abort(422, description=str(e))
 
-    async with AsyncSessionLocal() as db:
-        device = await require_verified_device(db)
+    db = get_db()
+    device = await require_verified_device(db)
 
-        result = await db.execute(select(ParkingLot).where(ParkingLot.id == session_data.parking_lot_id))
-        lot = result.scalar_one_or_none()
-        if lot is None:
-            abort(404, description=f"Parking lot {session_data.parking_lot_id} not found")
-        if not lot.is_active:
-            abort(400, description=f"Parking lot {lot.name} is not currently active")
+    lot_doc = await db.collection("parking_lots").document(str(session_data.parking_lot_id)).get()
+    if not lot_doc.exists:
+        abort(404, description=f"Parking lot {session_data.parking_lot_id} not found")
+    lot = ParkingLot.from_dict(lot_doc.to_dict(), doc_id=lot_doc.id)
+    if not lot.is_active:
+        abort(400, description=f"Parking lot {lot.name} is not currently active")
 
-        existing_result = await db.execute(
-            select(ParkingSession).where(
-                ParkingSession.device_id == device.id,
-                ParkingSession.checked_out_at.is_(None),
-            )
-        )
-        existing_session = existing_result.scalar_one_or_none()
-        if existing_session is not None:
-            existing_lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == existing_session.parking_lot_id))
-            existing_lot = existing_lot_result.scalar_one()
-            abort(400, description=f"You already have an active parking session at {existing_lot.name}. Please check out first.")
+    # Check for existing active session
+    existing_stream = db.collection("parking_sessions")\
+        .where("device_id", "==", device.device_id)\
+        .where("is_active", "==", True)\
+        .limit(1)\
+        .stream()
+    existing_session = None
+    async for doc in existing_stream:
+        existing_session = ParkingSession.from_dict(doc.to_dict(), doc_id=doc.id)
+        break
 
-        session = ParkingSession(device_id=device.id, parking_lot_id=lot.id)
-        db.add(session)
-        await db.commit()
-        await db.refresh(session)
+    if existing_session is not None:
+        existing_lot_doc = await db.collection("parking_lots").document(str(existing_session.parking_lot_id)).get()
+        existing_lot_name = existing_lot_doc.to_dict().get("name", "unknown") if existing_lot_doc.exists else "unknown"
+        abort(400, description=f"You already have an active parking session at {existing_lot_name}. Please check out first.")
 
-        return jsonify(ParkingSessionResponse.from_session(session, lot.name, lot.code).model_dump(mode="json")), 201
+    now = datetime.now(timezone.utc)
+    ref = db.collection("parking_sessions").document()
+    session = ParkingSession(
+        id=ref.id,
+        device_id=device.device_id,
+        parking_lot_id=lot.id,
+        parking_lot_name=lot.name,
+        parking_lot_code=lot.code,
+        checked_in_at=now,
+        is_active=True,
+        reminder_sent=False,
+    )
+    await ref.set(session.to_dict())
+
+    return jsonify(ParkingSessionResponse.from_session(session, lot.name, lot.code).model_dump(mode="json")), 201
 
 
 @bp.route("/checkout", methods=["POST"])
 async def check_out():
-    async with AsyncSessionLocal() as db:
-        device = await require_verified_device(db)
+    db = get_db()
+    device = await require_verified_device(db)
 
-        result = await db.execute(
-            select(ParkingSession).where(
-                ParkingSession.device_id == device.id,
-                ParkingSession.checked_out_at.is_(None),
-            )
-        )
-        session = result.scalar_one_or_none()
-        if session is None:
-            abort(400, description="You don't have an active parking session to check out from")
+    # Find active session
+    session_stream = db.collection("parking_sessions")\
+        .where("device_id", "==", device.device_id)\
+        .where("is_active", "==", True)\
+        .limit(1)\
+        .stream()
+    session = None
+    session_ref = None
+    async for doc in session_stream:
+        session = ParkingSession.from_dict(doc.to_dict(), doc_id=doc.id)
+        session_ref = doc.reference
+        break
 
-        checkout_time = datetime.now(timezone.utc)
-        session.checked_out_at = checkout_time
-        await db.commit()
+    if session is None:
+        abort(400, description="You don't have an active parking session to check out from")
 
-        return jsonify(CheckoutResponse(
-            success=True, message="Successfully checked out",
-            session_id=session.id, checked_out_at=checkout_time,
-        ).model_dump(mode="json"))
+    checkout_time = datetime.now(timezone.utc)
+    await session_ref.update({"checked_out_at": checkout_time, "is_active": False})
+
+    return jsonify(CheckoutResponse(
+        success=True, message="Successfully checked out",
+        session_id=session.id, checked_out_at=checkout_time,
+    ).model_dump(mode="json"))
 
 
 @bp.route("/current", methods=["GET"])
 async def get_current_session():
-    async with AsyncSessionLocal() as db:
-        device = await require_verified_device(db)
+    db = get_db()
+    device = await require_verified_device(db)
 
-        result = await db.execute(
-            select(ParkingSession).where(
-                ParkingSession.device_id == device.id,
-                ParkingSession.checked_out_at.is_(None),
-            )
-        )
-        session = result.scalar_one_or_none()
-        if session is None:
-            return jsonify(None)
+    session_stream = db.collection("parking_sessions")\
+        .where("device_id", "==", device.device_id)\
+        .where("is_active", "==", True)\
+        .limit(1)\
+        .stream()
+    session = None
+    async for doc in session_stream:
+        session = ParkingSession.from_dict(doc.to_dict(), doc_id=doc.id)
+        break
 
-        lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == session.parking_lot_id))
-        lot = lot_result.scalar_one()
-        return jsonify(ParkingSessionResponse.from_session(session, lot.name, lot.code).model_dump(mode="json"))
+    if session is None:
+        return jsonify(None)
+
+    return jsonify(ParkingSessionResponse.from_session(session, session.parking_lot_name, session.parking_lot_code).model_dump(mode="json"))
 
 
 @bp.route("/history", methods=["GET"])
 async def get_session_history():
     limit = request.args.get("limit", 20, type=int)
 
-    async with AsyncSessionLocal() as db:
-        device = await require_verified_device(db)
+    db = get_db()
+    device = await require_verified_device(db)
 
-        result = await db.execute(
-            select(ParkingSession)
-            .where(ParkingSession.device_id == device.id)
-            .order_by(ParkingSession.checked_in_at.desc())
-            .limit(limit)
-        )
-        sessions = result.scalars().all()
+    sessions_stream = db.collection("parking_sessions")\
+        .where("device_id", "==", device.device_id)\
+        .stream()
+    sessions = []
+    async for doc in sessions_stream:
+        sessions.append(ParkingSession.from_dict(doc.to_dict(), doc_id=doc.id))
 
-        lot_ids = {s.parking_lot_id for s in sessions}
-        lots_result = await db.execute(select(ParkingLot).where(ParkingLot.id.in_(lot_ids)))
-        lots = {lot.id: lot for lot in lots_result.scalars().all()}
+    # Sort by checked_in_at descending and apply limit
+    sessions.sort(key=lambda s: s.checked_in_at, reverse=True)
+    sessions = sessions[:limit]
 
-        return jsonify([
-            ParkingSessionResponse.from_session(s, lots[s.parking_lot_id].name, lots[s.parking_lot_id].code).model_dump(mode="json")
-            for s in sessions
-        ])
+    return jsonify([
+        ParkingSessionResponse.from_session(s, s.parking_lot_name, s.parking_lot_code).model_dump(mode="json")
+        for s in sessions
+    ])

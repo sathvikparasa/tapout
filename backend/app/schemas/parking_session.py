@@ -21,7 +21,7 @@ class ParkingSessionCreate(BaseModel):
 
 class ParkingSessionResponse(BaseModel):
     """Schema for parking session response."""
-    id: int
+    id: str
     parking_lot_id: int
     parking_lot_name: str
     parking_lot_code: str
@@ -30,11 +30,8 @@ class ParkingSessionResponse(BaseModel):
     is_active: bool
     reminder_sent: bool
 
-    class Config:
-        from_attributes = True
-
     @classmethod
-    def from_session(cls, session, lot_name: str, lot_code: str):
+    def from_session(cls, session, lot_name: str, lot_code: str) -> "ParkingSessionResponse":
         """Create response from session model with lot details."""
         return cls(
             id=session.id,
@@ -52,7 +49,7 @@ class CheckoutResponse(BaseModel):
     """Schema for checkout response."""
     success: bool
     message: str
-    session_id: int
+    session_id: str
     checked_out_at: datetime
 
     class Config:
@@ -60,7 +57,7 @@ class CheckoutResponse(BaseModel):
             "example": {
                 "success": True,
                 "message": "Successfully checked out",
-                "session_id": 123,
+                "session_id": "abc123def456",
                 "checked_out_at": "2024-01-15T14:30:00Z"
             }
         }

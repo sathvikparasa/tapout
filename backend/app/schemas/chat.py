@@ -23,12 +23,10 @@ class ChatMessageCreate(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
-    id: int
+    id: str
     content: str
     sent_at: datetime
     minutes_ago: int
-
-    model_config = {"from_attributes": True}
 
 
 class ChatListResponse(BaseModel):

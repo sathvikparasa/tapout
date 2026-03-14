@@ -28,14 +28,11 @@ class VoteCreate(BaseModel):
 
 class VoteResponse(BaseModel):
     """Schema for vote response."""
-    id: int
-    sighting_id: int
+    id: str
+    sighting_id: str
     vote_type: VoteType
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class VoteResult(BaseModel):

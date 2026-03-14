@@ -1,41 +1,38 @@
-"""
-TapsSighting model recording when TAPS is spotted at a parking lot.
-"""
-
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, String
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-
-from app.database import Base
+"""TapsSighting model for Firestore."""
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Optional
 
 
-class TapsSighting(Base):
-    """
-    Records a TAPS sighting at a parking lot.
+@dataclass
+class TapsSighting:
+    id: str
+    parking_lot_id: int
+    parking_lot_name: str
+    parking_lot_code: str
+    reported_at: datetime
+    reported_by_device_id: Optional[str] = None
+    notes: Optional[str] = None
 
-    Each sighting triggers notifications to all users currently
-    parked at that lot.
+    @classmethod
+    def from_dict(cls, data: dict, doc_id: str = "") -> "TapsSighting":
+        return cls(
+            id=doc_id or data.get("id", ""),
+            parking_lot_id=data.get("parking_lot_id", 0),
+            parking_lot_name=data.get("parking_lot_name", ""),
+            parking_lot_code=data.get("parking_lot_code", ""),
+            reported_at=data.get("reported_at", datetime.now(timezone.utc)),
+            reported_by_device_id=data.get("reported_by_device_id"),
+            notes=data.get("notes"),
+        )
 
-    Attributes:
-        id: Primary key
-        parking_lot_id: FK to the lot where TAPS was spotted
-        reported_by_device_id: FK to the device that reported (nullable for anonymous)
-        reported_at: When the sighting was reported
-        notes: Optional notes about the sighting
-    """
-
-    __tablename__ = "taps_sightings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    parking_lot_id = Column(Integer, ForeignKey("parking_lots.id"), nullable=False, index=True)
-    reported_by_device_id = Column(Integer, ForeignKey("devices.id"), nullable=True)
-    reported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
-    notes = Column(String(500), nullable=True)
-
-    # Relationships
-    parking_lot = relationship("ParkingLot", back_populates="taps_sightings")
-    reported_by_device = relationship("Device", back_populates="taps_sightings")
-    votes = relationship("Vote", back_populates="sighting", cascade="all, delete-orphan")
-
-    def __repr__(self):
-        return f"<TapsSighting(id={self.id}, lot_id={self.parking_lot_id}, at={self.reported_at})>"
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "parking_lot_id": self.parking_lot_id,
+            "parking_lot_name": self.parking_lot_name,
+            "parking_lot_code": self.parking_lot_code,
+            "reported_at": self.reported_at,
+            "reported_by_device_id": self.reported_by_device_id,
+            "notes": self.notes,
+        }

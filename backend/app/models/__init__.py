@@ -1,25 +1,15 @@
-"""
-SQLAlchemy database models.
-All models inherit from Base for unified table management.
-"""
+"""Firestore-backed data models."""
 
 from app.models.parking_lot import ParkingLot
 from app.models.device import Device
 from app.models.parking_session import ParkingSession
 from app.models.taps_sighting import TapsSighting
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationType
 from app.models.vote import Vote, VoteType
 from app.models.email_otp import EmailOTP
 from app.models.chat_message import ChatMessage
 
 __all__ = [
-    "ParkingLot",
-    "Device",
-    "ParkingSession",
-    "TapsSighting",
-    "Notification",
-    "Vote",
-    "VoteType",
-    "EmailOTP",
-    "ChatMessage",
+    "ParkingLot", "Device", "ParkingSession", "TapsSighting",
+    "Notification", "NotificationType", "Vote", "VoteType", "EmailOTP", "ChatMessage",
 ]

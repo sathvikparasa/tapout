@@ -14,7 +14,7 @@ class FeedSighting(BaseModel):
     Schema for a sighting in the feed.
     Includes vote counts and the current user's vote.
     """
-    id: int
+    id: str
     parking_lot_id: int
     parking_lot_name: str
     parking_lot_code: str
@@ -29,10 +29,9 @@ class FeedSighting(BaseModel):
     minutes_ago: int = Field(..., description="Minutes since the sighting was reported")
 
     class Config:
-        from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 1,
+                "id": "abc123",
                 "parking_lot_id": 1,
                 "parking_lot_name": "Hutchinson Parking Structure",
                 "parking_lot_code": "HUTCH",

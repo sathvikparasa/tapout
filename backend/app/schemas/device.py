@@ -29,15 +29,23 @@ class DeviceUpdate(BaseModel):
 
 class DeviceResponse(BaseModel):
     """Schema for device response."""
-    id: int
+    id: str
     device_id: str
     email_verified: bool
     is_push_enabled: bool
-    created_at: datetime
-    last_seen_at: datetime
+    created_at: Optional[datetime] = None
+    last_seen_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    @classmethod
+    def from_device(cls, device) -> "DeviceResponse":
+        return cls(
+            id=device.device_id,
+            device_id=device.device_id,
+            email_verified=device.email_verified,
+            is_push_enabled=device.is_push_enabled,
+            created_at=device.created_at,
+            last_seen_at=device.last_seen_at,
+        )
 
 
 class EmailVerificationRequest(BaseModel):
