@@ -35,9 +35,7 @@ class EmailService:
             <p style="color: #999; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
             <p style="color: #999; font-size: 12px;">
-                Having trouble? Contact us at
-                <a href="mailto:ucd.tapout@gmail.com" style="color: #666;">ucd.tapout@gmail.com</a>
-                or visit <a href="https://tapoutparking.info" style="color: #666;">tapoutparking.info</a>.
+                Having trouble? Visit <a href="https://tapoutparking.info" style="color: #666;">tapoutparking.info</a>.
             </p>
         </div>
         """

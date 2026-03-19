@@ -196,9 +196,11 @@ def _startup():
         logger.warning("REDIS_HOST not set — caching disabled")
 
     # Database
-    _run_async(init_db())
+    async def _init_and_seed():
+        await init_db()
+        await _seed_initial_data()
+    _run_async(_init_and_seed())
     logger.info("Database initialized")
-    _run_async(_seed_initial_data())
 
     # Scheduler
     scheduler.add_job(_scheduled_reminder_job, "interval", minutes=5, id="checkout_reminder", replace_existing=True)

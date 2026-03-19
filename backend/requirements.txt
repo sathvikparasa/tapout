@@ -3,6 +3,7 @@ flask[async]>=3.0.3
 flask-limiter>=3.5.0
 flask-cors>=4.0.0
 gunicorn>=22.0.0
+uvicorn[standard]>=0.30.0
 
 # Database (Cloud SQL PostgreSQL)
 sqlalchemy==2.0.25

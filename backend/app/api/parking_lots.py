@@ -4,11 +4,11 @@ Parking lots API endpoints.
 
 import math
 import random
-from typing import List
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, abort
+from sqlalchemy import select, func
 
 from app.database import AsyncSessionLocal
 from app.schemas.parking_lot import ParkingLotResponse, ParkingLotWithStats
@@ -55,67 +55,12 @@ def _ghost_parker_count(lot_id: int) -> int:
         return full_count // 2
     return full_count
 
-router = APIRouter(prefix="/lots", tags=["Parking Lots"])
+
+bp = Blueprint("parking_lots", __name__)
 
 
-@router.get(
-    "",
-    response_model=List[ParkingLotResponse],
-    summary="List parking lots",
-    description="Get a list of all active parking lots.",
-)
-async def list_parking_lots(
-    db: AsyncSession = Depends(get_db), _device: Device = Depends(get_current_device)
-):
-    cached = await cache_get("lots:all")
-    if cached is not None:
-        return cached
-
-    result = await db.execute(
-        select(ParkingLot).where(ParkingLot.is_active == True).order_by(ParkingLot.name)
-    )
-    lots = result.scalars().all()
-    data = [
-        ParkingLotResponse.model_validate(lot).model_dump(mode="json") for lot in lots
-    ]
-    await cache_set("lots:all", data, TTL_LOTS_LIST)
-    return data
-
-
-@router.get(
-    "/{lot_id}",
-    response_model=ParkingLotWithStats,
-    summary="Get parking lot details",
-    description="Get detailed information about a specific parking lot including real-time stats.",
-)
-async def get_parking_lot(
-    lot_id: int,
-    db: AsyncSession = Depends(get_db),
-    _device: Device = Depends(get_current_device),
-):
-    cached = await cache_get(f"lot_stats:{lot_id}")
-    if cached is not None:
-        return cached
-
-    result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
-    """
-    Get detailed information about a parking lot.
-
-    Includes:
-    - Basic lot information
-    - Number of currently parked users
-    - Recent sightings count (last hour)
-    - Current TAPS probability prediction
-    """
-    # Get the parking lot
-    result = await db.execute(select(ParkingLot).where(ParkingLot.id == lot_id))
-    lot = result.scalar_one_or_none()
-    if lot is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Parking lot {lot_id} not found",
-        )
-
+async def _build_lot_stats(db, lot) -> dict:
+    lot_id = lot.id
     parkers_result = await db.execute(
         select(func.count(ParkingSession.id)).where(
             ParkingSession.parking_lot_id == lot_id,
