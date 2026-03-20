@@ -20,8 +20,8 @@ email-validator==2.1.0
 # Authentication
 python-jose[cryptography]==3.3.0
 
-# Push notifications (APNs)
-aioapns==3.1
+# Push notifications (APNs) — sync HTTP/2 client via httpx + python-jose
+h2>=4.1.0,<5
 
 # Push notifications (FCM / Android)
 firebase-admin==6.4.0
