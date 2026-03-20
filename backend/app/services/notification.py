@@ -68,6 +68,15 @@ class NotificationService:
                 os.environ.get("APNS_BUNDLE_ID"),
                 "APNS_KEY_CONTENT" in os.environ,
             )
+            logger.warning(
+                "APNs settings at request time: key_id=%r team_id=%r "
+                "key_path=%r bundle_id=%r key_content_set=%s",
+                settings.apns_key_id,
+                settings.apns_team_id,
+                settings.apns_key_path,
+                settings.apns_bundle_id,
+                bool(settings.apns_key_content),
+            )
             if not all([
                 settings.apns_key_id,
                 settings.apns_team_id,
