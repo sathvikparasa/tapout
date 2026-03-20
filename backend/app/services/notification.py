@@ -8,6 +8,7 @@ Handles:
 """
 
 import logging
+import threading
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -21,12 +22,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.parking_session import ParkingSession
 from app.models.parking_lot import ParkingLot
 
-# Conditional import for APNs
-try:
-    from aioapns import APNs, NotificationRequest, PushType
-    APNS_AVAILABLE = True
-except ImportError:
-    APNS_AVAILABLE = False
+from app.services.apns_client import APNsClient
 
 # Conditional import for Firebase (FCM)
 try:
@@ -44,70 +40,62 @@ class NotificationService:
     Service for sending notifications via APNs and in-app polling.
     """
 
-    _apns_client: Optional["APNs"] = None
+    _apns_client: Optional["APNsClient"] = None
+    _apns_lock = threading.Lock()
+    _apns_checked: bool = False  # prevents log flooding on repeated calls when unconfigured
 
     @classmethod
-    def _get_apns_client(cls) -> Optional["APNs"]:
-        """
-        Get or create APNs client instance.
-
-        Returns:
-            APNs client if configured, None otherwise
-        """
-        if not APNS_AVAILABLE:
-            logger.warning("aioapns not available, push notifications disabled")
-            return None
-
+    def _get_apns_client(cls) -> Optional["APNsClient"]:
         if cls._apns_client is not None:
             return cls._apns_client
+        if cls._apns_checked:
+            return None
 
-        # Check if APNs is configured
-        import os
-        logger.warning(
-            "APNs env vars at request time: APNS_KEY_ID=%r APNS_TEAM_ID=%r "
-            "APNS_BUNDLE_ID=%r APNS_KEY_CONTENT_set=%s",
-            os.environ.get("APNS_KEY_ID"),
-            os.environ.get("APNS_TEAM_ID"),
-            os.environ.get("APNS_BUNDLE_ID"),
-            "APNS_KEY_CONTENT" in os.environ,
-        )
-        logger.warning(
-            "APNs settings at request time: key_id=%r team_id=%r "
-            "key_path=%r bundle_id=%r key_content_set=%s",
-            settings.apns_key_id,
-            settings.apns_team_id,
-            settings.apns_key_path,
-            settings.apns_bundle_id,
-            bool(settings.apns_key_content),
-        )
-        if not all([
-            settings.apns_key_id,
-            settings.apns_team_id,
-            settings.apns_key_path,
-            settings.apns_bundle_id,
-        ]):
+        with cls._apns_lock:
+            if cls._apns_client is not None:  # double-checked locking
+                return cls._apns_client
+            if cls._apns_checked:
+                return None
+
+            cls._apns_checked = True  # only log/attempt init once
+
+            import os
             logger.warning(
-                "APNs not fully configured, push notifications disabled. "
-                "key_id=%s team_id=%s key_path=%s bundle_id=%s",
-                bool(settings.apns_key_id),
-                bool(settings.apns_team_id),
-                bool(settings.apns_key_path),
-                bool(settings.apns_bundle_id),
+                "APNs env vars at request time: APNS_KEY_ID=%r APNS_TEAM_ID=%r "
+                "APNS_BUNDLE_ID=%r APNS_KEY_CONTENT_set=%s",
+                os.environ.get("APNS_KEY_ID"),
+                os.environ.get("APNS_TEAM_ID"),
+                os.environ.get("APNS_BUNDLE_ID"),
+                "APNS_KEY_CONTENT" in os.environ,
             )
-            return None
+            if not all([
+                settings.apns_key_id,
+                settings.apns_team_id,
+                settings.apns_key_path,
+                settings.apns_bundle_id,
+            ]):
+                logger.warning(
+                    "APNs not fully configured, push notifications disabled. "
+                    "key_id=%s team_id=%s key_path=%s bundle_id=%s",
+                    bool(settings.apns_key_id),
+                    bool(settings.apns_team_id),
+                    bool(settings.apns_key_path),
+                    bool(settings.apns_bundle_id),
+                )
+                return None
 
-        try:
-            cls._apns_client = APNs(
-                key=settings.apns_key_path,
-                key_id=settings.apns_key_id,
-                team_id=settings.apns_team_id,
-                topic=settings.apns_bundle_id,
-                use_sandbox=settings.apns_use_sandbox,
-            )
-            return cls._apns_client
-        except Exception as e:
-            logger.error(f"Failed to initialize APNs client: {e}")
-            return None
+            try:
+                cls._apns_client = APNsClient(
+                    key_path=settings.apns_key_path,
+                    key_id=settings.apns_key_id,
+                    team_id=settings.apns_team_id,
+                    bundle_id=settings.apns_bundle_id,
+                    use_sandbox=settings.apns_use_sandbox,
+                )
+                return cls._apns_client
+            except Exception as e:
+                logger.error(f"Failed to initialize APNs client: {e}")
+                return None
 
     @staticmethod
     def _is_fcm_token(token: str) -> bool:
@@ -165,36 +153,31 @@ class NotificationService:
         time_sensitive: bool = False,
     ) -> bool:
         """Send a push notification via APNs (iOS)."""
+        import asyncio
+
         apns_client = cls._get_apns_client()
         if apns_client is None:
             logger.debug("APNs client not available, skipping push notification")
             return False
 
+        payload = {
+            "aps": {
+                "alert": {"title": title, "body": body},
+                "sound": "default",
+                "badge": badge,
+                # time-sensitive shows above most notification summaries
+                "interruption-level": "time-sensitive" if time_sensitive else "active",
+            },
+            **(data or {}),
+        }
         try:
-            request = NotificationRequest(
+            # Run sync httpx call in a thread to avoid blocking the event loop
+            return await asyncio.to_thread(
+                apns_client.send,
                 device_token=push_token,
-                message={
-                    "aps": {
-                        "alert": {
-                            "title": title,
-                            "body": body,
-                        },
-                        "sound": "default",
-                        "badge": badge,
-                        "interruption-level": "time-sensitive" if time_sensitive else "active",
-                    },
-                    **(data or {}),
-                },
-                push_type=PushType.ALERT,
-                priority=10 if time_sensitive else None,
+                payload=payload,
+                priority=10,  # always 10 for user-facing alert type
             )
-            response = await apns_client.send_notification(request)
-
-            if not response.is_successful:
-                logger.warning(f"APNs push notification failed: {response.description}")
-                return False
-
-            return True
         except Exception as e:
             logger.error(f"Error sending APNs push notification: {e}")
             return False

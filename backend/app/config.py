@@ -103,7 +103,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # If APNS_KEY_CONTENT is provided but APNS_KEY_PATH is not,
-# write the key content to a temp file so aioapns can read it.
+# write the key content to a temp file so APNsClient can read it.
 if settings.apns_key_content and not settings.apns_key_path:
     import tempfile
     _apns_key_file = tempfile.NamedTemporaryFile(

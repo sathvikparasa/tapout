@@ -189,72 +189,93 @@ class TestSendFcm:
 # ---------------------------------------------------------------------------
 
 class TestSendApns:
-    """Tests for APNs sending with aioapns mocked."""
+    """Tests for APNs sending with sync APNsClient mocked."""
 
     @pytest.mark.asyncio
     async def test_send_apns_success(self):
         """Successful APNs send returns True."""
-        mock_response = MagicMock()
-        mock_response.is_successful = True
+        mock_client = MagicMock()
+        mock_client.send.return_value = True
 
-        mock_client = AsyncMock()
-        mock_client.send_notification = AsyncMock(return_value=mock_response)
-
-        with patch.object(
-            NotificationService, "_get_apns_client", return_value=mock_client
-        ):
+        with patch.object(NotificationService, "_get_apns_client", return_value=mock_client):
             result = await NotificationService._send_apns(
                 "a1b2c3d4" * 8, "Title", "Body"
             )
 
-            assert result is True
-            mock_client.send_notification.assert_called_once()
+        assert result is True
+        mock_client.send.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_send_apns_failure_response(self):
-        """APNs returns unsuccessful → returns False."""
-        mock_response = MagicMock()
-        mock_response.is_successful = False
-        mock_response.description = "BadDeviceToken"
+        """APNs client returns False → _send_apns returns False."""
+        mock_client = MagicMock()
+        mock_client.send.return_value = False
 
-        mock_client = AsyncMock()
-        mock_client.send_notification = AsyncMock(return_value=mock_response)
-
-        with patch.object(
-            NotificationService, "_get_apns_client", return_value=mock_client
-        ):
+        with patch.object(NotificationService, "_get_apns_client", return_value=mock_client):
             result = await NotificationService._send_apns(
                 "a1b2c3d4" * 8, "Title", "Body"
             )
 
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_apns_no_client(self):
         """APNs not configured (client is None) → returns False."""
-        with patch.object(
-            NotificationService, "_get_apns_client", return_value=None
-        ):
+        with patch.object(NotificationService, "_get_apns_client", return_value=None):
             result = await NotificationService._send_apns(
                 "a1b2c3d4" * 8, "Title", "Body"
             )
 
-            assert result is False
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_send_apns_exception(self):
-        """APNs send raises exception → returns False."""
-        mock_client = AsyncMock()
-        mock_client.send_notification = AsyncMock(side_effect=Exception("conn error"))
+        """APNs send raises network exception → returns False."""
+        mock_client = MagicMock()
+        mock_client.send.side_effect = Exception("conn error")
 
-        with patch.object(
-            NotificationService, "_get_apns_client", return_value=mock_client
-        ):
+        with patch.object(NotificationService, "_get_apns_client", return_value=mock_client):
             result = await NotificationService._send_apns(
                 "a1b2c3d4" * 8, "Title", "Body"
             )
 
-            assert result is False
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_send_apns_always_uses_priority_10(self):
+        """_send_apns always passes priority=10 regardless of time_sensitive flag."""
+        mock_client = MagicMock()
+        mock_client.send.return_value = True
+
+        with patch.object(NotificationService, "_get_apns_client", return_value=mock_client):
+            await NotificationService._send_apns("a1b2c3d4" * 8, "T", "B", time_sensitive=False)
+            await NotificationService._send_apns("a1b2c3d4" * 8, "T", "B", time_sensitive=True)
+
+        for call in mock_client.send.call_args_list:
+            assert call.kwargs["priority"] == 10
+
+    @pytest.mark.asyncio
+    async def test_get_apns_client_constructor_failure_returns_none(self):
+        """APNsClient constructor raises → _get_apns_client returns None, _send_apns returns False."""
+        # Reset singleton state for this test
+        NotificationService._apns_client = None
+        NotificationService._apns_checked = False
+
+        with patch("app.services.notification.APNsClient", side_effect=Exception("bad key")), \
+             patch("app.services.notification.settings") as mock_settings:
+            mock_settings.apns_key_id = "KID"
+            mock_settings.apns_team_id = "TID"
+            mock_settings.apns_key_path = "/fake/key.p8"
+            mock_settings.apns_bundle_id = "com.test.app"
+            mock_settings.apns_use_sandbox = True
+
+            result = await NotificationService._send_apns("a1b2c3d4" * 8, "T", "B")
+
+        assert result is False
+
+        # Cleanup singleton for subsequent tests
+        NotificationService._apns_client = None
+        NotificationService._apns_checked = False
 
 
 # ---------------------------------------------------------------------------
