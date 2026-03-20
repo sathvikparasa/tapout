@@ -9,6 +9,7 @@ Handles:
 
 import logging
 import threading
+import asyncio
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -104,6 +105,7 @@ class NotificationService:
                 return cls._apns_client
             except Exception as e:
                 logger.error(f"Failed to initialize APNs client: {e}")
+                cls._apns_client = None
                 return None
 
     @staticmethod
@@ -162,8 +164,6 @@ class NotificationService:
         time_sensitive: bool = False,
     ) -> bool:
         """Send a push notification via APNs (iOS)."""
-        import asyncio
-
         apns_client = cls._get_apns_client()
         if apns_client is None:
             logger.debug("APNs client not available, skipping push notification")
@@ -212,8 +212,6 @@ class NotificationService:
             return False
 
         try:
-            import asyncio
-
             # FCM data values must all be strings
             str_data = {k: str(v) for k, v in (data or {}).items()}
 

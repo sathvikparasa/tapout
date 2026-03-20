@@ -261,7 +261,7 @@ class TestSendApns:
         NotificationService._apns_client = None
         NotificationService._apns_checked = False
         try:
-            with patch("app.services.notification.APNsClient", side_effect=Exception("bad key")), \
+            with patch("app.services.notification.APNsClient", side_effect=Exception("bad key")) as mock_apns_client, \
                  patch("app.services.notification.settings") as mock_settings:
                 mock_settings.apns_key_id = "KID"
                 mock_settings.apns_team_id = "TID"
@@ -272,6 +272,7 @@ class TestSendApns:
                 result = await NotificationService._send_apns("a1b2c3d4" * 8, "T", "B")
 
             assert result is False
+            mock_apns_client.assert_called_once()
         finally:
             # Cleanup singleton for subsequent tests
             NotificationService._apns_client = None
